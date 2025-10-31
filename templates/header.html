@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{title}} - StockFake</title>
+    <link rel="stylesheet" href="/era-themes.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Courier New', monospace;
+            background-color: #1a1a1a;
+            color: #00ff00;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        h1 {
+            text-align: center;
+            margin-bottom: 20px;
+            color: #00ff00;
+            text-shadow: 0 0 10px #00ff00;
+        }
+        .nav {
+            text-align: center;
+            margin-bottom: 20px;
+            padding: 10px;
+            background-color: #000;
+            border: 2px solid #00ff00;
+        }
+        .nav a {
+            color: #00ff00;
+            margin: 0 10px;
+            text-decoration: none;
+            padding: 5px 10px;
+            display: inline-block;
+        }
+        .nav a:hover {
+            background-color: #003300;
+            text-decoration: underline;
+        }
+        .nav a.active {
+            background-color: #004400;
+            border: 1px solid #00ff00;
+        }
+        {{additionalStyles}}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>{{pageTitle}}</h1>
+        <div class="nav">
+            <a href="/">🏠 Portal</a> |
+            <a href="/bank">🏦 Bank</a> |
+            <a href="/trading">📈 Trading</a> |
+            <a href="/indexfunds">📊 Index Funds</a> |
+            <a href="/graphs">📉 Charts</a> |
+            <a href="/loans">💰 Loans</a> |
+            <a href="/taxes">📑 Taxes</a> |
+            <a href="/news">📰 News</a> |
+            <a href="/email">📧 Email</a>
+        </div>
