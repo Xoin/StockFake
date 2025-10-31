@@ -258,6 +258,35 @@ body.era-1990s button:active {
     border-style: inset !important;
 }
 
+body.era-1990s .nav-badge {
+    background-color: #ff0000 !important;
+    color: #ffffff !important;
+}
+
+body.era-1990s .news-date,
+body.era-1990s .news-headline,
+body.era-1990s .news-body {
+    color: #000000 !important;
+}
+
+body.era-1990s .stock-link {
+    color: #0000ff !important;
+}
+
+body.era-1990s .message {
+    color: #000000 !important;
+}
+
+body.era-1990s .error {
+    color: #ff0000 !important;
+    background-color: #ffe0e0 !important;
+}
+
+body.era-1990s .success {
+    color: #008000 !important;
+    background-color: #e0ffe0 !important;
+}
+
 /* 2000s: Web 2.0 (gradients, rounded corners, shadows) */
 body.era-2000s {
     font-family: 'Verdana', 'Arial', sans-serif;

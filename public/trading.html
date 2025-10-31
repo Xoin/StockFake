@@ -246,9 +246,19 @@
         async function loadAccountData() {
             try {
                 const response = await fetch('/api/account');
+                if (!response.ok) {
+                    throw new Error('Failed to load account data');
+                }
                 currentAccountData = await response.json();
             } catch (error) {
                 console.error('Error loading account data:', error);
+                // Display warning to user
+                const affordInfo = document.getElementById('affordabilityInfo');
+                if (affordInfo) {
+                    affordInfo.style.display = 'block';
+                    affordInfo.className = 'affordability-info cannot-afford';
+                    affordInfo.innerHTML = '⚠ Unable to load account data. Please refresh the page.';
+                }
             }
         }
         

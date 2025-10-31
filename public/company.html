@@ -515,9 +515,13 @@
             const canvas = document.getElementById('stockChart');
             const ctx = canvas.getContext('2d');
             
-            // Set canvas size
-            canvas.width = canvas.offsetWidth;
-            canvas.height = canvas.offsetHeight;
+            // Set canvas size only if it changed
+            const newWidth = canvas.offsetWidth;
+            const newHeight = canvas.offsetHeight;
+            if (canvas.width !== newWidth || canvas.height !== newHeight) {
+                canvas.width = newWidth;
+                canvas.height = newHeight;
+            }
             
             if (stockHistory.length === 0) {
                 ctx.fillStyle = '#00aa00';
