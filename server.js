@@ -234,6 +234,10 @@ app.get('/company/:symbol', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'company.html'));
 });
 
+app.get('/indexfund', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'indexfund.html'));
+});
+
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
