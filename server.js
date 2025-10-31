@@ -1669,6 +1669,11 @@ app.post('/api/indexfunds/trade', (req, res) => {
   const tradingFee = getTradingFee(totalCost, gameTime);
   
   if (action === 'buy') {
+    // Validate symbol to prevent prototype pollution
+    if (typeof symbol !== 'string' || symbol === '__proto__' || symbol === 'constructor' || symbol === 'prototype') {
+      return res.status(400).json({ error: 'Invalid symbol' });
+    }
+    
     const totalWithFee = totalCost + tradingFee;
     
     if (userAccount.cash < totalWithFee) {
@@ -1715,6 +1720,11 @@ app.post('/api/indexfunds/trade', (req, res) => {
     }
     
   } else if (action === 'sell') {
+    // Validate symbol to prevent prototype pollution
+    if (typeof symbol !== 'string' || symbol === '__proto__' || symbol === 'constructor' || symbol === 'prototype') {
+      return res.status(400).json({ error: 'Invalid symbol' });
+    }
+    
     const holding = userAccount.indexFundHoldings[symbol];
     if (!holding || holding.shares < shares) {
       return res.status(400).json({ error: 'Insufficient shares' });
