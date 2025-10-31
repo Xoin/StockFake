@@ -87,6 +87,10 @@ app.get('/graphs', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'graphs.html'));
 });
 
+app.get('/company/:symbol', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'company.html'));
+});
+
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
@@ -94,6 +98,7 @@ app.get('/', (req, res) => {
 // Stock data API
 const stocks = require('./data/stocks');
 const emailGenerator = require('./data/emails');
+const companies = require('./data/companies');
 
 app.get('/api/stocks', (req, res) => {
   res.json(stocks.getStockData(gameTime));
@@ -149,6 +154,28 @@ app.get('/api/market/index', (req, res) => {
   }
   
   res.json(history);
+});
+
+// Company information API
+app.get('/api/companies/:symbol', (req, res) => {
+  const { symbol } = req.params;
+  const companyInfo = companies.getCompanyInfoAtTime(symbol, gameTime);
+  
+  if (!companyInfo) {
+    return res.status(404).json({ error: 'Company not found' });
+  }
+  
+  res.json(companyInfo);
+});
+
+app.get('/api/companies', (req, res) => {
+  const allCompanies = companies.getAllCompanies();
+  const companiesInfo = allCompanies.map(symbol => ({
+    symbol,
+    info: companies.getCompanyInfoAtTime(symbol, gameTime)
+  })).filter(c => c.info && c.info.isAvailable);
+  
+  res.json(companiesInfo);
 });
 
 // News API

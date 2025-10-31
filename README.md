@@ -11,9 +11,17 @@ A stock trading game that uses historical stock data. The server starts in 1970 
   - 120+ stocks available in 1970, expanding to 200+ by 2020
   - Includes companies across all major sectors: Technology, Energy, Finance, Healthcare, Retail, and more
 - **Minor Price Fluctuations**: Stock prices include realistic ±2% fluctuations between data points
-- **Four Simulated Websites**:
+- **Company Information Pages**: Detailed company profiles including:
+  - Products and services with introduction dates
+  - Intellectual property (patents and trademarks)
+  - Financial information (revenue, net income, assets)
+  - Employee headcount over time
+  - Company history and headquarters
+- **Five Simulated Websites**:
   - 🏦 **Bank**: View your cash balance and stock portfolio
-  - 📈 **Trading Platform**: Buy and sell stocks during market hours
+  - 📈 **Trading Platform**: Buy and sell stocks during market hours, with links to company details
+  - 🏢 **Company Pages**: View detailed information about individual companies
+  - 📊 **Market Graphs**: Charts and market trends
   - 📰 **News**: Historical news limited to major events (Apollo 13, Nixon resigns, Oil Crisis, etc.)
   - 📧 **Email**: Notifications and messages
 
@@ -69,6 +77,8 @@ Stock availability changes over time - for example, Apple becomes available in 1
 - `GET /api/time` - Get current game time and market status
 - `GET /api/stocks` - Get all stock prices
 - `GET /api/stocks/:symbol` - Get specific stock price
+- `GET /api/companies` - Get all available companies
+- `GET /api/companies/:symbol` - Get detailed company information
 - `GET /api/news` - Get historical news up to current time
 - `GET /api/account` - Get user account info
 - `POST /api/trade` - Place a trade (buy/sell)
