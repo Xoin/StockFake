@@ -98,54 +98,20 @@
         <div class="pagination-controls-container"></div>
     </div>
     
-    <script>
-        // Helper function to escape HTML
-        function escapeHtml(text) {
-            const div = document.createElement('div');
-            div.textContent = text;
-            return div.innerHTML;
-        }
-        
-        async function updateNews() {
-            const response = await fetch('/api/news');
-            const news = await response.json();
-            
-            const container = document.getElementById('newsContainer');
-            
-            if (news.length === 0) {
-                container.innerHTML = '<div class="no-news">No news available yet. Major events will appear as time progresses.</div>';
-            } else {
-                container.innerHTML = news.map(item => `
-                    <div class="news-item">
-                        <div class="news-date">${new Date(item.date).toLocaleDateString()}</div>
-                        <div class="news-headline">${escapeHtml(item.headline)}</div>
-                        <div class="news-body">${escapeHtml(item.body)}</div>
-                    </div>
-                `).join('');
-            }
-        }
-        
-        async function updateTime() {
-            const response = await fetch('/api/time');
-            const data = await response.json();
-            const date = new Date(data.currentTime);
-            document.getElementById('timeDisplay').textContent = `Current Game Time: ${date.toLocaleString()}`;
-        }
-        
-        updateNews();
-        updateTime();
-        setInterval(updateNews, 5000);
-        setInterval(updateTime, 1000);
-    </script>
     <script src="common.js"></script>
     <script>
-        let newsPaginator;
+        let paginator;
         let allNews = [];
         
+        // Pagination render function - used by pagination controls in common.js
+        function renderPage() {
+            renderNewsPage();
+        }
+        
         async function renderNewsPage() {
-            if (!newsPaginator) return;
+            if (!paginator) return;
             
-            const pageNews = newsPaginator.getCurrentPageItems();
+            const pageNews = paginator.getCurrentPageItems();
             const container = document.getElementById('newsContainer');
             
             if (pageNews.length === 0 && allNews.length === 0) {
@@ -165,7 +131,7 @@
             // Update pagination controls
             const paginationDivs = document.querySelectorAll('.pagination-controls-container');
             paginationDivs.forEach(div => {
-                div.innerHTML = newsPaginator.renderControls();
+                div.innerHTML = paginator.renderControls();
             });
         }
         
@@ -176,8 +142,15 @@
             // Update localStorage with current count (mark as viewed)
             localStorage.setItem('lastNewsCount', allNews.length);
             
-            newsPaginator = new Paginator(allNews, 10);
+            paginator = new Paginator(allNews, 10);
             renderNewsPage();
+        }
+        
+        async function updateTime() {
+            const response = await fetch('/api/time');
+            const data = await response.json();
+            const date = new Date(data.currentTime);
+            document.getElementById('timeDisplay').textContent = `Current Game Time: ${date.toLocaleString()}`;
         }
         
         async function updateEraTheme() {
