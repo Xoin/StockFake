@@ -125,10 +125,69 @@ const LONG_TERM_TAX_RATE = 0.15; // 15% for holdings >= 1 year
 const DIVIDEND_TAX_RATE = 0.15; // 15% on dividends
 
 // Dividend data (quarterly payouts per share)
+// Companies with consistent dividend history
 const dividendRates = {
-  'IBM': 0.50,   // $0.50 per share per quarter
-  'XOM': 0.40,   // $0.40 per share per quarter
-  'GE': 0.35     // $0.35 per share per quarter
+  // Technology (many tech companies don't pay dividends or started recently)
+  'IBM': 0.50, 'AAPL': 0.25, 'MSFT': 0.30, 'INTC': 0.35, 'ORCL': 0.20,
+  'TXN': 0.28, 'QCOM': 0.30, 'CSCO': 0.38, 'HPQ': 0.25,
+  
+  // Energy (typically strong dividend payers)
+  'XOM': 0.45, 'CVX': 0.50, 'BP': 0.40, 'RDS': 0.42, 'TOT': 0.38,
+  'COP': 0.35, 'SLB': 0.25, 'OXY': 0.30,
+  
+  // Industrials
+  'GE': 0.35, 'BA': 0.52, 'CAT': 0.48, 'MMM': 0.60, 'HON': 0.42,
+  'LMT': 0.65, 'UTX': 0.45, 'DE': 0.40, 'EMR': 0.50,
+  
+  // Automotive
+  'GM': 0.38, 'F': 0.35, 'TM': 0.42, 'HMC': 0.35,
+  
+  // Healthcare & Pharmaceuticals
+  'JNJ': 0.55, 'PFE': 0.40, 'MRK': 0.45, 'LLY': 0.42, 'BMY': 0.50,
+  'AMGN': 0.48, 'GILD': 0.35, 'UNH': 0.30, 'CVS': 0.25, 'ABT': 0.45,
+  'MDT': 0.38, 'TMO': 0.15, 'ABBV': 0.65,
+  
+  // Financial Services (major dividend payers)
+  'JPM': 0.45, 'BAC': 0.40, 'WFC': 0.42, 'C': 0.38, 'GS': 0.50,
+  'MS': 0.45, 'AXP': 0.40, 'BLK': 0.52, 'SCHW': 0.25, 'USB': 0.42,
+  'PNC': 0.48, 'TFC': 0.45,
+  
+  // Insurance
+  'BRK.B': 0, 'AIG': 0.35, 'MET': 0.48, 'PRU': 0.52, 'ALL': 0.50,
+  'TRV': 0.55, 'PGR': 0.30,
+  
+  // Retail
+  'WMT': 0.55, 'HD': 0.50, 'LOW': 0.48, 'TGT': 0.45, 'COST': 0.35,
+  'KR': 0.30,
+  
+  // Consumer Goods (strong dividend history)
+  'PG': 0.60, 'KO': 0.42, 'PEP': 0.45, 'PM': 0.65, 'MO': 0.70,
+  'CL': 0.48, 'KMB': 0.52, 'GIS': 0.50, 'K': 0.48, 'CPB': 0.45,
+  'HSY': 0.42, 'MCD': 0.52, 'SBUX': 0.25, 'NKE': 0.28,
+  
+  // Telecom (high dividends)
+  'T': 0.52, 'VZ': 0.55, 'TMUS': 0, 'CTL': 0.25,
+  
+  // Media & Entertainment
+  'DIS': 0, 'CMCSA': 0.38, 'TWX': 0.40, 'FOXA': 0.35, 'VIAB': 0.42,
+  
+  // Chemicals & Materials
+  'DOW': 0.45, 'DD': 0.42, 'ECL': 0.35, 'APD': 0.52, 'PPG': 0.48,
+  'NEM': 0.30, 'FCX': 0.25,
+  
+  // Utilities (highest dividend payers)
+  'NEE': 0.55, 'DUK': 0.58, 'SO': 0.60, 'D': 0.52, 'EXC': 0.48,
+  'AEP': 0.55,
+  
+  // Transportation
+  'UPS': 0.52, 'FDX': 0.30, 'UNP': 0.48, 'NSC': 0.50, 'CSX': 0.45,
+  
+  // Real Estate (REITs typically pay high dividends)
+  'AMT': 0.60, 'PLD': 0.55, 'CCI': 0.62, 'SPG': 0.70,
+  
+  // Other major dividend payers
+  'ADM': 0.45, 'BG': 0.40, 'TSN': 0.38, 'CLX': 0.50, 'EL': 0.30,
+  'IP': 0.40, 'WY': 0.45, 'NUE': 0.42, 'AA': 0.35
 };
 
 // Track last dividend payout

@@ -1,35 +1,27 @@
 // Historical stock data with simulated fluctuations
-// Starting prices for major stocks in 1970
+// Data for 200+ major companies from 1970 to current day
 
-const historicalData = {
-  'IBM': [
-    { date: new Date('1970-01-01'), price: 22.50 },
-    { date: new Date('1970-06-01'), price: 24.30 },
-    { date: new Date('1971-01-01'), price: 26.80 },
-    { date: new Date('1972-01-01'), price: 30.50 },
-    { date: new Date('1973-01-01'), price: 28.20 },
-    { date: new Date('1974-01-01'), price: 25.10 },
-    { date: new Date('1975-01-01'), price: 32.50 }
-  ],
-  'XOM': [ // Exxon (was Esso)
-    { date: new Date('1970-01-01'), price: 18.75 },
-    { date: new Date('1970-06-01'), price: 19.20 },
-    { date: new Date('1971-01-01'), price: 21.30 },
-    { date: new Date('1972-01-01'), price: 23.80 },
-    { date: new Date('1973-01-01'), price: 28.50 },
-    { date: new Date('1974-01-01'), price: 24.30 },
-    { date: new Date('1975-01-01'), price: 26.80 }
-  ],
-  'GE': [ // General Electric
-    { date: new Date('1970-01-01'), price: 16.25 },
-    { date: new Date('1970-06-01'), price: 17.80 },
-    { date: new Date('1971-01-01'), price: 19.50 },
-    { date: new Date('1972-01-01'), price: 22.10 },
-    { date: new Date('1973-01-01'), price: 20.30 },
-    { date: new Date('1974-01-01'), price: 18.60 },
-    { date: new Date('1975-01-01'), price: 24.20 }
-  ]
-};
+const fs = require('fs');
+const path = require('path');
+
+// Load historical stock data
+const historicalStockData = JSON.parse(
+  fs.readFileSync(path.join(__dirname, 'historical-stock-data.json'), 'utf8')
+);
+
+// Convert the loaded data to the format we need
+const historicalData = {};
+const stockNames = {};
+const stockSectors = {};
+
+for (const [symbol, stockInfo] of Object.entries(historicalStockData.data)) {
+  historicalData[symbol] = stockInfo.history.map(entry => ({
+    date: new Date(entry.date),
+    price: entry.price
+  }));
+  stockNames[symbol] = stockInfo.name;
+  stockSectors[symbol] = stockInfo.sector;
+}
 
 // Get interpolated price with minor fluctuations
 function getStockPrice(symbol, currentTime) {
@@ -48,13 +40,9 @@ function getStockPrice(symbol, currentTime) {
     }
   }
   
-  // If before the first data point, use first price
+  // If before the first data point, return null (stock not available yet)
   if (currentTime < stockData[0].date) {
-    return {
-      symbol,
-      price: stockData[0].price,
-      change: 0
-    };
+    return null;
   }
   
   // If after the last data point, use last price
@@ -62,7 +50,9 @@ function getStockPrice(symbol, currentTime) {
     return {
       symbol,
       price: stockData[stockData.length - 1].price,
-      change: 0
+      change: 0,
+      name: getStockName(symbol),
+      sector: getStockSector(symbol)
     };
   }
   
@@ -84,25 +74,33 @@ function getStockPrice(symbol, currentTime) {
     symbol,
     price: parseFloat(price.toFixed(2)),
     change: parseFloat(change.toFixed(2)),
-    name: getStockName(symbol)
+    name: getStockName(symbol),
+    sector: getStockSector(symbol)
   };
 }
 
 function getStockName(symbol) {
-  const names = {
-    'IBM': 'International Business Machines',
-    'XOM': 'Exxon Corporation',
-    'GE': 'General Electric'
-  };
-  return names[symbol] || symbol;
+  return stockNames[symbol] || symbol;
+}
+
+function getStockSector(symbol) {
+  return stockSectors[symbol] || 'Unknown';
 }
 
 function getStockData(currentTime) {
   const symbols = Object.keys(historicalData);
-  return symbols.map(symbol => getStockPrice(symbol, currentTime));
+  return symbols
+    .map(symbol => getStockPrice(symbol, currentTime))
+    .filter(stock => stock !== null); // Filter out stocks not available yet
+}
+
+// Get stocks available at a given time (for filtering)
+function getAvailableStocks(currentTime) {
+  return getStockData(currentTime);
 }
 
 module.exports = {
   getStockPrice,
-  getStockData
+  getStockData,
+  getAvailableStocks
 };
