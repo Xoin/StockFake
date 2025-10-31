@@ -155,6 +155,23 @@ function calculateIndexPrice(fund, currentTime) {
   return averagePrice / 10;
 }
 
+// Calculate percentage change for an index fund from previous day
+function calculatePercentageChange(fund, currentTime) {
+  const price = calculateIndexPrice(fund, currentTime);
+  if (!price) return 0;
+  
+  // Calculate previous day's price for change percentage
+  const previousDay = new Date(currentTime.getTime() - (24 * 60 * 60 * 1000));
+  const previousPrice = calculateIndexPrice(fund, previousDay);
+  
+  // Calculate percentage change
+  if (previousPrice && previousPrice > 0) {
+    return ((price - previousPrice) / previousPrice) * 100;
+  }
+  
+  return 0;
+}
+
 // Get all available index funds at a given time
 function getAvailableIndexFunds(currentTime) {
   return indexFunds
@@ -163,11 +180,14 @@ function getAvailableIndexFunds(currentTime) {
       const price = calculateIndexPrice(fund, currentTime);
       if (!price) return null;
       
+      const change = calculatePercentageChange(fund, currentTime);
+      
       return {
         symbol: fund.symbol,
         name: fund.name,
         description: fund.description,
         price: price,
+        change: change,
         category: fund.category,
         expenseRatio: fund.expenseRatio,
         inceptionDate: fund.inceptionDate,
@@ -187,6 +207,8 @@ function getIndexFundDetails(symbol, currentTime) {
   const price = calculateIndexPrice(fund, currentTime);
   if (!price) return null;
   
+  const change = calculatePercentageChange(fund, currentTime);
+  
   // Get constituent details
   const constituentsWithPrices = fund.constituents
     .map(sym => {
@@ -204,6 +226,7 @@ function getIndexFundDetails(symbol, currentTime) {
     name: fund.name,
     description: fund.description,
     price: price,
+    change: change,
     category: fund.category,
     expenseRatio: fund.expenseRatio,
     inceptionDate: fund.inceptionDate,
