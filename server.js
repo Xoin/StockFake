@@ -59,7 +59,8 @@ app.post('/api/time/pause', (req, res) => {
 
 app.post('/api/time/speed', (req, res) => {
   const { multiplier } = req.body;
-  if (multiplier && multiplier > 0) {
+  // Validate multiplier is a positive number within reasonable bounds
+  if (multiplier && typeof multiplier === 'number' && multiplier > 0 && multiplier <= 86400) {
     timeMultiplier = multiplier;
   }
   res.json({ timeMultiplier });
@@ -103,7 +104,8 @@ app.get('/api/news', (req, res) => {
   res.json(news.getNews(gameTime));
 });
 
-// User account (simple in-memory for now)
+// User account (single global account for this single-player game)
+// In a multi-user environment, this would need to be per-session
 let userAccount = {
   cash: 10000,
   portfolio: {}

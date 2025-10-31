@@ -168,25 +168,32 @@
     <script>
         let stocks = [];
         
+        // Helper function to escape HTML
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+        
         async function updateStocks() {
             const response = await fetch('/api/stocks');
             stocks = await response.json();
             
             const stockSelect = document.getElementById('stockSymbol');
             stockSelect.innerHTML = '<option value="">Select Stock</option>' + 
-                stocks.map(s => `<option value="${s.symbol}">${s.symbol} - ${s.name}</option>`).join('');
+                stocks.map(s => `<option value="${escapeHtml(s.symbol)}">${escapeHtml(s.symbol)} - ${escapeHtml(s.name)}</option>`).join('');
             
             const tbody = document.getElementById('stocksList');
             tbody.innerHTML = stocks.map(stock => `
                 <tr>
-                    <td>${stock.symbol}</td>
-                    <td>${stock.name}</td>
+                    <td>${escapeHtml(stock.symbol)}</td>
+                    <td>${escapeHtml(stock.name)}</td>
                     <td>$${stock.price.toFixed(2)}</td>
                     <td class="${stock.change >= 0 ? 'positive' : 'negative'}">
                         ${stock.change >= 0 ? '+' : ''}${stock.change.toFixed(2)}%
                     </td>
                     <td>
-                        <button onclick="selectStock('${stock.symbol}')" class="buy-btn">Trade</button>
+                        <button onclick="selectStock('${escapeHtml(stock.symbol)}')" class="buy-btn">Trade</button>
                     </td>
                 </tr>
             `).join('');

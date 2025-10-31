@@ -105,6 +105,13 @@
     </div>
     
     <script>
+        // Helper function to escape HTML
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+        
         async function updateEmails() {
             const response = await fetch('/api/emails');
             const emails = await response.json();
@@ -117,11 +124,11 @@
                 container.innerHTML = emails.map((email, index) => `
                     <div class="email-item" onclick="toggleEmail(${index})">
                         <div class="email-header">
-                            <div class="email-from">From: ${email.from}</div>
+                            <div class="email-from">From: ${escapeHtml(email.from)}</div>
                             <div class="email-date">${new Date(email.date).toLocaleString()}</div>
                         </div>
-                        <div class="email-subject">${email.subject}</div>
-                        <div class="email-body" id="email-body-${index}">${email.body}</div>
+                        <div class="email-subject">${escapeHtml(email.subject)}</div>
+                        <div class="email-body" id="email-body-${index}">${escapeHtml(email.body)}</div>
                     </div>
                 `).join('');
             }

@@ -96,6 +96,13 @@
     </div>
     
     <script>
+        // Helper function to escape HTML
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+        
         async function updateNews() {
             const response = await fetch('/api/news');
             const news = await response.json();
@@ -108,8 +115,8 @@
                 container.innerHTML = news.map(item => `
                     <div class="news-item">
                         <div class="news-date">${new Date(item.date).toLocaleDateString()}</div>
-                        <div class="news-headline">${item.headline}</div>
-                        <div class="news-body">${item.body}</div>
+                        <div class="news-headline">${escapeHtml(item.headline)}</div>
+                        <div class="news-body">${escapeHtml(item.body)}</div>
                     </div>
                 `).join('');
             }
