@@ -1,4 +1,5 @@
 // Historical news events - focusing on business/economic events with less public details
+const stocks = require('./stocks');
 
 const newsEvents = [
   // 1970s - Oil Crisis Era
@@ -727,14 +728,12 @@ const newsEvents = [
 ];
 
 // Dynamic news generation based on market movements
-const stocks = require('./stocks');
 
 // Track stock price history for dynamic news generation
 let priceHistory = {};
 let sortedDateCache = []; // Cache of sorted dates for performance
 let dynamicNewsEvents = [];
 let nextDynamicNewsId = 10000; // Start dynamic IDs high to avoid conflicts
-let lastNewsCheckTime = null;
 
 // Thresholds for news generation
 const SIGNIFICANT_MOVE_THRESHOLD = 2.5; // 2.5% single-day move
@@ -774,7 +773,7 @@ function cleanupOldData(currentTime) {
   const timestamps = Object.keys(lastNewsGenerated);
   if (timestamps.length > 500) {
     timestamps.forEach(key => {
-      if (currentTime - lastNewsGenerated[key] > 30 * 24 * 60 * 60 * 1000) { // 30 days
+      if (currentTime.getTime() - lastNewsGenerated[key].getTime() > 30 * 24 * 60 * 60 * 1000) { // 30 days
         delete lastNewsGenerated[key];
       }
     });
@@ -787,9 +786,19 @@ function updatePriceHistory(currentTime) {
   
   if (!priceHistory[dateKey]) {
     priceHistory[dateKey] = {};
-    // Update sorted date cache when adding new date
-    sortedDateCache.push(dateKey);
-    sortedDateCache.sort();
+    // Insert new date in sorted position (dates are typically added chronologically)
+    if (sortedDateCache.length === 0 || dateKey > sortedDateCache[sortedDateCache.length - 1]) {
+      // Most common case: append to end
+      sortedDateCache.push(dateKey);
+    } else {
+      // Less common: insert in sorted position
+      const insertPos = sortedDateCache.findIndex(d => d > dateKey);
+      if (insertPos === -1) {
+        sortedDateCache.push(dateKey);
+      } else {
+        sortedDateCache.splice(insertPos, 0, dateKey);
+      }
+    }
   }
   
   currentStocks.forEach(stock => {
@@ -827,7 +836,7 @@ function generateDynamicNews(currentTime, currentStocks, dateKey) {
     // Check cooldown - use consistent key format
     const movementKey = `stock:${stock.symbol}`;
     const lastNews = lastNewsGenerated[movementKey];
-    if (lastNews && (currentTime - lastNews) < NEWS_COOLDOWN_MS) {
+    if (lastNews && (currentTime.getTime() - lastNews.getTime()) < NEWS_COOLDOWN_MS) {
       return;
     }
     
@@ -972,7 +981,7 @@ function generateSectorNews(currentTime, currentStocks, yesterdayKey) {
       const sectorKey = `sector:${sector}`;
       const lastNews = lastNewsGenerated[sectorKey];
       
-      if (!lastNews || (currentTime - lastNews) >= NEWS_COOLDOWN_MS * 3) { // 3-day cooldown for sectors
+      if (!lastNews || (currentTime.getTime() - lastNews.getTime()) >= NEWS_COOLDOWN_MS * 3) { // 3-day cooldown for sectors
         const newsItem = createSectorNews(sector, avgMove, sectorCounts[sector], currentTime);
         if (newsItem) {
           dynamicNewsEvents.push(newsItem);
@@ -1033,7 +1042,6 @@ function resetDynamicNews() {
   dynamicNewsEvents = [];
   nextDynamicNewsId = 10000;
   lastNewsGenerated = {};
-  lastNewsCheckTime = null;
 }
 
 module.exports = {
