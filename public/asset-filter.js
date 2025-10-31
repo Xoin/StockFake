@@ -10,6 +10,8 @@ class AssetFilter {
             onFilterChange: options.onFilterChange || (() => {}),
             showTypes: options.showTypes !== false,
             showSectors: options.showSectors !== false,
+            showPriceRange: options.showPriceRange !== false,
+            sectorLabel: options.sectorLabel || 'Sector',
             availableTypes: options.availableTypes || ['stocks', 'indexfunds'],
             availableSectors: options.availableSectors || [],
             ...options
@@ -18,7 +20,9 @@ class AssetFilter {
         this.activeFilters = {
             types: new Set(this.options.availableTypes), // All types selected by default
             sectors: new Set(),
-            searchTerm: ''
+            searchTerm: '',
+            priceMin: null,
+            priceMax: null
         };
 
         this.init();
@@ -165,6 +169,48 @@ class AssetFilter {
             .filter-tag .remove:hover {
                 color: #ff0000;
             }
+
+            .price-range-inputs {
+                display: flex;
+                gap: 10px;
+                margin-top: 10px;
+            }
+
+            .price-input {
+                flex: 1;
+                padding: 6px;
+                background-color: #001100;
+                border: 1px solid #00ff00;
+                color: #00ff00;
+                font-family: 'Courier New', monospace;
+                font-size: 0.85em;
+            }
+
+            .price-input::placeholder {
+                color: #006600;
+            }
+
+            .price-input:focus {
+                outline: none;
+                border-color: #00ff00;
+                box-shadow: 0 0 5px #00ff00;
+            }
+
+            .filter-clear-btn {
+                padding: 4px 8px;
+                background-color: #330000;
+                border: 1px solid #ff0000;
+                color: #ff0000;
+                cursor: pointer;
+                font-family: 'Courier New', monospace;
+                font-size: 0.8em;
+                margin-top: 5px;
+                width: 100%;
+            }
+
+            .filter-clear-btn:hover {
+                background-color: #440000;
+            }
         `;
         document.head.appendChild(styles);
     }
@@ -219,7 +265,7 @@ class AssetFilter {
         // Sector Filters
         if (this.options.showSectors && this.options.availableSectors.length > 0) {
             html += '<div class="filter-section">';
-            html += '<h3>Sector</h3>';
+            html += `<h3>${this.options.sectorLabel}</h3>`;
             
             this.options.availableSectors.forEach(sector => {
                 const checked = this.activeFilters.sectors.has(sector) ? 'checked' : '';
@@ -239,6 +285,30 @@ class AssetFilter {
                 `;
             });
             
+            html += '</div>';
+        }
+
+        // Price Range Filter
+        if (this.options.showPriceRange) {
+            html += '<div class="filter-section">';
+            html += '<h3>Price Range</h3>';
+            html += `
+                <div class="price-range-inputs">
+                    <input type="number" 
+                           class="price-input" 
+                           id="priceMin" 
+                           placeholder="Min $"
+                           min="0"
+                           step="0.01">
+                    <input type="number" 
+                           class="price-input" 
+                           id="priceMax" 
+                           placeholder="Max $"
+                           min="0"
+                           step="0.01">
+                </div>
+                <button class="filter-clear-btn" id="clearPriceBtn">Clear Price</button>
+            `;
             html += '</div>';
         }
 
@@ -294,6 +364,38 @@ class AssetFilter {
             });
         });
 
+        // Price range inputs
+        const priceMin = document.getElementById('priceMin');
+        const priceMax = document.getElementById('priceMax');
+        
+        if (priceMin) {
+            priceMin.addEventListener('input', (e) => {
+                const value = parseFloat(e.target.value);
+                this.activeFilters.priceMin = value > 0 ? value : null;
+                this.notifyFilterChange();
+            });
+        }
+        
+        if (priceMax) {
+            priceMax.addEventListener('input', (e) => {
+                const value = parseFloat(e.target.value);
+                this.activeFilters.priceMax = value > 0 ? value : null;
+                this.notifyFilterChange();
+            });
+        }
+
+        // Clear price button
+        const clearPriceBtn = document.getElementById('clearPriceBtn');
+        if (clearPriceBtn) {
+            clearPriceBtn.addEventListener('click', () => {
+                this.activeFilters.priceMin = null;
+                this.activeFilters.priceMax = null;
+                if (priceMin) priceMin.value = '';
+                if (priceMax) priceMax.value = '';
+                this.notifyFilterChange();
+            });
+        }
+
         // Select All button
         const selectAllBtn = document.getElementById('selectAllBtn');
         if (selectAllBtn) {
@@ -320,6 +422,12 @@ class AssetFilter {
                 });
                 this.activeFilters.types.clear();
                 this.activeFilters.sectors.clear();
+                this.activeFilters.priceMin = null;
+                this.activeFilters.priceMax = null;
+                const priceMin = document.getElementById('priceMin');
+                const priceMax = document.getElementById('priceMax');
+                if (priceMin) priceMin.value = '';
+                if (priceMax) priceMax.value = '';
                 this.notifyFilterChange();
             });
         }
@@ -336,7 +444,9 @@ class AssetFilter {
 
         const activeCount = this.activeFilters.types.size + 
                           this.activeFilters.sectors.size + 
-                          (this.activeFilters.searchTerm ? 1 : 0);
+                          (this.activeFilters.searchTerm ? 1 : 0) +
+                          (this.activeFilters.priceMin !== null ? 1 : 0) +
+                          (this.activeFilters.priceMax !== null ? 1 : 0);
 
         if (activeCount === 0) {
             display.innerHTML = '<em style="color: #666;">No active filters</em>';
@@ -381,7 +491,9 @@ class AssetFilter {
         return {
             types: Array.from(this.activeFilters.types),
             sectors: Array.from(this.activeFilters.sectors),
-            searchTerm: this.activeFilters.searchTerm
+            searchTerm: this.activeFilters.searchTerm,
+            priceMin: this.activeFilters.priceMin,
+            priceMax: this.activeFilters.priceMax
         };
     }
 
@@ -428,6 +540,16 @@ class AssetFilter {
             const term = this.activeFilters.searchTerm;
             const searchableText = `${item.symbol || ''} ${item.name || ''}`.toLowerCase();
             if (!searchableText.includes(term)) {
+                return false;
+            }
+        }
+
+        // Check price range
+        if (item.price !== undefined) {
+            if (this.activeFilters.priceMin !== null && item.price < this.activeFilters.priceMin) {
+                return false;
+            }
+            if (this.activeFilters.priceMax !== null && item.price > this.activeFilters.priceMax) {
                 return false;
             }
         }

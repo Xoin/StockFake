@@ -292,10 +292,16 @@
                 
                 // Initialize asset filter if not already done
                 if (!assetFilter) {
+                    // Get unique categories from funds
+                    const categories = [...new Set(allFunds.map(f => f.category).filter(c => c))].sort();
+                    
                     assetFilter = new AssetFilter({
                         containerId: 'filterSidebar',
                         availableTypes: ['indexfunds'],
-                        showSectors: false,
+                        availableSectors: categories,
+                        sectorLabel: 'Category',
+                        showSectors: true,
+                        showPriceRange: true,
                         onFilterChange: (filters) => {
                             filterFunds();
                         }
@@ -316,9 +322,9 @@
         function filterFunds() {
             let filteredFunds = allFunds;
             
-            // Apply asset filter if it exists
+            // Apply asset filter if it exists - map category to sector for filtering
             if (assetFilter) {
-                filteredFunds = allFunds.filter(f => assetFilter.matchesFilter(f));
+                filteredFunds = allFunds.filter(f => assetFilter.matchesFilter({...f, sector: f.category}));
             }
             
             const tbody = document.getElementById('fundsBody');

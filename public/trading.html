@@ -703,10 +703,15 @@
             
             // Initialize asset filter if not already done
             if (!assetFilter) {
+                // Get unique sectors from stocks
+                const sectors = [...new Set(stocks.map(s => s.sector).filter(s => s))].sort();
+                
                 assetFilter = new AssetFilter({
                     containerId: 'filterSidebar',
                     availableTypes: ['stocks'],
-                    showSectors: false,
+                    availableSectors: sectors,
+                    showSectors: true,
+                    showPriceRange: true,
                     onFilterChange: (filters) => {
                         filterStocks();
                     }
