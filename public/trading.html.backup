@@ -5,9 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>StockFake - Trading Platform</title>
     <link rel="stylesheet" href="era-themes.css">
-    <link rel="stylesheet" href="templates.css">
     <script src="header.js"></script>
-    <script src="templates.js"></script>
     <style>
         * {
             margin: 0;
@@ -73,18 +71,6 @@
         }
         th {
             background-color: #003300;
-        }
-        th.sortable {
-            cursor: pointer;
-            user-select: none;
-        }
-        th.sortable:hover {
-            background-color: #004400;
-        }
-        .sort-indicator {
-            display: inline-block;
-            margin-left: 5px;
-            color: #00ff00;
         }
         .positive {
             color: #00ff00;
@@ -282,40 +268,30 @@
             <div id="currentConcentrations" class="current-concentrations"></div>
         </div>
         
-        <div class="layout-with-sidebar">
-            <!-- Filter Sidebar -->
-            <div class="sidebar-container">
-                <div id="filterSidebarContainer"></div>
+        <div class="stocks-container">
+            <h2>Available Stocks</h2>
+            <div style="margin-bottom: 15px;">
+                <input type="text" id="stockSearch" placeholder="Search stocks by symbol or name..." 
+                    style="width: 100%; max-width: 400px; padding: 10px; font-size: 1em;"
+                    oninput="filterStocks()">
             </div>
-            
-            <!-- Main Content -->
-            <div class="content-container">
-                <div class="stocks-container">
-                    <h2>Available Stocks</h2>
-                    <div style="margin-bottom: 15px;">
-                        <input type="text" id="stockSearch" placeholder="Search stocks by symbol or name..." 
-                            style="width: 100%; max-width: 400px; padding: 10px; font-size: 1em;"
-                            oninput="filterStocks()">
-                    </div>
-                    <div class="pagination-controls-container"></div>
-                    <table id="stocksTable">
-                        <thead>
-                            <tr>
-                                <th class="sortable" data-sort-key="symbol">Symbol <span class="sort-indicator"></span></th>
-                                <th class="sortable" data-sort-key="name">Name <span class="sort-indicator"></span></th>
-                                <th class="sortable" data-sort-key="price">Price <span class="sort-indicator"></span></th>
-                                <th class="sortable" data-sort-key="change">Change % <span class="sort-indicator"></span></th>
-                                <th class="sortable" data-sort-key="sharesAvailable">Available <span class="sort-indicator"></span></th>
-                                <th>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody id="stocksList">
-                            <tr><td colspan="6">Loading...</td></tr>
-                        </tbody>
-                    </table>
-                    <div class="pagination-controls-container"></div>
-                </div>
-            </div>
+            <div class="pagination-controls-container"></div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Symbol</th>
+                        <th>Name</th>
+                        <th>Price</th>
+                        <th>Change %</th>
+                        <th>Available</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="stocksList">
+                    <tr><td colspan="6">Loading...</td></tr>
+                </tbody>
+            </table>
+            <div class="pagination-controls-container"></div>
         </div>
         
         <div class="trade-form">
@@ -699,178 +675,8 @@
             filterStocks();
         }
         
-        // Sector data mapping (will be populated from company data)
-        let sectorMap = {};
-        let filterSidebarInstance = null;
-        
-        // Initialize sector filter sidebar
-        async function initializeSectorFilter() {
-            // Fetch company data to get sectors
-            try {
-                const response = await fetch('/api/companies');
-                const companies = await response.json();
-                
-                // Build sector map
-                companies.forEach(company => {
-                    if (company.sector) {
-                        sectorMap[company.symbol] = company.sector;
-                    }
-                });
-                
-                // Count stocks per sector
-                const sectorCounts = {};
-                stocks.forEach(stock => {
-                    const sector = sectorMap[stock.symbol] || 'Other';
-                    sectorCounts[sector] = (sectorCounts[sector] || 0) + 1;
-                });
-                
-                // Create filter options
-                const filterOptions = Object.entries(sectorCounts)
-                    .sort((a, b) => a[0].localeCompare(b[0]))
-                    .map(([sector, count]) => ({
-                        value: sector,
-                        label: sector,
-                        count: count
-                    }));
-                
-                // Create filter sidebar
-                filterSidebarInstance = Templates.createFilterSidebar({
-                    id: 'sectorFilter',
-                    title: 'Filter by Sector',
-                    filters: [{
-                        key: 'sector',
-                        label: 'Sectors',
-                        type: 'checkbox',
-                        options: filterOptions
-                    }],
-                    onFilterChange: (activeFilters) => {
-                        filterStocks();
-                    }
-                });
-                
-                // Store globally for template access
-                window.filterSidebarInstance = filterSidebarInstance;
-                
-                // Render the sidebar
-                const container = document.getElementById('filterSidebarContainer');
-                if (container) {
-                    container.innerHTML = filterSidebarInstance.render();
-                }
-            } catch (error) {
-                console.error('Error initializing sector filter:', error);
-            }
-        }
-        
-        // Filter stocks based on search input and sector filters
-        function filterStocks() {
-            const searchTerm = document.getElementById('stockSearch')?.value.toLowerCase() || '';
-            
-            // Apply search filter
-            let filteredStocks = searchTerm 
-                ? stocks.filter(s => 
-                    s.symbol.toLowerCase().includes(searchTerm) || 
-                    s.name.toLowerCase().includes(searchTerm)
-                  )
-                : stocks;
-            
-            // Apply sector filter
-            if (filterSidebarInstance && filterSidebarInstance.activeFilters.sector && 
-                filterSidebarInstance.activeFilters.sector.length > 0) {
-                filteredStocks = filteredStocks.filter(stock => {
-                    const stockSector = sectorMap[stock.symbol] || 'Other';
-                    return filterSidebarInstance.activeFilters.sector.includes(stockSector);
-                });
-            }
-            
-            // Preserve current page if paginator exists
-            const currentPage = paginator ? paginator.currentPage : 1;
-            
-            // Initialize paginator with filtered data
-            paginator = new Paginator(filteredStocks, 20);
-            
-            // Try to restore the page number if it's still valid
-            if (currentPage <= paginator.totalPages) {
-                paginator.currentPage = currentPage;
-            }
-            
-            renderPage();
-        }
-        
-        // Sorting state
-        let currentSort = { column: null, direction: 'asc' };
-        
-        // Sort stocks by column
-        function sortStocks(columnKey) {
-            if (!stocks || stocks.length === 0) return;
-            
-            // Toggle direction if same column, otherwise default to asc
-            if (currentSort.column === columnKey) {
-                currentSort.direction = currentSort.direction === 'asc' ? 'desc' : 'asc';
-            } else {
-                currentSort.column = columnKey;
-                currentSort.direction = 'asc';
-            }
-            
-            // Sort the stocks array
-            stocks.sort((a, b) => {
-                let aVal = a[columnKey];
-                let bVal = b[columnKey];
-                
-                // Handle different data types
-                if (typeof aVal === 'number' && typeof bVal === 'number') {
-                    return currentSort.direction === 'asc' ? aVal - bVal : bVal - aVal;
-                }
-                
-                // String comparison
-                const aStr = String(aVal).toLowerCase();
-                const bStr = String(bVal).toLowerCase();
-                
-                if (currentSort.direction === 'asc') {
-                    return aStr < bStr ? -1 : aStr > bStr ? 1 : 0;
-                } else {
-                    return bStr < aStr ? -1 : bStr > aStr ? 1 : 0;
-                }
-            });
-            
-            // Update sort indicators
-            updateSortIndicators(columnKey, currentSort.direction);
-            
-            // Re-render with current filters
-            filterStocks();
-        }
-        
-        // Update sort indicators in table headers
-        function updateSortIndicators(activeColumn, direction) {
-            const headers = document.querySelectorAll('#stocksTable th.sortable');
-            headers.forEach(th => {
-                const sortKey = th.dataset.sortKey;
-                const indicator = th.querySelector('.sort-indicator');
-                if (indicator) {
-                    if (sortKey === activeColumn) {
-                        indicator.textContent = direction === 'asc' ? ' ▲' : ' ▼';
-                    } else {
-                        indicator.textContent = '';
-                    }
-                }
-            });
-        }
-        
-        // Initialize sort handlers
-        function initializeSorting() {
-            const headers = document.querySelectorAll('#stocksTable th.sortable');
-            headers.forEach(th => {
-                th.style.cursor = 'pointer';
-                th.addEventListener('click', () => {
-                    const sortKey = th.dataset.sortKey;
-                    if (sortKey) {
-                        sortStocks(sortKey);
-                    }
-                });
-            });
-        }
-        
         // Filter stocks based on search input
-        function filterStocks_OLD() {
+        function filterStocks() {
             const searchTerm = document.getElementById('stockSearch')?.value.toLowerCase() || '';
             const filteredStocks = searchTerm 
                 ? stocks.filter(s => 
@@ -896,10 +702,7 @@
         // Initialize data
         loadAccountData();
         calculateTradingFee();
-        updateStocks().then(() => {
-            initializeSectorFilter();
-            initializeSorting();
-        });
+        updateStocks();
         updateTradeHaltWarning();
         updateNavNotifications(); // Initial update
         setInterval(updateStocks, 2000);

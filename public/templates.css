@@ -1,0 +1,296 @@
+/* Shared template styles for StockFake */
+
+/* Sortable Table Styles */
+.sortable-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.sortable-table th.sortable {
+    cursor: pointer;
+    user-select: none;
+    position: relative;
+    padding-right: 20px;
+}
+
+.sortable-table th.sortable:hover {
+    background-color: #004400;
+}
+
+.sortable-table th.sortable::after {
+    content: '⇅';
+    position: absolute;
+    right: 5px;
+    opacity: 0.3;
+}
+
+/* Filter Sidebar Styles */
+.filter-sidebar {
+    background-color: #000;
+    border: 2px solid #00ff00;
+    padding: 15px;
+    margin-bottom: 20px;
+    min-width: 200px;
+}
+
+.filter-sidebar h3 {
+    margin-bottom: 15px;
+    color: #00ff00;
+    text-align: center;
+    border-bottom: 1px solid #003300;
+    padding-bottom: 10px;
+}
+
+.filter-group {
+    margin-bottom: 20px;
+}
+
+.filter-group h4 {
+    color: #00aa00;
+    margin-bottom: 10px;
+    font-size: 0.9em;
+    text-transform: uppercase;
+}
+
+.filter-option {
+    display: flex;
+    align-items: center;
+    padding: 5px 0;
+    cursor: pointer;
+    color: #00ff00;
+}
+
+.filter-option:hover {
+    background-color: #001100;
+}
+
+.filter-option input[type="checkbox"] {
+    margin-right: 8px;
+    cursor: pointer;
+}
+
+.filter-option span {
+    font-size: 0.9em;
+}
+
+.clear-filters-btn {
+    width: 100%;
+    background-color: #330000;
+    color: #ff0000;
+    border: 2px solid #ff0000;
+    padding: 8px;
+    margin-top: 10px;
+    cursor: pointer;
+    font-family: 'Courier New', monospace;
+    font-size: 0.85em;
+}
+
+.clear-filters-btn:hover {
+    background-color: #ff0000;
+    color: #000;
+}
+
+/* Portfolio Summary Card */
+.portfolio-summary-card {
+    background-color: #000;
+    border: 2px solid #00ff00;
+    padding: 20px;
+    margin-bottom: 20px;
+}
+
+.portfolio-summary-card h3 {
+    color: #00ff00;
+    margin-bottom: 15px;
+    text-align: center;
+    border-bottom: 1px solid #003300;
+    padding-bottom: 10px;
+}
+
+.portfolio-metrics {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.metric-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 8px;
+    background-color: #001100;
+    border-left: 3px solid #00aa00;
+}
+
+.metric-label {
+    color: #00aa00;
+    font-weight: bold;
+}
+
+.metric-value {
+    color: #00ff00;
+    font-weight: bold;
+}
+
+.metric-value.positive {
+    color: #00ff00;
+}
+
+.metric-value.negative {
+    color: #ff0000;
+}
+
+/* Sector Allocation */
+.sector-allocation {
+    margin-top: 20px;
+    padding-top: 15px;
+    border-top: 1px solid #003300;
+}
+
+.sector-allocation h4 {
+    color: #00aa00;
+    margin-bottom: 12px;
+    font-size: 0.9em;
+}
+
+.sector-bar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 8px;
+}
+
+.sector-label {
+    min-width: 100px;
+    color: #00aa00;
+    font-size: 0.85em;
+}
+
+.sector-progress {
+    flex: 1;
+    height: 20px;
+    background-color: #002200;
+    border: 1px solid #003300;
+    position: relative;
+}
+
+.sector-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #00ff00, #00aa00);
+    transition: width 0.3s ease;
+}
+
+.sector-percentage {
+    min-width: 50px;
+    text-align: right;
+    color: #00ff00;
+    font-size: 0.85em;
+}
+
+/* Layout helpers for sidebar + content */
+.layout-with-sidebar {
+    display: flex;
+    gap: 20px;
+    align-items: flex-start;
+}
+
+.sidebar-container {
+    flex: 0 0 250px;
+}
+
+.content-container {
+    flex: 1;
+    min-width: 0; /* Prevents flex item overflow */
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+    .layout-with-sidebar {
+        flex-direction: column;
+    }
+    
+    .sidebar-container {
+        flex: 1;
+        width: 100%;
+    }
+}
+
+/* Page header template styles */
+.page-header {
+    background-color: #000;
+    border: 2px solid #00ff00;
+    padding: 15px;
+    margin-bottom: 20px;
+}
+
+.page-header h1 {
+    text-align: center;
+    margin-bottom: 15px;
+    color: #00ff00;
+    text-shadow: 0 0 10px #00ff00;
+}
+
+.breadcrumb {
+    text-align: center;
+    color: #00aa00;
+    margin-bottom: 10px;
+}
+
+.breadcrumb a {
+    color: #00ff00;
+    text-decoration: none;
+}
+
+.breadcrumb a:hover {
+    text-decoration: underline;
+}
+
+.breadcrumb span {
+    margin: 0 5px;
+}
+
+/* Pagination styles */
+.pagination-controls {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    padding: 15px 0;
+    flex-wrap: wrap;
+}
+
+.page-btn {
+    background-color: #003300;
+    color: #00ff00;
+    border: 1px solid #00ff00;
+    padding: 5px 10px;
+    cursor: pointer;
+    font-family: 'Courier New', monospace;
+    font-size: 0.9em;
+    min-width: 35px;
+}
+
+.page-btn:hover:not(:disabled) {
+    background-color: #00ff00;
+    color: #000;
+}
+
+.page-btn:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+}
+
+.page-btn.active {
+    background-color: #00ff00;
+    color: #000;
+    font-weight: bold;
+}
+
+.page-ellipsis {
+    color: #00aa00;
+    padding: 0 5px;
+}
+
+.page-info {
+    margin-left: 15px;
+    color: #00aa00;
+    font-size: 0.85em;
+}
