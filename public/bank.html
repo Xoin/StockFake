@@ -116,9 +116,53 @@
                 Total Account Value: $<span id="totalValue">0.00</span>
             </div>
         </div>
+        
+        <div class="portfolio">
+            <h2>Recent Transactions</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Type</th>
+                        <th>Symbol</th>
+                        <th>Shares</th>
+                        <th>Price</th>
+                        <th>Tax</th>
+                        <th>Total</th>
+                    </tr>
+                </thead>
+                <tbody id="transactionsList">
+                    <tr><td colspan="7">No transactions</td></tr>
+                </tbody>
+            </table>
+        </div>
+        
+        <div class="portfolio">
+            <h2>Dividend History</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Quarter</th>
+                        <th>Gross</th>
+                        <th>Tax</th>
+                        <th>Net</th>
+                    </tr>
+                </thead>
+                <tbody id="dividendsList">
+                    <tr><td colspan="5">No dividends yet</td></tr>
+                </tbody>
+            </table>
+        </div>
     </div>
     
     <script>
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+        
         async function updateAccount() {
             const [accountRes, stocksRes] = await Promise.all([
                 fetch('/api/account'),
@@ -157,6 +201,40 @@
             
             document.getElementById('portfolioValue').textContent = portfolioValue.toFixed(2);
             document.getElementById('totalValue').textContent = (account.cash + portfolioValue).toFixed(2);
+            
+            // Update transactions list
+            const transactionsList = document.getElementById('transactionsList');
+            if (!account.transactions || account.transactions.length === 0) {
+                transactionsList.innerHTML = '<tr><td colspan="7">No transactions</td></tr>';
+            } else {
+                transactionsList.innerHTML = account.transactions.slice().reverse().map(tx => `
+                    <tr>
+                        <td>${new Date(tx.date).toLocaleDateString()}</td>
+                        <td>${escapeHtml(tx.type.toUpperCase())}</td>
+                        <td>${escapeHtml(tx.symbol)}</td>
+                        <td>${tx.shares}</td>
+                        <td>$${tx.pricePerShare.toFixed(2)}</td>
+                        <td>${tx.tax ? '$' + tx.tax.toFixed(2) : '-'}</td>
+                        <td>$${(tx.netProceeds || tx.total).toFixed(2)}</td>
+                    </tr>
+                `).join('');
+            }
+            
+            // Update dividends list
+            const dividendsList = document.getElementById('dividendsList');
+            if (!account.dividends || account.dividends.length === 0) {
+                dividendsList.innerHTML = '<tr><td colspan="5">No dividends yet</td></tr>';
+            } else {
+                dividendsList.innerHTML = account.dividends.slice().reverse().map(div => `
+                    <tr>
+                        <td>${new Date(div.date).toLocaleDateString()}</td>
+                        <td>${escapeHtml(div.quarter)}</td>
+                        <td>$${div.grossAmount.toFixed(2)}</td>
+                        <td>$${div.tax.toFixed(2)}</td>
+                        <td>$${div.netAmount.toFixed(2)}</td>
+                    </tr>
+                `).join('');
+            }
         }
         
         updateAccount();
