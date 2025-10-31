@@ -1,0 +1,21 @@
+{
+  "name": "stockfake",
+  "version": "1.0.0",
+  "description": "A stock trading game using historical stock data",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "keywords": [
+    "stock",
+    "trading",
+    "game",
+    "historical"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "express": "^4.18.2"
+  }
+}
