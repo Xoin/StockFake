@@ -93,6 +93,8 @@ app.get('/', (req, res) => {
 
 // Stock data API
 const stocks = require('./data/stocks');
+const emailGenerator = require('./data/emails');
+
 app.get('/api/stocks', (req, res) => {
   res.json(stocks.getStockData(gameTime));
 });
@@ -616,7 +618,9 @@ app.post('/api/trade', (req, res) => {
     
     // Calculate weighted average borrow price
     userAccount.shortPositions[symbol].shares = totalShares;
-    userAccount.shortPositions[symbol].borrowPrice = (currentBorrowValue + newBorrowValue) / totalShares;
+    if (totalShares > 0) {
+      userAccount.shortPositions[symbol].borrowPrice = (currentBorrowValue + newBorrowValue) / totalShares;
+    }
     if (currentShortShares === 0) {
       userAccount.shortPositions[symbol].borrowDate = new Date(gameTime);
     }
@@ -717,8 +721,6 @@ app.post('/api/trade', (req, res) => {
 });
 
 // Email API (generate emails based on game events)
-const emailGenerator = require('./data/emails');
-
 app.get('/api/emails', (req, res) => {
   const emails = [
     {
