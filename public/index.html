@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>StockFake - Portal</title>
+    <link rel="stylesheet" href="era-themes.css">
     <style>
         * {
             margin: 0;
@@ -166,6 +167,19 @@
         
         updateTime();
         setInterval(updateTime, 1000);
+    </script>
+    <script src="common.js"></script>
+    <script>
+        async function updateEraTheme() {
+            const response = await fetch('/api/time');
+            const data = await response.json();
+            const gameDate = new Date(data.currentTime);
+            const year = gameDate.getFullYear();
+            applyEraTheme(year);
+        }
+        
+        updateEraTheme();
+        setInterval(updateEraTheme, 10000);
     </script>
 </body>
 </html>

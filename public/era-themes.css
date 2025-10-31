@@ -1,0 +1,548 @@
+/* Era-based theming for StockFake */
+/* Mobile-first responsive design */
+
+/* Pagination controls */
+.pagination-controls {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-items: center;
+    gap: 5px;
+    padding: 15px;
+    margin: 20px 0;
+}
+
+.page-btn {
+    min-width: 40px;
+    padding: 8px 12px;
+    cursor: pointer;
+    font-family: inherit;
+}
+
+.page-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.page-ellipsis {
+    padding: 0 5px;
+}
+
+.page-info {
+    margin-left: 10px;
+    font-size: 0.9em;
+}
+
+/* Mobile-first base styles */
+@media (max-width: 768px) {
+    .container {
+        padding: 10px !important;
+    }
+    
+    table {
+        font-size: 0.85em;
+    }
+    
+    th, td {
+        padding: 8px 5px !important;
+    }
+    
+    .portal-links {
+        grid-template-columns: 1fr !important;
+    }
+    
+    .page-btn {
+        min-width: 35px;
+        padding: 6px 10px;
+        font-size: 0.9em;
+    }
+    
+    .page-info {
+        width: 100%;
+        text-align: center;
+        margin: 5px 0;
+    }
+}
+
+/* 1970s: Terminal-style (green on black) */
+body.era-1970s {
+    font-family: 'Courier New', monospace;
+    background-color: #1a1a1a;
+    color: #00ff00;
+}
+
+body.era-1970s .page-btn {
+    background-color: #003300;
+    color: #00ff00;
+    border: 2px solid #00ff00;
+}
+
+body.era-1970s .page-btn:hover:not(:disabled) {
+    background-color: #00ff00;
+    color: #000;
+}
+
+body.era-1970s .page-btn.active {
+    background-color: #00ff00;
+    color: #000;
+    font-weight: bold;
+}
+
+body.era-1970s .page-ellipsis {
+    color: #00aa00;
+}
+
+/* 1980s: Early GUI style (amber/cyan CRT colors) */
+body.era-1980s {
+    font-family: 'Courier New', 'Lucida Console', monospace;
+    background: linear-gradient(to bottom, #1a0033 0%, #000033 100%);
+    color: #ffaa00;
+}
+
+body.era-1980s * {
+    border-color: #ffaa00 !important;
+    color: #ffaa00;
+}
+
+body.era-1980s .positive {
+    color: #00ffff !important;
+}
+
+body.era-1980s .negative {
+    color: #ff00ff !important;
+}
+
+body.era-1980s h1, body.era-1980s h2 {
+    color: #00ffff;
+    text-shadow: 0 0 5px #00ffff;
+}
+
+body.era-1980s .page-btn {
+    background-color: #330066;
+    color: #ffaa00;
+    border: 3px double #ffaa00 !important;
+    box-shadow: 2px 2px 0 #ff00ff;
+}
+
+body.era-1980s .page-btn:hover:not(:disabled) {
+    background-color: #ffaa00;
+    color: #000033;
+}
+
+body.era-1980s .page-btn.active {
+    background-color: #00ffff;
+    color: #000033;
+    font-weight: bold;
+}
+
+body.era-1980s table {
+    border: 3px double #ffaa00 !important;
+}
+
+body.era-1980s th {
+    background-color: #330066 !important;
+}
+
+/* 1990s: Web 1.0 (Times New Roman, gray, basic tables) */
+body.era-1990s {
+    font-family: 'Times New Roman', Times, serif;
+    background-color: #c0c0c0;
+    color: #000000;
+}
+
+body.era-1990s .container {
+    background-color: #ffffff;
+    border: 2px solid #000000;
+}
+
+body.era-1990s * {
+    border-color: #000000 !important;
+    color: #000000;
+}
+
+body.era-1990s .positive {
+    color: #008000 !important;
+}
+
+body.era-1990s .negative {
+    color: #ff0000 !important;
+}
+
+body.era-1990s h1 {
+    color: #0000ff;
+    text-shadow: 2px 2px #808080;
+    font-size: 2em;
+}
+
+body.era-1990s h2 {
+    color: #800080;
+    font-size: 1.5em;
+}
+
+body.era-1990s a {
+    color: #0000ff !important;
+    text-decoration: underline;
+}
+
+body.era-1990s a:visited {
+    color: #800080 !important;
+}
+
+body.era-1990s .page-btn {
+    background-color: #c0c0c0;
+    color: #000000;
+    border: 2px outset #808080 !important;
+    font-family: Arial, sans-serif;
+}
+
+body.era-1990s .page-btn:hover:not(:disabled) {
+    background-color: #a0a0a0;
+}
+
+body.era-1990s .page-btn:active {
+    border-style: inset !important;
+}
+
+body.era-1990s .page-btn.active {
+    background-color: #000080;
+    color: #ffffff;
+    border-style: inset !important;
+}
+
+body.era-1990s table {
+    background-color: #ffffff;
+    border-collapse: collapse;
+}
+
+body.era-1990s th {
+    background-color: #808080 !important;
+    color: #ffffff !important;
+}
+
+body.era-1990s .portal-link {
+    background-color: #e0e0e0 !important;
+    border: 2px outset #808080 !important;
+}
+
+/* 2000s: Web 2.0 (gradients, rounded corners, shadows) */
+body.era-2000s {
+    font-family: 'Verdana', 'Arial', sans-serif;
+    background: linear-gradient(to bottom, #4a90e2 0%, #357abd 100%);
+    color: #333333;
+}
+
+body.era-2000s .container {
+    background-color: #ffffff;
+    border-radius: 10px;
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+}
+
+body.era-2000s * {
+    border-color: #cccccc !important;
+    color: #333333;
+}
+
+body.era-2000s .positive {
+    color: #28a745 !important;
+}
+
+body.era-2000s .negative {
+    color: #dc3545 !important;
+}
+
+body.era-2000s h1 {
+    color: #2c5aa0;
+    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.2);
+    background: linear-gradient(to bottom, #f0f0f0 0%, #d0d0d0 100%);
+    padding: 15px;
+    border-radius: 8px;
+}
+
+body.era-2000s h2 {
+    color: #4a90e2;
+}
+
+body.era-2000s a {
+    color: #2c5aa0 !important;
+    text-decoration: none;
+}
+
+body.era-2000s a:hover {
+    text-decoration: underline;
+}
+
+body.era-2000s .page-btn {
+    background: linear-gradient(to bottom, #ffffff 0%, #e0e0e0 100%);
+    color: #333333;
+    border: 1px solid #cccccc !important;
+    border-radius: 5px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+body.era-2000s .page-btn:hover:not(:disabled) {
+    background: linear-gradient(to bottom, #f0f0f0 0%, #d0d0d0 100%);
+    box-shadow: 0 3px 6px rgba(0, 0, 0, 0.2);
+}
+
+body.era-2000s .page-btn.active {
+    background: linear-gradient(to bottom, #4a90e2 0%, #357abd 100%);
+    color: #ffffff;
+    font-weight: bold;
+}
+
+body.era-2000s table {
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+body.era-2000s th {
+    background: linear-gradient(to bottom, #4a90e2 0%, #357abd 100%) !important;
+    color: #ffffff !important;
+}
+
+body.era-2000s tr:nth-child(even) {
+    background-color: #f8f9fa;
+}
+
+body.era-2000s .portal-link {
+    background: linear-gradient(to bottom, #ffffff 0%, #f0f0f0 100%) !important;
+    border: 1px solid #cccccc !important;
+    border-radius: 8px;
+    box-shadow: 0 3px 6px rgba(0, 0, 0, 0.1);
+}
+
+body.era-2000s .portal-link:hover {
+    box-shadow: 0 5px 10px rgba(0, 0, 0, 0.2) !important;
+    transform: translateY(-2px);
+    transition: all 0.3s;
+}
+
+/* 2010s: Flat design (minimal, clean, card-based) */
+body.era-2010s {
+    font-family: 'Helvetica Neue', 'Arial', sans-serif;
+    background-color: #ecf0f1;
+    color: #2c3e50;
+}
+
+body.era-2010s .container {
+    background-color: #ffffff;
+    border-radius: 4px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+}
+
+body.era-2010s * {
+    border-color: #e0e0e0 !important;
+    color: #2c3e50;
+}
+
+body.era-2010s .positive {
+    color: #27ae60 !important;
+}
+
+body.era-2010s .negative {
+    color: #e74c3c !important;
+}
+
+body.era-2010s h1 {
+    color: #34495e;
+    font-weight: 300;
+    font-size: 2.5em;
+}
+
+body.era-2010s h2 {
+    color: #3498db;
+    font-weight: 400;
+}
+
+body.era-2010s a {
+    color: #3498db !important;
+    text-decoration: none;
+    transition: color 0.3s;
+}
+
+body.era-2010s a:hover {
+    color: #2980b9 !important;
+}
+
+body.era-2010s .page-btn {
+    background-color: #ffffff;
+    color: #3498db;
+    border: 1px solid #3498db !important;
+    border-radius: 3px;
+    transition: all 0.3s;
+}
+
+body.era-2010s .page-btn:hover:not(:disabled) {
+    background-color: #3498db;
+    color: #ffffff;
+}
+
+body.era-2010s .page-btn.active {
+    background-color: #3498db;
+    color: #ffffff;
+    font-weight: 500;
+}
+
+body.era-2010s table {
+    border: none !important;
+}
+
+body.era-2010s th {
+    background-color: #34495e !important;
+    color: #ffffff !important;
+    font-weight: 500;
+    text-transform: uppercase;
+    font-size: 0.85em;
+    letter-spacing: 0.5px;
+}
+
+body.era-2010s tr {
+    border-bottom: 1px solid #ecf0f1 !important;
+}
+
+body.era-2010s tr:hover {
+    background-color: #f8f9fa;
+}
+
+body.era-2010s .portal-link {
+    background-color: #ffffff !important;
+    border: 1px solid #e0e0e0 !important;
+    border-radius: 4px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+    transition: all 0.3s;
+}
+
+body.era-2010s .portal-link:hover {
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.12) !important;
+    transform: translateY(-3px);
+}
+
+/* 2020s: Modern responsive (CSS Grid, custom properties) */
+body.era-2020s {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', sans-serif;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: #1a202c;
+}
+
+body.era-2020s .container {
+    background-color: rgba(255, 255, 255, 0.95);
+    border-radius: 12px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+    backdrop-filter: blur(10px);
+}
+
+body.era-2020s * {
+    border-color: #e2e8f0 !important;
+    color: #1a202c;
+}
+
+body.era-2020s .positive {
+    color: #10b981 !important;
+}
+
+body.era-2020s .negative {
+    color: #ef4444 !important;
+}
+
+body.era-2020s h1 {
+    color: #1a202c;
+    font-weight: 700;
+    font-size: 2.5em;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+body.era-2020s h2 {
+    color: #667eea;
+    font-weight: 600;
+}
+
+body.era-2020s a {
+    color: #667eea !important;
+    text-decoration: none;
+    transition: all 0.3s;
+}
+
+body.era-2020s a:hover {
+    color: #764ba2 !important;
+}
+
+body.era-2020s .page-btn {
+    background-color: #ffffff;
+    color: #667eea;
+    border: 2px solid #667eea !important;
+    border-radius: 8px;
+    transition: all 0.3s;
+    font-weight: 500;
+}
+
+body.era-2020s .page-btn:hover:not(:disabled) {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: #ffffff;
+    transform: scale(1.05);
+}
+
+body.era-2020s .page-btn.active {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: #ffffff;
+    font-weight: 600;
+}
+
+body.era-2020s table {
+    border-radius: 8px;
+    overflow: hidden;
+    border: none !important;
+}
+
+body.era-2020s th {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+    color: #ffffff !important;
+    font-weight: 600;
+    text-transform: uppercase;
+    font-size: 0.85em;
+    letter-spacing: 1px;
+}
+
+body.era-2020s tr {
+    border-bottom: 1px solid #e2e8f0 !important;
+    transition: all 0.3s;
+}
+
+body.era-2020s tr:hover {
+    background-color: #f7fafc;
+    transform: scale(1.01);
+}
+
+body.era-2020s .portal-link {
+    background: rgba(255, 255, 255, 0.9) !important;
+    border: 2px solid transparent !important;
+    border-radius: 12px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    transition: all 0.3s;
+    position: relative;
+    overflow: hidden;
+}
+
+body.era-2020s .portal-link::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    opacity: 0;
+    transition: opacity 0.3s;
+}
+
+body.era-2020s .portal-link:hover::before {
+    opacity: 0.1;
+}
+
+body.era-2020s .portal-link:hover {
+    box-shadow: 0 8px 24px rgba(102, 126, 234, 0.3) !important;
+    transform: translateY(-5px);
+    border-color: #667eea !important;
+}
