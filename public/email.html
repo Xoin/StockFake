@@ -136,7 +136,7 @@
     
     <script src="common.js"></script>
     <script>
-        let emailPaginator;
+        let paginator;
         let allEmails = [];
         let readEmailIds = new Set(JSON.parse(localStorage.getItem('readEmailIds') || '[]'));
         let expandedEmails = new Set();
@@ -147,9 +147,9 @@
         }
         
         async function renderEmailPage() {
-            if (!emailPaginator) return;
+            if (!paginator) return;
             
-            const pageEmails = emailPaginator.getCurrentPageItems();
+            const pageEmails = paginator.getCurrentPageItems();
             const container = document.getElementById('emailContainer');
             
             if (pageEmails.length === 0 && allEmails.length === 0) {
@@ -157,7 +157,7 @@
             } else if (pageEmails.length === 0) {
                 container.innerHTML = '<div class="no-emails">No items on this page.</div>';
             } else {
-                const startIndex = (emailPaginator.currentPage - 1) * emailPaginator.itemsPerPage;
+                const startIndex = (paginator.currentPage - 1) * paginator.itemsPerPage;
                 container.innerHTML = pageEmails.map((email, relativeIndex) => {
                     const index = startIndex + relativeIndex;
                     const isExpanded = expandedEmails.has(index);
@@ -179,7 +179,7 @@
             // Update pagination controls
             const paginationDivs = document.querySelectorAll('.pagination-controls-container');
             paginationDivs.forEach(div => {
-                div.innerHTML = emailPaginator.renderControls();
+                div.innerHTML = paginator.renderControls();
             });
         }
         
@@ -215,8 +215,8 @@
             // Update localStorage with current count
             localStorage.setItem('lastEmailCount', allEmails.length);
             
-            if (!emailPaginator || emailsChanged) {
-                emailPaginator = new Paginator(allEmails, 15);
+            if (!paginator || emailsChanged) {
+                paginator = new Paginator(allEmails, 15);
                 renderEmailPage();
             }
             // If emails haven't changed, don't re-render to preserve expanded state
