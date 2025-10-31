@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>StockFake - Portal</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Courier New', monospace;
+            background-color: #1a1a1a;
+            color: #00ff00;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        h1 {
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 2.5em;
+            text-shadow: 0 0 10px #00ff00;
+        }
+        .time-display {
+            background-color: #000;
+            border: 2px solid #00ff00;
+            padding: 15px;
+            margin-bottom: 20px;
+            text-align: center;
+            font-size: 1.2em;
+        }
+        .market-status {
+            display: inline-block;
+            margin-left: 20px;
+            padding: 5px 10px;
+            border-radius: 5px;
+        }
+        .market-open {
+            background-color: #004400;
+            color: #00ff00;
+        }
+        .market-closed {
+            background-color: #440000;
+            color: #ff0000;
+        }
+        .controls {
+            background-color: #000;
+            border: 2px solid #00ff00;
+            padding: 15px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        button {
+            background-color: #003300;
+            color: #00ff00;
+            border: 2px solid #00ff00;
+            padding: 10px 20px;
+            margin: 5px;
+            cursor: pointer;
+            font-family: 'Courier New', monospace;
+            font-size: 1em;
+        }
+        button:hover {
+            background-color: #00ff00;
+            color: #000;
+        }
+        .portal-links {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-top: 30px;
+        }
+        .portal-link {
+            background-color: #000;
+            border: 2px solid #00ff00;
+            padding: 30px;
+            text-align: center;
+            text-decoration: none;
+            color: #00ff00;
+            display: block;
+            transition: all 0.3s;
+        }
+        .portal-link:hover {
+            background-color: #003300;
+            box-shadow: 0 0 20px #00ff00;
+        }
+        .portal-link h2 {
+            margin-bottom: 10px;
+            font-size: 1.5em;
+        }
+        .portal-link p {
+            color: #00aa00;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>⚡ STOCKFAKE ⚡</h1>
+        <div class="time-display">
+            <div id="gameTime">Loading...</div>
+            <span id="marketStatus" class="market-status">...</span>
+        </div>
+        <div class="controls">
+            <button onclick="togglePause()">⏯ Pause/Resume</button>
+            <button onclick="setSpeed(60)">🐌 Slow (1s = 1min)</button>
+            <button onclick="setSpeed(3600)">⚡ Normal (1s = 1hr)</button>
+            <button onclick="setSpeed(86400)">🚀 Fast (1s = 1day)</button>
+        </div>
+        <div class="portal-links">
+            <a href="/trading" class="portal-link">
+                <h2>📈 Trading Platform</h2>
+                <p>Buy and sell stocks</p>
+            </a>
+            <a href="/bank" class="portal-link">
+                <h2>🏦 Bank Account</h2>
+                <p>View your balance and portfolio</p>
+            </a>
+            <a href="/news" class="portal-link">
+                <h2>📰 News</h2>
+                <p>Historical events and market news</p>
+            </a>
+            <a href="/email" class="portal-link">
+                <h2>📧 Email</h2>
+                <p>Messages and notifications</p>
+            </a>
+        </div>
+    </div>
+    <script>
+        async function updateTime() {
+            const response = await fetch('/api/time');
+            const data = await response.json();
+            const date = new Date(data.currentTime);
+            document.getElementById('gameTime').textContent = date.toLocaleString();
+            
+            const statusEl = document.getElementById('marketStatus');
+            if (data.isMarketOpen) {
+                statusEl.textContent = '🟢 MARKET OPEN';
+                statusEl.className = 'market-status market-open';
+            } else {
+                statusEl.textContent = '🔴 MARKET CLOSED';
+                statusEl.className = 'market-status market-closed';
+            }
+        }
+        
+        async function togglePause() {
+            await fetch('/api/time/pause', { method: 'POST' });
+            updateTime();
+        }
+        
+        async function setSpeed(multiplier) {
+            await fetch('/api/time/speed', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ multiplier })
+            });
+        }
+        
+        updateTime();
+        setInterval(updateTime, 1000);
+    </script>
+</body>
+</html>

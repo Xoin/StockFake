@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>StockFake - Email</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Courier New', monospace;
+            background-color: #1a1a1a;
+            color: #00ff00;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        h1 {
+            text-align: center;
+            margin-bottom: 20px;
+            color: #00ff00;
+            text-shadow: 0 0 10px #00ff00;
+        }
+        .nav {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        .nav a {
+            color: #00ff00;
+            margin: 0 10px;
+            text-decoration: none;
+        }
+        .nav a:hover {
+            text-decoration: underline;
+        }
+        .email-container {
+            background-color: #000;
+            border: 2px solid #00ff00;
+            padding: 20px;
+        }
+        .email-item {
+            border: 1px solid #003300;
+            padding: 15px;
+            margin-bottom: 15px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        .email-item:hover {
+            background-color: #003300;
+        }
+        .email-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 10px;
+        }
+        .email-from {
+            color: #00ff00;
+            font-weight: bold;
+        }
+        .email-date {
+            color: #00aa00;
+            font-size: 0.9em;
+        }
+        .email-subject {
+            font-size: 1.1em;
+            margin-bottom: 10px;
+            color: #00ff00;
+        }
+        .email-body {
+            color: #00cc00;
+            display: none;
+            margin-top: 10px;
+            padding-top: 10px;
+            border-top: 1px solid #003300;
+            line-height: 1.5;
+        }
+        .email-item.expanded .email-body {
+            display: block;
+        }
+        .no-emails {
+            text-align: center;
+            padding: 40px;
+            color: #00aa00;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📧 EMAIL</h1>
+        <div class="nav">
+            <a href="/">← Back to Portal</a> |
+            <a href="/trading">Trading</a> |
+            <a href="/bank">Bank</a> |
+            <a href="/news">News</a>
+        </div>
+        
+        <div class="email-container" id="emailContainer">
+            <div class="no-emails">Loading emails...</div>
+        </div>
+    </div>
+    
+    <script>
+        async function updateEmails() {
+            const response = await fetch('/api/emails');
+            const emails = await response.json();
+            
+            const container = document.getElementById('emailContainer');
+            
+            if (emails.length === 0) {
+                container.innerHTML = '<div class="no-emails">No emails yet.</div>';
+            } else {
+                container.innerHTML = emails.map((email, index) => `
+                    <div class="email-item" onclick="toggleEmail(${index})">
+                        <div class="email-header">
+                            <div class="email-from">From: ${email.from}</div>
+                            <div class="email-date">${new Date(email.date).toLocaleString()}</div>
+                        </div>
+                        <div class="email-subject">${email.subject}</div>
+                        <div class="email-body" id="email-body-${index}">${email.body}</div>
+                    </div>
+                `).join('');
+            }
+        }
+        
+        function toggleEmail(index) {
+            const emailItem = document.getElementById(`email-body-${index}`).parentElement;
+            emailItem.classList.toggle('expanded');
+        }
+        
+        updateEmails();
+        setInterval(updateEmails, 5000);
+    </script>
+</body>
+</html>

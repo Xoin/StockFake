@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>StockFake - Bank Account</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Courier New', monospace;
+            background-color: #1a1a1a;
+            color: #00ff00;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        h1 {
+            text-align: center;
+            margin-bottom: 20px;
+            color: #00ff00;
+            text-shadow: 0 0 10px #00ff00;
+        }
+        .nav {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        .nav a {
+            color: #00ff00;
+            margin: 0 10px;
+            text-decoration: none;
+        }
+        .nav a:hover {
+            text-decoration: underline;
+        }
+        .account-summary {
+            background-color: #000;
+            border: 2px solid #00ff00;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        .balance {
+            font-size: 2em;
+            text-align: center;
+            margin: 20px 0;
+            color: #00ff00;
+        }
+        .portfolio {
+            background-color: #000;
+            border: 2px solid #00ff00;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th, td {
+            padding: 10px;
+            text-align: left;
+            border-bottom: 1px solid #003300;
+        }
+        th {
+            background-color: #003300;
+        }
+        .total-value {
+            font-size: 1.5em;
+            text-align: right;
+            margin-top: 20px;
+            padding: 10px;
+            border-top: 2px solid #00ff00;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🏦 BANK ACCOUNT</h1>
+        <div class="nav">
+            <a href="/">← Back to Portal</a> |
+            <a href="/trading">Trading</a> |
+            <a href="/news">News</a> |
+            <a href="/email">Email</a>
+        </div>
+        
+        <div class="account-summary">
+            <h2>Account Summary</h2>
+            <div class="balance">
+                Cash Balance: $<span id="cashBalance">0.00</span>
+            </div>
+        </div>
+        
+        <div class="portfolio">
+            <h2>Stock Portfolio</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Symbol</th>
+                        <th>Shares</th>
+                        <th>Current Price</th>
+                        <th>Total Value</th>
+                    </tr>
+                </thead>
+                <tbody id="portfolioList">
+                    <tr><td colspan="4">Loading...</td></tr>
+                </tbody>
+            </table>
+            <div class="total-value">
+                Total Portfolio Value: $<span id="portfolioValue">0.00</span>
+            </div>
+            <div class="total-value">
+                Total Account Value: $<span id="totalValue">0.00</span>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        async function updateAccount() {
+            const [accountRes, stocksRes] = await Promise.all([
+                fetch('/api/account'),
+                fetch('/api/stocks')
+            ]);
+            
+            const account = await accountRes.json();
+            const stocks = await stocksRes.json();
+            
+            document.getElementById('cashBalance').textContent = account.cash.toFixed(2);
+            
+            const portfolioList = document.getElementById('portfolioList');
+            let portfolioValue = 0;
+            
+            if (Object.keys(account.portfolio).length === 0) {
+                portfolioList.innerHTML = '<tr><td colspan="4">No stocks owned</td></tr>';
+            } else {
+                portfolioList.innerHTML = Object.entries(account.portfolio)
+                    .filter(([_, shares]) => shares > 0)
+                    .map(([symbol, shares]) => {
+                        const stock = stocks.find(s => s.symbol === symbol);
+                        const currentPrice = stock ? stock.price : 0;
+                        const value = shares * currentPrice;
+                        portfolioValue += value;
+                        
+                        return `
+                            <tr>
+                                <td>${symbol}</td>
+                                <td>${shares}</td>
+                                <td>$${currentPrice.toFixed(2)}</td>
+                                <td>$${value.toFixed(2)}</td>
+                            </tr>
+                        `;
+                    }).join('');
+            }
+            
+            document.getElementById('portfolioValue').textContent = portfolioValue.toFixed(2);
+            document.getElementById('totalValue').textContent = (account.cash + portfolioValue).toFixed(2);
+        }
+        
+        updateAccount();
+        setInterval(updateAccount, 2000);
+    </script>
+</body>
+</html>

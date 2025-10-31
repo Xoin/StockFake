@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>StockFake - News</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Courier New', monospace;
+            background-color: #1a1a1a;
+            color: #00ff00;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        h1 {
+            text-align: center;
+            margin-bottom: 20px;
+            color: #00ff00;
+            text-shadow: 0 0 10px #00ff00;
+        }
+        .nav {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        .nav a {
+            color: #00ff00;
+            margin: 0 10px;
+            text-decoration: none;
+        }
+        .nav a:hover {
+            text-decoration: underline;
+        }
+        .time-display {
+            background-color: #000;
+            border: 2px solid #00ff00;
+            padding: 10px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        .news-container {
+            background-color: #000;
+            border: 2px solid #00ff00;
+            padding: 20px;
+        }
+        .news-item {
+            border-bottom: 1px solid #003300;
+            padding: 20px 0;
+        }
+        .news-item:last-child {
+            border-bottom: none;
+        }
+        .news-date {
+            color: #00aa00;
+            font-size: 0.9em;
+            margin-bottom: 5px;
+        }
+        .news-headline {
+            font-size: 1.3em;
+            margin-bottom: 10px;
+            color: #00ff00;
+        }
+        .news-body {
+            color: #00cc00;
+            line-height: 1.5;
+        }
+        .no-news {
+            text-align: center;
+            padding: 40px;
+            color: #00aa00;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📰 HISTORICAL NEWS</h1>
+        <div class="nav">
+            <a href="/">← Back to Portal</a> |
+            <a href="/trading">Trading</a> |
+            <a href="/bank">Bank</a> |
+            <a href="/email">Email</a>
+        </div>
+        
+        <div class="time-display" id="timeDisplay">Loading...</div>
+        
+        <div class="news-container" id="newsContainer">
+            <div class="no-news">Loading news...</div>
+        </div>
+    </div>
+    
+    <script>
+        async function updateNews() {
+            const response = await fetch('/api/news');
+            const news = await response.json();
+            
+            const container = document.getElementById('newsContainer');
+            
+            if (news.length === 0) {
+                container.innerHTML = '<div class="no-news">No news available yet. Major events will appear as time progresses.</div>';
+            } else {
+                container.innerHTML = news.map(item => `
+                    <div class="news-item">
+                        <div class="news-date">${new Date(item.date).toLocaleDateString()}</div>
+                        <div class="news-headline">${item.headline}</div>
+                        <div class="news-body">${item.body}</div>
+                    </div>
+                `).join('');
+            }
+        }
+        
+        async function updateTime() {
+            const response = await fetch('/api/time');
+            const data = await response.json();
+            const date = new Date(data.currentTime);
+            document.getElementById('timeDisplay').textContent = `Current Game Time: ${date.toLocaleString()}`;
+        }
+        
+        updateNews();
+        updateTime();
+        setInterval(updateNews, 5000);
+        setInterval(updateTime, 1000);
+    </script>
+</body>
+</html>
