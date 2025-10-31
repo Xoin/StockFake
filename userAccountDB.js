@@ -18,7 +18,7 @@ function getUserAccountData() {
   const indexFundHoldings = {};
   const indexFundRows = db.getIndexFundHoldings().all();
   indexFundRows.forEach(row => {
-    const purchaseHistory = db.getPurchaseHistory.all(row.symbol, 'indexfund');
+    const purchaseHistory = db.getPurchaseHistory().all(row.symbol, 'indexfund');
     indexFundHoldings[row.symbol] = {
       shares: row.shares,
       purchaseHistory: purchaseHistory.map(p => ({
@@ -45,7 +45,7 @@ function getUserAccountData() {
   const purchaseHistory = {};
   const symbols = [...new Set(portfolioRows.map(r => r.symbol))];
   symbols.forEach(symbol => {
-    const history = db.getPurchaseHistory.all(symbol, 'stock');
+    const history = db.getPurchaseHistory().all(symbol, 'stock');
     if (history.length > 0) {
       purchaseHistory[symbol] = history.map(p => ({
         id: p.id,
@@ -81,7 +81,7 @@ function getUserAccountData() {
       marginInterestRate: marginAccount.margin_interest_rate,
       lastMarginInterestDate: marginAccount.last_margin_interest_date ? new Date(marginAccount.last_margin_interest_date) : null,
       hasMarginEnabled: Boolean(marginAccount.has_margin_enabled),
-      marginCalls: db.getMarginCalls.all(100).map(mc => ({
+      marginCalls: db.getMarginCalls().all(100).map(mc => ({
         id: mc.id,
         issueDate: new Date(mc.issue_date),
         dueDate: new Date(mc.due_date),
@@ -115,7 +115,7 @@ function getUserAccountData() {
       markedAsMissed: Boolean(loan.marked_as_missed),
       termDays: loan.term_days
     })),
-    transactions: db.getTransactions.all(20).map(tx => {
+    transactions: db.getTransactions().all(20).map(tx => {
       const data = tx.data ? JSON.parse(tx.data) : {};
       return {
         date: new Date(tx.date),
@@ -129,7 +129,7 @@ function getUserAccountData() {
         ...data
       };
     }),
-    dividends: db.getDividends.all(10).map(div => ({
+    dividends: db.getDividends().all(10).map(div => ({
       date: new Date(div.date),
       quarter: div.quarter,
       grossAmount: div.gross_amount,
@@ -137,19 +137,19 @@ function getUserAccountData() {
       netAmount: div.net_amount,
       details: JSON.parse(div.details || '[]')
     })),
-    taxes: db.getTaxes.all(10).map(tax => ({
+    taxes: db.getTaxes().all(10).map(tax => ({
       date: new Date(tax.date),
       type: tax.type,
       amount: tax.amount,
       description: tax.description
     })),
-    fees: db.getFees.all(10).map(fee => ({
+    fees: db.getFees().all(10).map(fee => ({
       date: new Date(fee.date),
       type: fee.type,
       amount: fee.amount,
       description: fee.description
     })),
-    loanHistory: db.getLoanHistory.all(20).map(lh => {
+    loanHistory: db.getLoanHistory().all(20).map(lh => {
       const data = lh.data ? JSON.parse(lh.data) : {};
       return {
         date: new Date(lh.date),
