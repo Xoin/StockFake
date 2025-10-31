@@ -638,10 +638,13 @@ function processMarginInterest() {
   
   const daysSinceLastCharge = (currentDate - lastInterestDate) / (1000 * 60 * 60 * 24);
   
-  // Charge interest daily
+  // Charge interest daily with compound interest
   if (daysSinceLastCharge >= 1) {
     const dailyRate = userAccount.marginAccount.marginInterestRate / 365;
-    const interest = userAccount.marginAccount.marginBalance * dailyRate * daysSinceLastCharge;
+    const balanceBeforeInterest = userAccount.marginAccount.marginBalance;
+    
+    // Compound interest: P * (1 + r)^t - P
+    const interest = balanceBeforeInterest * (Math.pow(1 + dailyRate, daysSinceLastCharge) - 1);
     
     // Add interest to margin balance
     userAccount.marginAccount.marginBalance += interest;
@@ -652,7 +655,7 @@ function processMarginInterest() {
       date: new Date(gameTime),
       type: 'margin-interest',
       amount: interest,
-      description: `Margin interest on $${userAccount.marginAccount.marginBalance.toFixed(2)} balance`
+      description: `Margin interest on $${balanceBeforeInterest.toFixed(2)} balance`
     });
   }
 }
@@ -1757,25 +1760,30 @@ app.post('/api/indexfunds/trade', (req, res) => {
     // Update holding purchase history
     holding.purchaseHistory = purchases;
     
-    // Calculate expense ratio fee for time held
-    const oldestPurchase = holding.purchaseHistory[0];
-    if (oldestPurchase) {
-      const daysHeld = (gameTime - new Date(oldestPurchase.date)) / (1000 * 60 * 60 * 24);
-      const expenseFee = indexFunds.calculateExpenseRatioFee(fund, shares, daysHeld);
-      
-      if (expenseFee > 0) {
-        userAccount.fees.push({
-          date: new Date(gameTime),
-          type: 'index-fund-expense',
-          amount: expenseFee,
-          description: `Expense ratio fee (${(fund.expenseRatio * 100).toFixed(2)}%) for ${fund.name}`
-        });
-        taxAmount += expenseFee; // Deduct from proceeds
-      }
+    // Calculate expense ratio fee based on actual holding periods (FIFO)
+    let totalExpenseFee = 0;
+    const soldPurchases = purchases.filter(p => p.shares === 0); // These were fully consumed in the sale
+    
+    soldPurchases.forEach(purchase => {
+      const daysHeld = (gameTime - new Date(purchase.date)) / (1000 * 60 * 60 * 24);
+      const dailyFeeRate = fund.expenseRatio / 365;
+      const purchaseValue = purchase.shares * purchase.pricePerShare;
+      const fee = purchaseValue * dailyFeeRate * daysHeld;
+      totalExpenseFee += fee;
+    });
+    
+    if (totalExpenseFee > 0) {
+      userAccount.fees.push({
+        date: new Date(gameTime),
+        type: 'index-fund-expense',
+        amount: totalExpenseFee,
+        description: `Expense ratio fee (${(fund.expenseRatio * 100).toFixed(2)}%) for ${fund.name}`
+      });
+      taxAmount += totalExpenseFee; // Deduct from proceeds
     }
     
     // Apply sale and deduct tax and fee
-    const grossSaleAmount = totalCost;
+    const grossSaleAmount = fundPrice * shares;  // Fixed: use actual sale proceeds
     const netSaleProceeds = grossSaleAmount - taxAmount - tradingFee;
     userAccount.cash += netSaleProceeds;
     holding.shares -= shares;

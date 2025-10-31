@@ -238,12 +238,13 @@ function getIndexFundHistory(symbol, currentTime, days = 30) {
 }
 
 // Calculate expense ratio charge (annual fee divided by days)
-function calculateExpenseRatioFee(fund, shares, daysHeld) {
+// Note: This function is deprecated - expense ratio should be calculated in server.js using game time
+function calculateExpenseRatioFee(fund, shares, daysHeld, gameTime) {
   const annualFee = fund.expenseRatio;
   const dailyFeeRate = annualFee / 365;
   
-  // Fee is calculated on the share value
-  const currentPrice = calculateIndexPrice(fund, new Date());
+  // Fee is calculated on the share value at game time
+  const currentPrice = calculateIndexPrice(fund, gameTime || new Date());
   if (!currentPrice) return 0;
   
   const positionValue = shares * currentPrice;
