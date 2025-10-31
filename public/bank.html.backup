@@ -97,7 +97,6 @@
             </div>
             <div class="balance" style="font-size: 1em; margin: 10px 0;">
                 Purchasing Power (1970 dollars): $<span id="realValue">0.00</span>
-                <span style="cursor: help; color: #00aa00; margin-left: 8px;" title="This shows what your current cash would be worth in 1970 dollars, adjusted for inflation. Your starting $10,000 in 1970 would be worth much more in today's dollars!">ℹ️</span>
             </div>
             <div style="text-align: center; color: #00aa00; margin: 10px 0;">
                 Inflation Rate: <span id="inflationRate">0</span>% | Cumulative: <span id="cumulativeInflation">1.0</span>x
@@ -405,13 +404,6 @@
                         <td>$${(tx.netProceeds || tx.total).toFixed(2)}</td>
                     </tr>
                 `).join('');
-                
-                // Initialize or refresh sorter for transactions
-                if (!transactionsSorter) {
-                    transactionsSorter = makeSortable('transactionsTable');
-                } else {
-                    transactionsSorter.refresh();
-                }
             }
             
             // Update dividends list
@@ -444,153 +436,6 @@
                     </tr>
                 `).join('');
             }
-        }
-        
-        // Update combined portfolio with extended information
-        async function updateCombinedPortfolio(account, stocks) {
-            const combinedList = document.getElementById('combinedPortfolioList');
-            let totalPortfolioValue = 0;
-            let totalCost = 0;
-            const positions = [];
-            
-            // Fetch index funds data
-            const indexFundsRes = await fetch('/api/indexfunds');
-            const indexFunds = await indexFundsRes.json();
-            
-            // Process stock positions
-            for (const [symbol, shares] of Object.entries(account.portfolio)) {
-                if (shares <= 0) continue;
-                
-                const stock = stocks.find(s => s.symbol === symbol);
-                const currentPrice = stock ? stock.price : 0;
-                const totalValue = shares * currentPrice;
-                
-                // Calculate average cost from purchase history
-                let avgCost = 0;
-                let positionCost = 0;
-                if (account.purchaseHistory && account.purchaseHistory[symbol]) {
-                    let totalShares = 0;
-                    let totalPaid = 0;
-                    account.purchaseHistory[symbol].forEach(purchase => {
-                        totalShares += purchase.shares;
-                        totalPaid += purchase.shares * purchase.pricePerShare;
-                    });
-                    if (totalShares > 0) {
-                        avgCost = totalPaid / totalShares;
-                        positionCost = shares * avgCost;
-                    }
-                }
-                
-                const gainLoss = totalValue - positionCost;
-                const returnPercent = positionCost > 0 ? (gainLoss / positionCost) * 100 : 0;
-                
-                positions.push({
-                    symbol,
-                    type: '📈 Stock',
-                    shares,
-                    avgCost,
-                    currentPrice,
-                    totalValue,
-                    totalCost: positionCost,
-                    gainLoss,
-                    returnPercent
-                });
-                
-                totalPortfolioValue += totalValue;
-                totalCost += positionCost;
-            }
-            
-            // Process index fund positions
-            if (account.indexFundHoldings) {
-                for (const [symbol, holding] of Object.entries(account.indexFundHoldings)) {
-                    if (holding.shares <= 0) continue;
-                    
-                    const fund = indexFunds.find(f => f.symbol === symbol);
-                    const currentPrice = fund ? fund.price : 0;
-                    const totalValue = holding.shares * currentPrice;
-                    
-                    // Calculate average cost
-                    let avgCost = 0;
-                    let positionCost = 0;
-                    if (holding.purchaseHistory && holding.purchaseHistory.length > 0) {
-                        let totalShares = 0;
-                        let totalPaid = 0;
-                        holding.purchaseHistory.forEach(purchase => {
-                            totalShares += purchase.shares;
-                            totalPaid += purchase.shares * purchase.pricePerShare;
-                        });
-                        if (totalShares > 0) {
-                            avgCost = totalPaid / totalShares;
-                            positionCost = holding.shares * avgCost;
-                        }
-                    }
-                    
-                    const gainLoss = totalValue - positionCost;
-                    const returnPercent = positionCost > 0 ? (gainLoss / positionCost) * 100 : 0;
-                    
-                    positions.push({
-                        symbol,
-                        type: '📊 Index Fund',
-                        shares: holding.shares,
-                        avgCost,
-                        currentPrice,
-                        totalValue,
-                        totalCost: positionCost,
-                        gainLoss,
-                        returnPercent
-                    });
-                    
-                    totalPortfolioValue += totalValue;
-                    totalCost += positionCost;
-                }
-            }
-            
-            // Render combined portfolio
-            if (positions.length === 0) {
-                combinedList.innerHTML = '<tr><td colspan="9">No positions</td></tr>';
-            } else {
-                combinedList.innerHTML = positions.map(pos => {
-                    const gainLossClass = pos.gainLoss >= 0 ? 'positive' : 'negative';
-                    const returnClass = pos.returnPercent >= 0 ? 'positive' : 'negative';
-                    
-                    return `
-                        <tr>
-                            <td><strong>${pos.symbol}</strong></td>
-                            <td>${pos.type}</td>
-                            <td>${pos.shares.toFixed(2)}</td>
-                            <td>$${pos.avgCost.toFixed(2)}</td>
-                            <td>$${pos.currentPrice.toFixed(2)}</td>
-                            <td>$${pos.totalValue.toFixed(2)}</td>
-                            <td>$${pos.totalCost.toFixed(2)}</td>
-                            <td class="${gainLossClass}">$${pos.gainLoss.toFixed(2)}</td>
-                            <td class="${returnClass}">${pos.returnPercent.toFixed(2)}%</td>
-                        </tr>
-                    `;
-                }).join('');
-                
-                // Initialize or refresh sorter
-                if (!portfolioSorter) {
-                    portfolioSorter = makeSortable('combinedPortfolioTable', {
-                        defaultSort: { column: 5, direction: 'desc' } // Sort by Total Value descending
-                    });
-                } else {
-                    portfolioSorter.refresh();
-                }
-            }
-            
-            // Update totals
-            document.getElementById('totalCost').textContent = totalCost.toFixed(2);
-            document.getElementById('portfolioValue').textContent = totalPortfolioValue.toFixed(2);
-            
-            const totalGainLoss = totalPortfolioValue - totalCost;
-            const totalReturn = totalCost > 0 ? (totalGainLoss / totalCost) * 100 : 0;
-            
-            const gainLossEl = document.getElementById('totalGainLoss');
-            gainLossEl.textContent = '$' + totalGainLoss.toFixed(2);
-            gainLossEl.className = totalGainLoss >= 0 ? 'positive' : 'negative';
-            
-            document.getElementById('totalReturnPercent').textContent = totalReturn.toFixed(2);
-            document.getElementById('totalValue').textContent = (account.cash + totalPortfolioValue).toFixed(2);
         }
         
         updateAccount();
