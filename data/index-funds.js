@@ -198,6 +198,16 @@ function getIndexFundDetails(symbol, currentTime) {
   const price = calculateIndexPrice(fund, currentTime);
   if (!price) return null;
   
+  // Calculate previous day's price for change percentage
+  const previousDay = new Date(currentTime.getTime() - (24 * 60 * 60 * 1000));
+  const previousPrice = calculateIndexPrice(fund, previousDay);
+  
+  // Calculate percentage change
+  let change = 0;
+  if (previousPrice && previousPrice > 0) {
+    change = ((price - previousPrice) / previousPrice) * 100;
+  }
+  
   // Get constituent details
   const constituentsWithPrices = fund.constituents
     .map(sym => {
@@ -215,6 +225,7 @@ function getIndexFundDetails(symbol, currentTime) {
     name: fund.name,
     description: fund.description,
     price: price,
+    change: change,
     category: fund.category,
     expenseRatio: fund.expenseRatio,
     inceptionDate: fund.inceptionDate,
