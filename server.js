@@ -1557,6 +1557,11 @@ app.post('/api/trade', (req, res) => {
   // If market is closed, queue the order instead of rejecting it
   if (!isMarketOpen(gameTime)) {
     try {
+      // Validate symbol to prevent prototype pollution
+      if (typeof symbol !== 'string' || symbol === '__proto__' || symbol === 'constructor' || symbol === 'prototype') {
+        return res.status(400).json({ error: 'Invalid symbol' });
+      }
+      
       // Validate inputs
       if (!symbol || !action || !shares || shares <= 0) {
         return res.status(400).json({ error: 'Invalid trade parameters' });
@@ -1589,6 +1594,11 @@ app.post('/api/trade', (req, res) => {
     } catch (error) {
       return res.status(500).json({ error: 'Failed to queue order: ' + error.message });
     }
+  }
+  
+  // Validate symbol to prevent prototype pollution
+  if (typeof symbol !== 'string' || symbol === '__proto__' || symbol === 'constructor' || symbol === 'prototype') {
+    return res.status(400).json({ error: 'Invalid symbol' });
   }
   
   // Check for trade halts
