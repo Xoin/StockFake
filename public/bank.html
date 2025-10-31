@@ -167,27 +167,6 @@
             </div>
         </div>
         
-        <div class="portfolio" id="indexFundsSection" style="display: none;">
-            <h2>📊 Index Fund Holdings</h2>
-            <table>
-                <thead>
-                    <tr>
-                        <th>Fund</th>
-                        <th>Shares</th>
-                        <th>Current Price</th>
-                        <th>Total Value</th>
-                        <th>Category</th>
-                    </tr>
-                </thead>
-                <tbody id="indexFundsList">
-                    <tr><td colspan="5">No index funds</td></tr>
-                </tbody>
-            </table>
-            <div class="total-value">
-                Total Index Funds Value: $<span id="indexFundsValue">0.00</span>
-            </div>
-        </div>
-        
         <div class="portfolio" id="shortPositionsSection" style="display: none;">
             <h2>Short Positions</h2>
             <table>
@@ -321,45 +300,6 @@
                     }
                 }
             }
-            
-            // Display index fund holdings
-            let indexFundsValue = 0;
-            const indexFundsSection = document.getElementById('indexFundsSection');
-            const indexFundsList = document.getElementById('indexFundsList');
-            
-            if (account.indexFundHoldings && Object.keys(account.indexFundHoldings).length > 0) {
-                indexFundsSection.style.display = 'block';
-                
-                // Fetch index fund prices
-                const indexFundsRes = await fetch('/api/indexfunds');
-                const indexFunds = await indexFundsRes.json();
-                
-                indexFundsList.innerHTML = Object.entries(account.indexFundHoldings)
-                    .filter(([_, holding]) => holding.shares > 0)
-                    .map(([symbol, holding]) => {
-                        const fund = indexFunds.find(f => f.symbol === symbol);
-                        const currentPrice = fund ? fund.price : 0;
-                        const value = holding.shares * currentPrice;
-                        indexFundsValue += value;
-                        
-                        return `
-                            <tr>
-                                <td>${symbol}</td>
-                                <td>${holding.shares.toFixed(2)}</td>
-                                <td>$${currentPrice.toFixed(2)}</td>
-                                <td>$${value.toFixed(2)}</td>
-                                <td>${fund ? fund.category : 'N/A'}</td>
-                            </tr>
-                        `;
-                    }).join('');
-                    
-                document.getElementById('indexFundsValue').textContent = indexFundsValue.toFixed(2);
-            } else {
-                indexFundsSection.style.display = 'none';
-            }
-            
-            // Update total value to include index funds
-            document.getElementById('totalValue').textContent = (account.cash + portfolioValue + indexFundsValue).toFixed(2);
             
             // Update short positions
             const shortPositionsSection = document.getElementById('shortPositionsSection');

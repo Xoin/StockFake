@@ -984,6 +984,7 @@ app.get('/api/account', (req, res) => {
   res.json({
     cash: userAccount.cash,
     portfolio: userAccount.portfolio,
+    purchaseHistory: userAccount.purchaseHistory,
     indexFundHoldings: userAccount.indexFundHoldings,
     shortPositions: userAccount.shortPositions,
     transactions: userAccount.transactions.slice(-20), // Last 20 transactions
