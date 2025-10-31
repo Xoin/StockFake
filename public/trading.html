@@ -276,7 +276,7 @@
                     oninput="filterStocks()">
             </div>
             <div class="pagination-controls-container"></div>
-            <table>
+            <table id="stocksTable">
                 <thead>
                     <tr>
                         <th>Symbol</th>
@@ -616,6 +616,7 @@
             }
         }
     </script>
+    <script src="table-sorter.js"></script>
     <script src="common.js"></script>
     <script>
         async function renderPage() {
@@ -653,6 +654,13 @@
             paginationDivs.forEach(div => {
                 div.innerHTML = paginator.renderControls();
             });
+            
+            // Add table sorting (will sort the current page)
+            if (typeof makeSortable !== 'undefined') {
+                makeSortable('stocksTable', {
+                    sortableColumns: [0, 1, 2, 3, 4] // All columns except Actions
+                });
+            }
         }
         
         async function updateStocks() {
