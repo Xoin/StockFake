@@ -32,14 +32,34 @@ A stock trading game that uses historical stock data. The server starts in 1970 
   - Credit score system (300-850) that adjusts based on payment behavior
   - Late payment penalties and default consequences
   - Term lengths from 90 days to 10 years
-- **Six Simulated Websites**:
-  - 🏦 **Bank**: View your cash balance, stock portfolio, and credit score
+- **Margin Trading & Portfolio Limits**: Advanced trading with risk controls
+  - Margin trading: Buy stocks with borrowed money (up to 2:1 leverage)
+  - Dynamic margin requirements based on historical regulations (70% before 1974, 50% after)
+  - Maintenance margin requirements and margin calls
+  - Forced liquidation when margin calls aren't met
+  - Position concentration limits (max 30% in single stock)
+  - Daily margin interest charges
+  - Portfolio risk monitoring and metrics
+- **Index Funds**: Diversified market exposure through 8 index funds
+  - S&P 500 Index Fund (500 largest US companies)
+  - NASDAQ-100 Index Fund (tech-heavy 100 non-financial NASDAQ stocks)
+  - Dow Jones Industrial Average Fund (30 blue-chip companies)
+  - Russell 2000 Small Cap Index Fund (small-cap stocks)
+  - Energy Sector Index Fund
+  - Technology Sector Index Fund
+  - Financial Services Index Fund
+  - Healthcare Index Fund
+  - Automatic expense ratios (0.15% - 0.40% annually)
+  - Historical inception dates matching real index fund availability
+- **Seven Simulated Websites**:
+  - 🏦 **Bank**: View your cash balance, stock portfolio, index funds, margin account, and credit score
   - 📈 **Trading Platform**: Buy and sell stocks during market hours, with share availability shown
   - 💰 **Loans**: Apply for loans, manage payments, and track credit score
   - 🏢 **Company Pages**: View detailed information about individual companies
   - 📊 **Market Graphs**: Charts and market trends
   - 📰 **News**: Historical news limited to major events (Apollo 13, Nixon resigns, Oil Crisis, etc.)
   - 📧 **Email**: Notifications and messages including loan status updates
+  - 📋 **Tax Center**: Yearly tax breakdowns for capital gains, dividends, and short sales
 
 ## Installation
 
@@ -105,7 +125,13 @@ Stock availability changes over time - for example, Apple becomes available in 1
 - `GET /api/stocks` - Get all stock prices with share availability
 - `GET /api/stocks/:symbol` - Get specific stock price and availability details
 - `GET /api/stocks/:symbol/history` - Get historical prices for charting
-- `POST /api/trade` - Place a trade (buy/sell/short/cover)
+- `POST /api/trade` - Place a trade (buy/sell/buy-margin/short/cover)
+
+### Index Funds
+- `GET /api/indexfunds` - Get all available index funds with current prices
+- `GET /api/indexfunds/:symbol` - Get detailed index fund information including constituents
+- `GET /api/indexfunds/:symbol/history` - Get historical index fund prices
+- `POST /api/indexfunds/trade` - Buy or sell index fund shares
 
 ### Companies & Information
 - `GET /api/companies` - Get all available companies
@@ -113,11 +139,19 @@ Stock availability changes over time - for example, Apple becomes available in 1
 - `GET /api/news` - Get historical news up to current time
 
 ### Account & Loans
-- `GET /api/account` - Get user account info including credit score and loans
+- `GET /api/account` - Get user account info including credit score, loans, margin account, and portfolio metrics
 - `GET /api/loans/companies` - Get available loan companies based on credit score
 - `GET /api/loans/active` - Get active loans
 - `POST /api/loans/take` - Apply for and take out a loan
 - `POST /api/loans/pay` - Make a payment on a loan
+
+### Margin Trading
+- `POST /api/margin/toggle` - Enable or disable margin trading
+- `POST /api/margin/pay` - Pay down margin debt
+- `POST /api/margin/calculate` - Calculate margin requirements for a potential trade
+
+### Tax Information
+- `GET /api/taxes` - Get tax summary and breakdown by year (query param: ?year=YYYY)
 
 ### Communications
 - `GET /api/emails` - Get email notifications including loan updates

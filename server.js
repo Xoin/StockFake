@@ -11,6 +11,7 @@ const companies = require('./data/companies');
 const loanCompanies = require('./data/loan-companies');
 const tradeHalts = require('./data/trade-halts');
 const shareAvailability = require('./data/share-availability');
+const indexFunds = require('./data/index-funds');
 
 // Middleware
 app.use(express.json());
@@ -99,6 +100,10 @@ app.get('/graphs', (req, res) => {
 
 app.get('/loans', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'loans.html'));
+});
+
+app.get('/taxes', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'taxes.html'));
 });
 
 app.get('/company/:symbol', (req, res) => {
@@ -226,6 +231,7 @@ app.get('/api/news', (req, res) => {
 let userAccount = {
   cash: 10000,
   portfolio: {},
+  indexFundHoldings: {}, // Track index fund shares: {symbol: {shares, purchaseHistory}}
   shortPositions: {}, // Track short positions (symbol: {shares, borrowPrice, borrowDate})
   purchaseHistory: {}, // Track purchase prices for tax calculation
   transactions: [], // History of all transactions
@@ -236,11 +242,31 @@ let userAccount = {
   shareholderInfluence: {}, // Track voting power by company
   creditScore: 750, // Starting credit score (fair)
   loans: [], // Active loans: { id, companyId, principal, balance, interestRate, startDate, dueDate, lastPaymentDate, missedPayments, status }
-  loanHistory: [] // History of all loan activities
+  loanHistory: [], // History of all loan activities
+  marginAccount: {
+    marginBalance: 0, // Amount borrowed on margin
+    marginInterestRate: 0.08, // 8% annual interest on margin (historical rates varied)
+    lastMarginInterestDate: null, // Track last time interest was charged
+    marginCalls: [], // History of margin calls
+    hasMarginEnabled: false // Whether margin trading is enabled
+  },
+  riskControls: {
+    maxLeverage: 2.0, // Maximum leverage ratio (2:1 = 50% margin)
+    maxPositionSize: 0.30, // Max 30% of portfolio in single stock
+    maintenanceMarginRatio: 0.30, // Minimum 30% equity ratio to avoid margin call
+    concentrationWarningThreshold: 0.20 // Warn at 20% concentration
+  }
 };
 
 // Trading restrictions
 const TRADE_COOLDOWN_MS = 5 * 60 * 1000; // 5 minutes cooldown between trades for same stock
+
+// Margin trading constants
+const INITIAL_MARGIN_REQUIREMENT = 0.50; // 50% initial margin (post-1974 regulation)
+const INITIAL_MARGIN_REQUIREMENT_1970 = 0.70; // 70% initial margin in early 1970s
+const MAINTENANCE_MARGIN_REQUIREMENT = 0.30; // 30% maintenance margin (25% is typical, using 30% for safety)
+const MARGIN_CALL_GRACE_PERIOD_DAYS = 5; // Days to meet margin call before forced liquidation
+const MARGIN_INTEREST_RATE_BASE = 0.08; // 8% annual base rate on margin loans
 
 // Tax rates
 const SHORT_TERM_TAX_RATE = 0.30; // 30% for holdings < 1 year
@@ -484,6 +510,258 @@ setInterval(checkAndChargeMonthlyFee, 10000);
 setInterval(trackInflation, 5000);
 setInterval(updateShortPositions, 10000);
 
+// Margin account helper functions
+
+// Get initial margin requirement based on year (regulations changed over time)
+function getInitialMarginRequirement(currentTime) {
+  const year = currentTime.getFullYear();
+  // Regulation T changed in 1974 from 70% to 50%
+  if (year < 1974) {
+    return INITIAL_MARGIN_REQUIREMENT_1970;
+  }
+  return INITIAL_MARGIN_REQUIREMENT;
+}
+
+// Calculate current portfolio value
+function calculatePortfolioValue() {
+  let totalValue = 0;
+  
+  // Add individual stock positions
+  for (const [symbol, shares] of Object.entries(userAccount.portfolio)) {
+    if (shares > 0) {
+      const stockPrice = stocks.getStockPrice(symbol, gameTime);
+      if (stockPrice) {
+        totalValue += stockPrice.price * shares;
+      }
+    }
+  }
+  
+  // Add index fund positions
+  for (const [symbol, holding] of Object.entries(userAccount.indexFundHoldings)) {
+    if (holding.shares > 0) {
+      const fundPrice = indexFunds.calculateIndexPrice(
+        indexFunds.indexFunds.find(f => f.symbol === symbol),
+        gameTime
+      );
+      if (fundPrice) {
+        totalValue += fundPrice * holding.shares;
+      }
+    }
+  }
+  
+  return totalValue;
+}
+
+// Calculate total account equity (cash + portfolio - margin debt)
+function calculateAccountEquity() {
+  const portfolioValue = calculatePortfolioValue();
+  const totalEquity = userAccount.cash + portfolioValue - userAccount.marginAccount.marginBalance;
+  return totalEquity;
+}
+
+// Calculate buying power (how much can be purchased with margin)
+function calculateBuyingPower() {
+  const initialMarginReq = getInitialMarginRequirement(gameTime);
+  const portfolioValue = calculatePortfolioValue();
+  const equity = calculateAccountEquity();
+  
+  // Buying power = (cash + portfolio value) / initial margin requirement - current positions
+  const maxPositionValue = equity / initialMarginReq;
+  const currentPositionValue = portfolioValue;
+  const additionalBuyingPower = Math.max(0, maxPositionValue - currentPositionValue);
+  
+  return {
+    buyingPower: additionalBuyingPower,
+    maxLeverage: userAccount.riskControls.maxLeverage,
+    currentLeverage: equity > 0 ? (portfolioValue / equity) : 0
+  };
+}
+
+// Calculate margin ratio (equity / portfolio value)
+function calculateMarginRatio() {
+  const portfolioValue = calculatePortfolioValue();
+  if (portfolioValue === 0) return 1.0; // No positions, fully margined
+  
+  const equity = calculateAccountEquity();
+  return equity / portfolioValue;
+}
+
+// Check if account is subject to margin call
+function checkMarginCall() {
+  const marginRatio = calculateMarginRatio();
+  const maintenanceMargin = userAccount.riskControls.maintenanceMarginRatio;
+  
+  if (marginRatio < maintenanceMargin && userAccount.marginAccount.marginBalance > 0) {
+    return {
+      isMarginCall: true,
+      currentRatio: marginRatio,
+      requiredRatio: maintenanceMargin,
+      equity: calculateAccountEquity(),
+      portfolioValue: calculatePortfolioValue(),
+      marginDebt: userAccount.marginAccount.marginBalance,
+      amountNeeded: (maintenanceMargin * calculatePortfolioValue()) - calculateAccountEquity()
+    };
+  }
+  
+  return { isMarginCall: false };
+}
+
+// Check position concentration risk
+function checkPositionConcentration(symbol) {
+  const portfolioValue = calculatePortfolioValue();
+  if (portfolioValue === 0) return { concentration: 0, warning: false, limit: false };
+  
+  const stockPrice = stocks.getStockPrice(symbol, gameTime);
+  if (!stockPrice) return { concentration: 0, warning: false, limit: false };
+  
+  const shares = userAccount.portfolio[symbol] || 0;
+  const positionValue = shares * stockPrice.price;
+  const concentration = positionValue / portfolioValue;
+  
+  return {
+    concentration: concentration,
+    warning: concentration >= userAccount.riskControls.concentrationWarningThreshold,
+    limit: concentration >= userAccount.riskControls.maxPositionSize,
+    currentPercent: concentration * 100,
+    maxPercent: userAccount.riskControls.maxPositionSize * 100
+  };
+}
+
+// Process margin interest (charged daily)
+function processMarginInterest() {
+  if (userAccount.marginAccount.marginBalance <= 0) return;
+  
+  const currentDate = new Date(gameTime);
+  const lastInterestDate = userAccount.marginAccount.lastMarginInterestDate 
+    ? new Date(userAccount.marginAccount.lastMarginInterestDate) 
+    : currentDate;
+  
+  const daysSinceLastCharge = (currentDate - lastInterestDate) / (1000 * 60 * 60 * 24);
+  
+  // Charge interest daily with compound interest
+  if (daysSinceLastCharge >= 1) {
+    const dailyRate = userAccount.marginAccount.marginInterestRate / 365;
+    const balanceBeforeInterest = userAccount.marginAccount.marginBalance;
+    
+    // Compound interest: P * (1 + r)^t - P
+    const interest = balanceBeforeInterest * (Math.pow(1 + dailyRate, daysSinceLastCharge) - 1);
+    
+    // Add interest to margin balance
+    userAccount.marginAccount.marginBalance += interest;
+    userAccount.marginAccount.lastMarginInterestDate = new Date(gameTime);
+    
+    // Record fee
+    userAccount.fees.push({
+      date: new Date(gameTime),
+      type: 'margin-interest',
+      amount: interest,
+      description: `Margin interest on $${balanceBeforeInterest.toFixed(2)} balance`
+    });
+  }
+}
+
+// Check and issue margin calls
+function processMarginCalls() {
+  const marginCallStatus = checkMarginCall();
+  
+  if (marginCallStatus.isMarginCall) {
+    // Check if this is a new margin call or existing one
+    const activeMarginCall = userAccount.marginAccount.marginCalls.find(
+      call => call.status === 'active'
+    );
+    
+    if (!activeMarginCall) {
+      // Issue new margin call
+      const marginCall = {
+        id: userAccount.marginAccount.marginCalls.length + 1,
+        issueDate: new Date(gameTime),
+        dueDate: new Date(gameTime.getTime() + (MARGIN_CALL_GRACE_PERIOD_DAYS * 24 * 60 * 60 * 1000)),
+        amountNeeded: marginCallStatus.amountNeeded,
+        currentRatio: marginCallStatus.currentRatio,
+        requiredRatio: marginCallStatus.requiredRatio,
+        status: 'active'
+      };
+      
+      userAccount.marginAccount.marginCalls.push(marginCall);
+      
+      // This would trigger an email notification
+      console.log(`MARGIN CALL ISSUED: Need $${marginCallStatus.amountNeeded.toFixed(2)} by ${marginCall.dueDate}`);
+    } else {
+      // Check if grace period has expired
+      const currentDate = new Date(gameTime);
+      const dueDate = new Date(activeMarginCall.dueDate);
+      
+      if (currentDate > dueDate) {
+        // Force liquidation - sell positions to meet margin requirements
+        activeMarginCall.status = 'liquidated';
+        activeMarginCall.liquidationDate = new Date(gameTime);
+        
+        // Implement forced liquidation
+        forceLiquidation();
+      }
+    }
+  } else {
+    // Check if there's an active margin call that can be cleared
+    const activeMarginCall = userAccount.marginAccount.marginCalls.find(
+      call => call.status === 'active'
+    );
+    
+    if (activeMarginCall) {
+      activeMarginCall.status = 'met';
+      activeMarginCall.metDate = new Date(gameTime);
+    }
+  }
+}
+
+// Force liquidation to meet margin requirements
+function forceLiquidation() {
+  // Sort positions by size (liquidate largest first)
+  const positions = Object.entries(userAccount.portfolio)
+    .filter(([symbol, shares]) => shares > 0)
+    .map(([symbol, shares]) => {
+      const stockPrice = stocks.getStockPrice(symbol, gameTime);
+      return {
+        symbol,
+        shares,
+        price: stockPrice ? stockPrice.price : 0,
+        value: stockPrice ? stockPrice.price * shares : 0
+      };
+    })
+    .sort((a, b) => b.value - a.value);
+  
+  // Liquidate positions until margin requirements are met
+  for (const position of positions) {
+    const marginCallStatus = checkMarginCall();
+    if (!marginCallStatus.isMarginCall) break;
+    
+    // Sell entire position
+    const saleProceeds = position.value;
+    const tradingFee = getTradingFee(saleProceeds, gameTime);
+    const netProceeds = saleProceeds - tradingFee;
+    
+    // Update account
+    userAccount.cash += netProceeds;
+    delete userAccount.portfolio[position.symbol];
+    
+    // Record forced sale transaction
+    userAccount.transactions.push({
+      date: new Date(gameTime),
+      type: 'forced-liquidation',
+      symbol: position.symbol,
+      shares: position.shares,
+      pricePerShare: position.price,
+      tradingFee: tradingFee,
+      netProceeds: netProceeds
+    });
+    
+    console.log(`FORCED LIQUIDATION: Sold ${position.shares} shares of ${position.symbol} for $${netProceeds.toFixed(2)}`);
+  }
+}
+
+// Call these periodically
+setInterval(processMarginInterest, 10000);
+setInterval(processMarginCalls, 10000);
+
 // Loan processing functions
 let loanIdCounter = 1;
 
@@ -566,9 +844,23 @@ function processLoans() {
 setInterval(processLoans, 10000);
 
 app.get('/api/account', (req, res) => {
+  const portfolioValue = calculatePortfolioValue();
+  const accountEquity = calculateAccountEquity();
+  const marginCallStatus = checkMarginCall();
+  const buyingPowerInfo = calculateBuyingPower();
+  
+  // Calculate position concentrations
+  const positionConcentrations = {};
+  for (const symbol in userAccount.portfolio) {
+    if (userAccount.portfolio[symbol] > 0) {
+      positionConcentrations[symbol] = checkPositionConcentration(symbol);
+    }
+  }
+  
   res.json({
     cash: userAccount.cash,
     portfolio: userAccount.portfolio,
+    indexFundHoldings: userAccount.indexFundHoldings,
     shortPositions: userAccount.shortPositions,
     transactions: userAccount.transactions.slice(-20), // Last 20 transactions
     dividends: userAccount.dividends.slice(-10), // Last 10 dividend payments
@@ -583,7 +875,26 @@ app.get('/api/account', (req, res) => {
       realValue: userAccount.cash / cumulativeInflation, // Purchasing power in 1970 dollars
       inflationYear: gameTime.getFullYear(),
       currentRate: inflationRates[gameTime.getFullYear()] || 0
-    }
+    },
+    marginAccount: {
+      marginBalance: userAccount.marginAccount.marginBalance,
+      marginInterestRate: userAccount.marginAccount.marginInterestRate,
+      hasMarginEnabled: userAccount.marginAccount.hasMarginEnabled,
+      marginCalls: userAccount.marginAccount.marginCalls.slice(-5), // Last 5 margin calls
+      buyingPower: buyingPowerInfo.buyingPower,
+      currentLeverage: buyingPowerInfo.currentLeverage,
+      maxLeverage: buyingPowerInfo.maxLeverage
+    },
+    portfolioMetrics: {
+      portfolioValue: portfolioValue,
+      accountEquity: accountEquity,
+      marginRatio: calculateMarginRatio(),
+      marginCallStatus: marginCallStatus,
+      initialMarginRequirement: getInitialMarginRequirement(gameTime),
+      maintenanceMarginRequirement: userAccount.riskControls.maintenanceMarginRatio,
+      positionConcentrations: positionConcentrations
+    },
+    riskControls: userAccount.riskControls
   });
 });
 
@@ -622,7 +933,7 @@ app.post('/api/trade', (req, res) => {
   const totalCost = stockPrice.price * shares;
   const tradingFee = getTradingFee(totalCost, gameTime);
   
-  if (action === 'buy') {
+  if (action === 'buy' || action === 'buy-margin') {
     // Check share availability
     const availabilityCheck = shareAvailability.canPurchaseShares(symbol, shares);
     if (!availabilityCheck.canPurchase) {
@@ -633,48 +944,150 @@ app.post('/api/trade', (req, res) => {
     }
     
     const totalWithFee = totalCost + tradingFee;
-    if (userAccount.cash < totalWithFee) {
-      return res.status(400).json({ error: 'Insufficient funds (including trading fee)' });
-    }
+    const useMargin = action === 'buy-margin' || (userAccount.marginAccount.hasMarginEnabled && userAccount.cash < totalWithFee);
     
-    // Record the share purchase in availability tracking
-    shareAvailability.recordPurchase(symbol, shares);
+    // Check position concentration limits
+    const futureShares = (userAccount.portfolio[symbol] || 0) + shares;
+    const futurePositionValue = futureShares * stockPrice.price;
+    const currentPortfolioValue = calculatePortfolioValue();
+    const futurePortfolioValue = currentPortfolioValue + totalCost;
+    const futureConcentration = futurePositionValue / futurePortfolioValue;
     
-    userAccount.cash -= totalWithFee;
-    userAccount.portfolio[symbol] = (userAccount.portfolio[symbol] || 0) + shares;
-    
-    // Track purchase for tax calculation
-    if (!userAccount.purchaseHistory[symbol]) {
-      userAccount.purchaseHistory[symbol] = [];
-    }
-    userAccount.purchaseHistory[symbol].push({
-      date: new Date(gameTime),
-      shares: shares,
-      pricePerShare: stockPrice.price
-    });
-    
-    // Update shareholder influence
-    userAccount.shareholderInfluence[symbol] = (userAccount.shareholderInfluence[symbol] || 0) + shares;
-    
-    // Record transaction
-    userAccount.transactions.push({
-      date: new Date(gameTime),
-      type: 'buy',
-      symbol,
-      shares,
-      pricePerShare: stockPrice.price,
-      tradingFee: tradingFee,
-      total: totalWithFee
-    });
-    
-    // Record fee
-    if (tradingFee > 0) {
-      userAccount.fees.push({
-        date: new Date(gameTime),
-        type: 'trading',
-        amount: tradingFee,
-        description: `Trading fee for buying ${shares} shares of ${symbol}`
+    if (futureConcentration > userAccount.riskControls.maxPositionSize) {
+      return res.status(400).json({ 
+        error: `Position would exceed maximum concentration limit of ${(userAccount.riskControls.maxPositionSize * 100).toFixed(0)}%. Current concentration would be ${(futureConcentration * 100).toFixed(1)}%`,
+        maxPositionSize: userAccount.riskControls.maxPositionSize,
+        futureConcentration: futureConcentration
       });
+    }
+    
+    // Handle margin trading
+    if (useMargin) {
+      const initialMarginReq = getInitialMarginRequirement(gameTime);
+      const requiredCash = totalWithFee * initialMarginReq;
+      const marginAmount = totalWithFee - requiredCash;
+      
+      // Check if user has enough cash for initial margin requirement
+      if (userAccount.cash < requiredCash) {
+        return res.status(400).json({ 
+          error: `Insufficient funds for margin purchase. Need ${(initialMarginReq * 100).toFixed(0)}% initial margin ($${requiredCash.toFixed(2)})`,
+          requiredCash: requiredCash,
+          availableCash: userAccount.cash
+        });
+      }
+      
+      // Check leverage limits
+      const currentEquity = calculateAccountEquity();
+      const newMarginBalance = userAccount.marginAccount.marginBalance + marginAmount;
+      const newPortfolioValue = calculatePortfolioValue() + totalCost;
+      const newLeverage = currentEquity > 0 ? newPortfolioValue / currentEquity : 0;
+      
+      if (newLeverage > userAccount.riskControls.maxLeverage) {
+        return res.status(400).json({ 
+          error: `Trade would exceed maximum leverage of ${userAccount.riskControls.maxLeverage}:1. New leverage would be ${newLeverage.toFixed(2)}:1`,
+          maxLeverage: userAccount.riskControls.maxLeverage,
+          newLeverage: newLeverage
+        });
+      }
+      
+      // Execute margin purchase
+      userAccount.cash -= requiredCash;
+      userAccount.marginAccount.marginBalance += marginAmount;
+      if (!userAccount.marginAccount.hasMarginEnabled) {
+        userAccount.marginAccount.hasMarginEnabled = true;
+        userAccount.marginAccount.lastMarginInterestDate = new Date(gameTime);
+      }
+      
+      // Record the share purchase in availability tracking
+      shareAvailability.recordPurchase(symbol, shares);
+      
+      userAccount.portfolio[symbol] = (userAccount.portfolio[symbol] || 0) + shares;
+      
+      // Track purchase for tax calculation
+      if (!userAccount.purchaseHistory[symbol]) {
+        userAccount.purchaseHistory[symbol] = [];
+      }
+      userAccount.purchaseHistory[symbol].push({
+        date: new Date(gameTime),
+        shares: shares,
+        pricePerShare: stockPrice.price
+      });
+      
+      // Update shareholder influence
+      userAccount.shareholderInfluence[symbol] = (userAccount.shareholderInfluence[symbol] || 0) + shares;
+      
+      // Record transaction
+      userAccount.transactions.push({
+        date: new Date(gameTime),
+        type: 'buy-margin',
+        symbol,
+        shares,
+        pricePerShare: stockPrice.price,
+        tradingFee: tradingFee,
+        total: totalWithFee,
+        cashPaid: requiredCash,
+        marginUsed: marginAmount,
+        initialMarginPercent: initialMarginReq * 100
+      });
+      
+      // Record fee
+      if (tradingFee > 0) {
+        userAccount.fees.push({
+          date: new Date(gameTime),
+          type: 'trading',
+          amount: tradingFee,
+          description: `Trading fee for buying ${shares} shares of ${symbol} on margin`
+        });
+      }
+    } else {
+      // Regular cash purchase
+      if (userAccount.cash < totalWithFee) {
+        return res.status(400).json({ 
+          error: 'Insufficient funds (including trading fee). Enable margin trading to use leverage.',
+          requiredCash: totalWithFee,
+          availableCash: userAccount.cash
+        });
+      }
+      
+      // Record the share purchase in availability tracking
+      shareAvailability.recordPurchase(symbol, shares);
+      
+      userAccount.cash -= totalWithFee;
+      userAccount.portfolio[symbol] = (userAccount.portfolio[symbol] || 0) + shares;
+      
+      // Track purchase for tax calculation
+      if (!userAccount.purchaseHistory[symbol]) {
+        userAccount.purchaseHistory[symbol] = [];
+      }
+      userAccount.purchaseHistory[symbol].push({
+        date: new Date(gameTime),
+        shares: shares,
+        pricePerShare: stockPrice.price
+      });
+      
+      // Update shareholder influence
+      userAccount.shareholderInfluence[symbol] = (userAccount.shareholderInfluence[symbol] || 0) + shares;
+      
+      // Record transaction
+      userAccount.transactions.push({
+        date: new Date(gameTime),
+        type: 'buy',
+        symbol,
+        shares,
+        pricePerShare: stockPrice.price,
+        tradingFee: tradingFee,
+        total: totalWithFee
+      });
+      
+      // Record fee
+      if (tradingFee > 0) {
+        userAccount.fees.push({
+          date: new Date(gameTime),
+          type: 'trading',
+          amount: tradingFee,
+          description: `Trading fee for buying ${shares} shares of ${symbol}`
+        });
+      }
     }
     
   } else if (action === 'sell') {
@@ -728,7 +1141,7 @@ app.post('/api/trade', (req, res) => {
     }
     
     // Apply sale and deduct tax and fee
-    const grossSaleAmount = totalCost;
+    const grossSaleAmount = stockPrice.price * shares;  // Fixed: use actual sale proceeds
     const netSaleProceeds = grossSaleAmount - taxAmount - tradingFee;
     userAccount.cash += netSaleProceeds;
     userAccount.portfolio[symbol] -= shares;
@@ -1097,6 +1510,448 @@ app.post('/api/loans/pay', (req, res) => {
   });
 });
 
+// Margin account endpoints
+
+// Enable/disable margin trading
+app.post('/api/margin/toggle', (req, res) => {
+  userAccount.marginAccount.hasMarginEnabled = !userAccount.marginAccount.hasMarginEnabled;
+  
+  if (userAccount.marginAccount.hasMarginEnabled) {
+    userAccount.marginAccount.lastMarginInterestDate = new Date(gameTime);
+  }
+  
+  res.json({
+    marginEnabled: userAccount.marginAccount.hasMarginEnabled,
+    message: userAccount.marginAccount.hasMarginEnabled ? 
+      'Margin trading enabled. You can now buy stocks with leverage.' :
+      'Margin trading disabled. You can only make cash purchases.'
+  });
+});
+
+// Pay down margin debt
+app.post('/api/margin/pay', (req, res) => {
+  const { amount } = req.body;
+  
+  if (amount <= 0) {
+    return res.status(400).json({ error: 'Payment amount must be positive' });
+  }
+  
+  if (userAccount.cash < amount) {
+    return res.status(400).json({ error: 'Insufficient funds' });
+  }
+  
+  if (userAccount.marginAccount.marginBalance <= 0) {
+    return res.status(400).json({ error: 'No margin debt to pay down' });
+  }
+  
+  const paymentAmount = Math.min(amount, userAccount.marginAccount.marginBalance);
+  userAccount.cash -= paymentAmount;
+  userAccount.marginAccount.marginBalance -= paymentAmount;
+  
+  // Record transaction
+  userAccount.transactions.push({
+    date: new Date(gameTime),
+    type: 'margin-payment',
+    amount: paymentAmount,
+    remainingMarginBalance: userAccount.marginAccount.marginBalance
+  });
+  
+  res.json({
+    amountPaid: paymentAmount,
+    remainingMarginBalance: userAccount.marginAccount.marginBalance,
+    message: userAccount.marginAccount.marginBalance > 0 ?
+      `Payment of $${paymentAmount.toFixed(2)} applied. Remaining margin balance: $${userAccount.marginAccount.marginBalance.toFixed(2)}` :
+      'Margin debt fully paid off!'
+  });
+});
+
+// Get margin requirements for a potential trade
+app.post('/api/margin/calculate', (req, res) => {
+  const { symbol, shares } = req.body;
+  
+  const stockPrice = stocks.getStockPrice(symbol, gameTime);
+  if (!stockPrice) {
+    return res.status(404).json({ error: 'Stock not found' });
+  }
+  
+  const totalCost = stockPrice.price * shares;
+  const tradingFee = getTradingFee(totalCost, gameTime);
+  const totalWithFee = totalCost + tradingFee;
+  const initialMarginReq = getInitialMarginRequirement(gameTime);
+  const requiredCash = totalWithFee * initialMarginReq;
+  const marginAmount = totalWithFee - requiredCash;
+  
+  // Check concentration
+  const futureShares = (userAccount.portfolio[symbol] || 0) + shares;
+  const futurePositionValue = futureShares * stockPrice.price;
+  const currentPortfolioValue = calculatePortfolioValue();
+  const futurePortfolioValue = currentPortfolioValue + totalCost;
+  const futureConcentration = futurePositionValue / futurePortfolioValue;
+  
+  // Check leverage
+  const currentEquity = calculateAccountEquity();
+  const newMarginBalance = userAccount.marginAccount.marginBalance + marginAmount;
+  const newPortfolioValue = calculatePortfolioValue() + totalCost;
+  const newLeverage = currentEquity > 0 ? newPortfolioValue / currentEquity : 0;
+  
+  res.json({
+    totalCost: totalCost,
+    tradingFee: tradingFee,
+    totalWithFee: totalWithFee,
+    initialMarginRequirement: initialMarginReq,
+    requiredCash: requiredCash,
+    marginAmount: marginAmount,
+    canAffordCash: userAccount.cash >= totalWithFee,
+    canAffordMargin: userAccount.cash >= requiredCash,
+    futureConcentration: futureConcentration,
+    concentrationLimit: userAccount.riskControls.maxPositionSize,
+    wouldExceedConcentration: futureConcentration > userAccount.riskControls.maxPositionSize,
+    newLeverage: newLeverage,
+    leverageLimit: userAccount.riskControls.maxLeverage,
+    wouldExceedLeverage: newLeverage > userAccount.riskControls.maxLeverage
+  });
+});
+
+// Index Funds API endpoints
+
+// Get all available index funds
+app.get('/api/indexfunds', (req, res) => {
+  const availableFunds = indexFunds.getAvailableIndexFunds(gameTime);
+  res.json(availableFunds);
+});
+
+// Get specific index fund details
+app.get('/api/indexfunds/:symbol', (req, res) => {
+  const { symbol } = req.params;
+  const fundDetails = indexFunds.getIndexFundDetails(symbol, gameTime);
+  
+  if (!fundDetails) {
+    return res.status(404).json({ error: 'Index fund not found or not available yet' });
+  }
+  
+  res.json(fundDetails);
+});
+
+// Get index fund history
+app.get('/api/indexfunds/:symbol/history', (req, res) => {
+  const { symbol } = req.params;
+  const { days } = req.query;
+  
+  const daysToFetch = parseInt(days) || 30;
+  const history = indexFunds.getIndexFundHistory(symbol, gameTime, daysToFetch);
+  
+  res.json(history);
+});
+
+// Trade index funds (buy/sell)
+app.post('/api/indexfunds/trade', (req, res) => {
+  const { symbol, action, shares } = req.body;
+  
+  if (!isMarketOpen(gameTime)) {
+    return res.status(400).json({ error: 'Market is closed' });
+  }
+  
+  const fund = indexFunds.indexFunds.find(f => f.symbol === symbol);
+  if (!fund) {
+    return res.status(404).json({ error: 'Index fund not found' });
+  }
+  
+  if (gameTime < fund.inceptionDate) {
+    return res.status(400).json({ error: 'This index fund is not available yet' });
+  }
+  
+  const fundPrice = indexFunds.calculateIndexPrice(fund, gameTime);
+  if (!fundPrice) {
+    return res.status(404).json({ error: 'Unable to calculate fund price' });
+  }
+  
+  const totalCost = fundPrice * shares;
+  const tradingFee = getTradingFee(totalCost, gameTime);
+  
+  if (action === 'buy') {
+    // Validate symbol to prevent prototype pollution
+    if (typeof symbol !== 'string' || symbol === '__proto__' || symbol === 'constructor' || symbol === 'prototype') {
+      return res.status(400).json({ error: 'Invalid symbol' });
+    }
+    
+    const totalWithFee = totalCost + tradingFee;
+    
+    if (userAccount.cash < totalWithFee) {
+      return res.status(400).json({ error: 'Insufficient funds' });
+    }
+    
+    userAccount.cash -= totalWithFee;
+    
+    // Initialize index fund holding if needed
+    if (!userAccount.indexFundHoldings[symbol]) {
+      userAccount.indexFundHoldings[symbol] = {
+        shares: 0,
+        purchaseHistory: []
+      };
+    }
+    
+    userAccount.indexFundHoldings[symbol].shares += shares;
+    userAccount.indexFundHoldings[symbol].purchaseHistory.push({
+      date: new Date(gameTime),
+      shares: shares,
+      pricePerShare: fundPrice
+    });
+    
+    // Record transaction
+    userAccount.transactions.push({
+      date: new Date(gameTime),
+      type: 'buy-indexfund',
+      symbol,
+      name: fund.name,
+      shares,
+      pricePerShare: fundPrice,
+      tradingFee: tradingFee,
+      total: totalWithFee
+    });
+    
+    // Record fee
+    if (tradingFee > 0) {
+      userAccount.fees.push({
+        date: new Date(gameTime),
+        type: 'trading',
+        amount: tradingFee,
+        description: `Trading fee for buying ${shares} shares of ${fund.name}`
+      });
+    }
+    
+  } else if (action === 'sell') {
+    // Validate symbol to prevent prototype pollution
+    if (typeof symbol !== 'string' || symbol === '__proto__' || symbol === 'constructor' || symbol === 'prototype') {
+      return res.status(400).json({ error: 'Invalid symbol' });
+    }
+    
+    const holding = userAccount.indexFundHoldings[symbol];
+    if (!holding || holding.shares < shares) {
+      return res.status(400).json({ error: 'Insufficient shares' });
+    }
+    
+    // Calculate capital gains tax using FIFO
+    let remainingShares = shares;
+    let totalCostBasis = 0;
+    let taxAmount = 0;
+    
+    const purchases = holding.purchaseHistory.slice();
+    
+    while (remainingShares > 0 && purchases.length > 0) {
+      const purchase = purchases[0];
+      const sharesToSell = Math.min(remainingShares, purchase.shares);
+      const costBasis = sharesToSell * purchase.pricePerShare;
+      totalCostBasis += costBasis;
+      
+      // Calculate holding period
+      const purchaseDate = new Date(purchase.date);
+      const currentDate = new Date(gameTime);
+      const holdingDays = (currentDate - purchaseDate) / (1000 * 60 * 60 * 24);
+      const isLongTerm = holdingDays >= 365;
+      
+      // Calculate gain/loss
+      const saleProceeds = sharesToSell * fundPrice;
+      const capitalGain = saleProceeds - costBasis;
+      
+      if (capitalGain > 0) {
+        const taxRate = isLongTerm ? LONG_TERM_TAX_RATE : SHORT_TERM_TAX_RATE;
+        taxAmount += capitalGain * taxRate;
+      }
+      
+      // Update purchase history
+      purchase.shares -= sharesToSell;
+      if (purchase.shares <= 0) {
+        purchases.shift();
+      }
+      
+      remainingShares -= sharesToSell;
+    }
+    
+    // Track which purchases were used in the sale for expense ratio calculation
+    const purchasesUsedInSale = [];
+    let remainingForExpense = shares;
+    
+    for (const purchase of holding.purchaseHistory) {
+      if (remainingForExpense <= 0) break;
+      
+      const sharesFromThisPurchase = Math.min(remainingForExpense, purchase.shares);
+      purchasesUsedInSale.push({
+        shares: sharesFromThisPurchase,
+        pricePerShare: purchase.pricePerShare,
+        date: purchase.date
+      });
+      remainingForExpense -= sharesFromThisPurchase;
+    }
+    
+    // Update holding purchase history
+    holding.purchaseHistory = purchases;
+    
+    // Calculate expense ratio fee based on actual holding periods for shares sold
+    let totalExpenseFee = 0;
+    
+    purchasesUsedInSale.forEach(purchase => {
+      const daysHeld = (gameTime - new Date(purchase.date)) / (1000 * 60 * 60 * 24);
+      const dailyFeeRate = fund.expenseRatio / 365;
+      const purchaseValue = purchase.shares * purchase.pricePerShare;
+      const fee = purchaseValue * dailyFeeRate * daysHeld;
+      totalExpenseFee += fee;
+    });
+    
+    if (totalExpenseFee > 0) {
+      userAccount.fees.push({
+        date: new Date(gameTime),
+        type: 'index-fund-expense',
+        amount: totalExpenseFee,
+        description: `Expense ratio fee (${(fund.expenseRatio * 100).toFixed(2)}%) for ${fund.name}`
+      });
+    }
+    
+    // Apply sale and deduct tax, fee, and expense ratio
+    const grossSaleAmount = fundPrice * shares;
+    const netSaleProceeds = grossSaleAmount - taxAmount - tradingFee - totalExpenseFee;
+    userAccount.cash += netSaleProceeds;
+    holding.shares -= shares;
+    
+    // Clean up if no shares left
+    if (holding.shares <= 0) {
+      delete userAccount.indexFundHoldings[symbol];
+    }
+    
+    // Record transaction
+    userAccount.transactions.push({
+      date: new Date(gameTime),
+      type: 'sell-indexfund',
+      symbol,
+      name: fund.name,
+      shares,
+      pricePerShare: fundPrice,
+      total: grossSaleAmount,
+      tax: taxAmount,
+      tradingFee: tradingFee,
+      netProceeds: netSaleProceeds
+    });
+    
+    // Record fee
+    if (tradingFee > 0) {
+      userAccount.fees.push({
+        date: new Date(gameTime),
+        type: 'trading',
+        amount: tradingFee,
+        description: `Trading fee for selling ${shares} shares of ${fund.name}`
+      });
+    }
+    
+    // Record tax if any
+    if (taxAmount > 0) {
+      userAccount.taxes.push({
+        date: new Date(gameTime),
+        type: 'capital-gains',
+        amount: taxAmount,
+        description: `Capital gains tax on ${shares} shares of ${fund.name}`
+      });
+    }
+  }
+  
+  res.json(userAccount);
+});
+
+// Tax summary API endpoint
+app.get('/api/taxes', (req, res) => {
+  const { year } = req.query;
+  const targetYear = year ? parseInt(year) : gameTime.getFullYear();
+  
+  // Filter taxes by year
+  const yearlyTaxes = userAccount.taxes.filter(tax => {
+    const taxYear = new Date(tax.date).getFullYear();
+    return taxYear === targetYear;
+  });
+  
+  // Calculate tax breakdown by type
+  const taxBreakdown = {
+    capitalGains: 0,
+    shortGains: 0,
+    dividends: 0,
+    total: 0
+  };
+  
+  const detailedTaxes = [];
+  
+  yearlyTaxes.forEach(tax => {
+    if (tax.type === 'capital-gains') {
+      taxBreakdown.capitalGains += tax.amount;
+    } else if (tax.type === 'short-gains') {
+      taxBreakdown.shortGains += tax.amount;
+    } else if (tax.type === 'dividend') {
+      taxBreakdown.dividends += tax.amount;
+    }
+    taxBreakdown.total += tax.amount;
+    
+    detailedTaxes.push({
+      date: tax.date,
+      type: tax.type,
+      amount: tax.amount,
+      description: tax.description
+    });
+  });
+  
+  // Get dividend summary for the year
+  const yearlyDividends = userAccount.dividends.filter(div => {
+    const divYear = new Date(div.date).getFullYear();
+    return divYear === targetYear;
+  });
+  
+  const dividendSummary = {
+    totalGross: 0,
+    totalTax: 0,
+    totalNet: 0,
+    count: yearlyDividends.length
+  };
+  
+  yearlyDividends.forEach(div => {
+    dividendSummary.totalGross += div.grossAmount;
+    dividendSummary.totalTax += div.tax;
+    dividendSummary.totalNet += div.netAmount;
+  });
+  
+  // Get transaction summary for capital gains calculations
+  const yearlyTransactions = userAccount.transactions.filter(tx => {
+    const txYear = new Date(tx.date).getFullYear();
+    return txYear === targetYear && (tx.type === 'sell' || tx.type === 'sell-indexfund');
+  });
+  
+  const capitalGainsSummary = {
+    totalSales: yearlyTransactions.length,
+    totalProceeds: 0,
+    totalTax: 0,
+    shortTermGains: 0,
+    longTermGains: 0
+  };
+  
+  yearlyTransactions.forEach(tx => {
+    capitalGainsSummary.totalProceeds += tx.total || 0;
+    capitalGainsSummary.totalTax += tx.tax || 0;
+  });
+  
+  // Get all years with tax data
+  const yearsWithTaxes = [...new Set(
+    userAccount.taxes.map(tax => new Date(tax.date).getFullYear())
+  )].sort((a, b) => b - a);
+  
+  res.json({
+    year: targetYear,
+    taxBreakdown,
+    dividendSummary,
+    capitalGainsSummary,
+    detailedTaxes,
+    yearsWithTaxes,
+    currentTaxRates: {
+      shortTermCapitalGains: SHORT_TERM_TAX_RATE * 100,
+      longTermCapitalGains: LONG_TERM_TAX_RATE * 100,
+      dividends: DIVIDEND_TAX_RATE * 100
+    }
+  });
+});
+
 // Email API (generate emails based on game events)
 app.get('/api/emails', (req, res) => {
   const emails = [
@@ -1186,6 +2041,29 @@ app.get('/api/emails', (req, res) => {
         subject: `🚨 LOAN DEFAULT - Loan #${loanEvent.loanId}`,
         body: `Your loan (Loan #${loanEvent.loanId}) has gone into default after multiple missed payments. Remaining balance: $${loanEvent.remainingBalance.toFixed(2)}. Your credit score has been severely impacted (-${Math.abs(loanEvent.creditScoreChange)} points). This will affect your ability to obtain future loans.`,
         date: loanEvent.date,
+        spam: false
+      });
+    }
+  });
+  
+  // Add margin call notification emails
+  userAccount.marginAccount.marginCalls.forEach((marginCall, index) => {
+    if (marginCall.status === 'active') {
+      emails.push({
+        id: 900 + index,
+        from: 'margin@stockfake.com',
+        subject: `⚠️ MARGIN CALL - Action Required`,
+        body: `Your account has fallen below the maintenance margin requirement. Current margin ratio: ${(marginCall.currentRatio * 100).toFixed(1)}%, Required: ${(marginCall.requiredRatio * 100).toFixed(1)}%. You need to deposit $${marginCall.amountNeeded.toFixed(2)} or reduce positions by ${marginCall.dueDate.toLocaleDateString()}. Failure to meet this margin call may result in forced liquidation.`,
+        date: marginCall.issueDate,
+        spam: false
+      });
+    } else if (marginCall.status === 'liquidated') {
+      emails.push({
+        id: 950 + index,
+        from: 'margin@stockfake.com',
+        subject: `🚨 FORCED LIQUIDATION - Margin Call Not Met`,
+        body: `Your positions have been forcibly liquidated due to failure to meet margin call requirements. This action was necessary to protect against further losses. Please review your account and consider the risks of margin trading.`,
+        date: marginCall.liquidationDate,
         spam: false
       });
     }
