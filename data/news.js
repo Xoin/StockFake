@@ -731,6 +731,7 @@ const stocks = require('./stocks');
 
 // Track stock price history for dynamic news generation
 let priceHistory = {};
+let sortedDateCache = []; // Cache of sorted dates for performance
 let dynamicNewsEvents = [];
 let nextDynamicNewsId = 10000; // Start dynamic IDs high to avoid conflicts
 let lastNewsCheckTime = null;
@@ -760,6 +761,9 @@ function cleanupOldData(currentTime) {
     }
   });
   
+  // Rebuild sorted date cache after cleanup
+  sortedDateCache = Object.keys(priceHistory).sort();
+  
   // Clean up old dynamic news events (keep only most recent)
   if (dynamicNewsEvents.length > MAX_DYNAMIC_NEWS_ITEMS) {
     dynamicNewsEvents.sort((a, b) => b.date - a.date);
@@ -783,17 +787,19 @@ function updatePriceHistory(currentTime) {
   
   if (!priceHistory[dateKey]) {
     priceHistory[dateKey] = {};
+    // Update sorted date cache when adding new date
+    sortedDateCache.push(dateKey);
+    sortedDateCache.sort();
   }
   
   currentStocks.forEach(stock => {
-    if (!priceHistory[dateKey][stock.symbol]) {
-      priceHistory[dateKey][stock.symbol] = {
-        price: stock.price,
-        change: stock.change,
-        name: stock.name,
-        sector: stock.sector
-      };
-    }
+    // Always update to latest price for the day (in case of multiple calls per day)
+    priceHistory[dateKey][stock.symbol] = {
+      price: stock.price,
+      change: stock.change,
+      name: stock.name,
+      sector: stock.sector
+    };
   });
   
   // Generate dynamic news based on significant movements
@@ -818,8 +824,9 @@ function generateDynamicNews(currentTime, currentStocks, dateKey) {
     // Calculate actual daily change
     const dailyChange = ((stock.price - yesterdayData.price) / yesterdayData.price) * 100;
     
-    // Check cooldown
-    const lastNews = lastNewsGenerated[stock.symbol];
+    // Check cooldown - use consistent key format
+    const movementKey = `stock:${stock.symbol}`;
+    const lastNews = lastNewsGenerated[movementKey];
     if (lastNews && (currentTime - lastNews) < NEWS_COOLDOWN_MS) {
       return;
     }
@@ -829,13 +836,13 @@ function generateDynamicNews(currentTime, currentStocks, dateKey) {
       const newsItem = createMarketMovementNews(stock, dailyChange, currentTime);
       if (newsItem) {
         dynamicNewsEvents.push(newsItem);
-        lastNewsGenerated[stock.symbol] = currentTime;
+        lastNewsGenerated[movementKey] = currentTime;
       }
     }
     
     // Check for volatility patterns (multiple days of high movement)
     const volatility = calculateVolatility(stock.symbol, dateKey);
-    const volatilityKey = `${stock.symbol}:volatility`;
+    const volatilityKey = `volatility:${stock.symbol}`;
     if (volatility > VOLATILITY_THRESHOLD && !lastNewsGenerated[volatilityKey]) {
       const newsItem = createVolatilityNews(stock, volatility, currentTime);
       if (newsItem) {
@@ -850,11 +857,9 @@ function generateDynamicNews(currentTime, currentStocks, dateKey) {
 }
 
 function calculateVolatility(symbol, currentDateKey) {
-  // Get sorted dates efficiently by filtering recent dates
-  const allDates = Object.keys(priceHistory);
-  const recentDates = allDates
+  // Use cached sorted dates for better performance
+  const recentDates = sortedDateCache
     .filter(d => d <= currentDateKey)
-    .sort()
     .reverse()
     .slice(0, VOLATILITY_WINDOW);
   
@@ -1024,6 +1029,7 @@ function getLatestNews(currentTime, limit = 5) {
 // Reset function for testing
 function resetDynamicNews() {
   priceHistory = {};
+  sortedDateCache = [];
   dynamicNewsEvents = [];
   nextDynamicNewsId = 10000;
   lastNewsGenerated = {};
