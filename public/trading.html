@@ -39,43 +39,6 @@
         .nav a:hover {
             text-decoration: underline;
         }
-        .time-display {
-            background-color: #000;
-            border: 2px solid #00ff00;
-            padding: 10px;
-            margin-bottom: 20px;
-            text-align: center;
-        }
-        .status-indicators {
-            margin-top: 8px;
-            font-size: 0.9em;
-            display: flex;
-            justify-content: center;
-            gap: 15px;
-            flex-wrap: wrap;
-        }
-        .status-badge {
-            display: inline-block;
-            padding: 3px 10px;
-            border-radius: 3px;
-            font-weight: bold;
-            font-size: 0.85em;
-        }
-        .paused-badge {
-            background-color: #440000;
-            color: #ff0000;
-            border: 1px solid #ff0000;
-        }
-        .running-badge {
-            background-color: #004400;
-            color: #00ff00;
-            border: 1px solid #00ff00;
-        }
-        .speed-badge {
-            background-color: #000044;
-            color: #00ffff;
-            border: 1px solid #00ffff;
-        }
         .halt-warning {
             background-color: #440000;
             border: 2px solid #ff0000;
@@ -169,19 +132,9 @@
 </head>
 <body>
     <div class="container">
-        <h1>📈 TRADING PLATFORM</h1>
-        <div class="nav">
-            <a href="/">← Back to Portal</a> |
-            <a href="/bank">Bank</a> |
-            <a href="/loans">Loans</a> |
-            <a href="/news">News</a> |
-            <a href="/email">Email</a>
-        </div>
-        <div class="time-display" id="timeDisplay">Loading...</div>
-        <div class="status-indicators">
-            <span id="pauseStatus" class="status-badge">...</span>
-            <span id="speedStatus" class="status-badge speed-badge">...</span>
-        </div>
+        <!-- Header will be loaded here -->
+        <div id="page-header"></div>
+        
         <div id="haltWarning" class="halt-warning" style="display: none;"></div>
         
         <div class="stocks-container">
@@ -225,42 +178,16 @@
         </div>
     </div>
     
+    <script src="header.js"></script>
     <script>
         let stocks = [];
         let paginator;
         
-        async function updateTime() {
+        // Check for trade halts (called by interval)
+        async function updateTradeHaltWarning() {
             const response = await fetch('/api/time');
             const data = await response.json();
-            const date = new Date(data.currentTime);
-            const status = data.isMarketOpen ? '🟢 MARKET OPEN' : '🔴 MARKET CLOSED';
-            document.getElementById('timeDisplay').textContent = `${date.toLocaleString()} - ${status}`;
             
-            // Update pause status
-            const pauseStatusEl = document.getElementById('pauseStatus');
-            if (data.isPaused) {
-                pauseStatusEl.textContent = '⏸ PAUSED';
-                pauseStatusEl.className = 'status-badge paused-badge';
-            } else {
-                pauseStatusEl.textContent = '▶ RUNNING';
-                pauseStatusEl.className = 'status-badge running-badge';
-            }
-            
-            // Update speed status
-            const speedStatusEl = document.getElementById('speedStatus');
-            let speedText = '';
-            if (data.timeMultiplier === 60) {
-                speedText = '🐌 SLOW';
-            } else if (data.timeMultiplier === 3600) {
-                speedText = '⚡ NORMAL';
-            } else if (data.timeMultiplier === 86400) {
-                speedText = '🚀 FAST';
-            } else {
-                speedText = `⏱ ${data.timeMultiplier}s`;
-            }
-            speedStatusEl.textContent = speedText;
-            
-            // Check for trade halts
             const haltWarning = document.getElementById('haltWarning');
             if (data.tradeHalt && data.tradeHalt.status === 'current') {
                 const halt = data.tradeHalt.halt;
@@ -314,9 +241,6 @@
                 document.getElementById('message').innerHTML = `<div class="message error">Error: ${error.message}</div>`;
             }
         }
-        
-        updateTime();
-        setInterval(updateTime, 1000);
     </script>
     <script src="common.js"></script>
     <script>
@@ -396,11 +320,25 @@
             applyEraTheme(year);
         }
         
+        // Initialize page with header
+        loadHeader('page-header', {
+            title: '📈 TRADING PLATFORM',
+            navigationLinks: [
+                { href: '/', text: '← Back to Portal' },
+                { href: '/bank', text: 'Bank' },
+                { href: '/loans', text: 'Loans' },
+                { href: '/news', text: 'News' },
+                { href: '/email', text: 'Email' }
+            ]
+        });
+        
         updateStocks();
         updateEraTheme();
+        updateTradeHaltWarning();
         updateNavNotifications(); // Initial update
         setInterval(updateStocks, 2000);
         setInterval(updateEraTheme, 10000);
+        setInterval(updateTradeHaltWarning, 1000);
         setInterval(updateNavNotifications, 3000); // Update every 3 seconds
     </script>
 </body>
