@@ -46,6 +46,36 @@
             margin-bottom: 20px;
             text-align: center;
         }
+        .status-indicators {
+            margin-top: 8px;
+            font-size: 0.9em;
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+        .status-badge {
+            display: inline-block;
+            padding: 3px 10px;
+            border-radius: 3px;
+            font-weight: bold;
+            font-size: 0.85em;
+        }
+        .paused-badge {
+            background-color: #440000;
+            color: #ff0000;
+            border: 1px solid #ff0000;
+        }
+        .running-badge {
+            background-color: #004400;
+            color: #00ff00;
+            border: 1px solid #00ff00;
+        }
+        .speed-badge {
+            background-color: #000044;
+            color: #00ffff;
+            border: 1px solid #00ffff;
+        }
         .halt-warning {
             background-color: #440000;
             border: 2px solid #ff0000;
@@ -148,6 +178,10 @@
             <a href="/email">Email</a>
         </div>
         <div class="time-display" id="timeDisplay">Loading...</div>
+        <div class="status-indicators">
+            <span id="pauseStatus" class="status-badge">...</span>
+            <span id="speedStatus" class="status-badge speed-badge">...</span>
+        </div>
         <div id="haltWarning" class="halt-warning" style="display: none;"></div>
         
         <div class="stocks-container">
@@ -201,6 +235,30 @@
             const date = new Date(data.currentTime);
             const status = data.isMarketOpen ? '🟢 MARKET OPEN' : '🔴 MARKET CLOSED';
             document.getElementById('timeDisplay').textContent = `${date.toLocaleString()} - ${status}`;
+            
+            // Update pause status
+            const pauseStatusEl = document.getElementById('pauseStatus');
+            if (data.isPaused) {
+                pauseStatusEl.textContent = '⏸ PAUSED';
+                pauseStatusEl.className = 'status-badge paused-badge';
+            } else {
+                pauseStatusEl.textContent = '▶ RUNNING';
+                pauseStatusEl.className = 'status-badge running-badge';
+            }
+            
+            // Update speed status
+            const speedStatusEl = document.getElementById('speedStatus');
+            let speedText = '';
+            if (data.timeMultiplier === 60) {
+                speedText = '🐌 SLOW';
+            } else if (data.timeMultiplier === 3600) {
+                speedText = '⚡ NORMAL';
+            } else if (data.timeMultiplier === 86400) {
+                speedText = '🚀 FAST';
+            } else {
+                speedText = `⏱ ${data.timeMultiplier}s`;
+            }
+            speedStatusEl.textContent = speedText;
             
             // Check for trade halts
             const haltWarning = document.getElementById('haltWarning');
@@ -304,8 +362,16 @@
             stocks = await response.json();
             
             const stockSelect = document.getElementById('stockSymbol');
+            // Preserve the currently selected value
+            const currentSelection = stockSelect.value;
+            
             stockSelect.innerHTML = '<option value="">Select Stock</option>' + 
                 stocks.map(s => `<option value="${escapeHtml(s.symbol)}">${escapeHtml(s.symbol)} - ${escapeHtml(s.name)}</option>`).join('');
+            
+            // Restore the selection if it still exists in the updated list
+            if (currentSelection && stocks.find(s => s.symbol === currentSelection)) {
+                stockSelect.value = currentSelection;
+            }
             
             // Initialize paginator
             paginator = new Paginator(stocks, 20);

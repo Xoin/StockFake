@@ -23,6 +23,22 @@ for (const [symbol, stockInfo] of Object.entries(historicalStockData.data)) {
   stockSectors[symbol] = stockInfo.sector;
 }
 
+// Deterministic pseudo-random function based on time and symbol
+// This ensures the same time always produces the same price
+function seededRandom(symbol, time) {
+  // Create a hash from symbol and time (rounded to nearest minute for stability)
+  const roundedTime = Math.floor(time / 60000) * 60000; // Round to minute
+  let hash = 0;
+  const str = symbol + roundedTime.toString();
+  for (let i = 0; i < str.length; i++) {
+    const char = str.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash; // Convert to 32bit integer
+  }
+  // Convert hash to a value between 0 and 1
+  return Math.abs(Math.sin(hash) * 10000) % 1;
+}
+
 // Get interpolated price with minor fluctuations
 function getStockPrice(symbol, currentTime) {
   const stockData = historicalData[symbol];
@@ -63,8 +79,9 @@ function getStockPrice(symbol, currentTime) {
   
   const basePrice = before.price + (priceRange * (timePassed / timeRange));
   
-  // Add minor random fluctuation (±2%)
-  const fluctuation = (Math.random() - 0.5) * 0.04 * basePrice;
+  // Add minor deterministic fluctuation (±2%) based on time and symbol
+  const randomValue = seededRandom(symbol, currentTime.getTime());
+  const fluctuation = (randomValue - 0.5) * 0.04 * basePrice;
   const price = Math.max(0.01, basePrice + fluctuation);
   
   // Calculate change from previous base price

@@ -56,6 +56,37 @@
             margin-bottom: 20px;
             text-align: center;
         }
+        .controls-status {
+            margin-bottom: 10px;
+            padding: 10px;
+            background-color: #001100;
+            border: 1px solid #00ff00;
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+        .status-indicator {
+            display: inline-block;
+            padding: 5px 15px;
+            border-radius: 3px;
+            font-weight: bold;
+        }
+        .paused-indicator {
+            background-color: #440000;
+            color: #ff0000;
+            border: 1px solid #ff0000;
+        }
+        .running-indicator {
+            background-color: #004400;
+            color: #00ff00;
+            border: 1px solid #00ff00;
+        }
+        .speed-indicator {
+            background-color: #000044;
+            color: #00ffff;
+            border: 1px solid #00ffff;
+        }
         button {
             background-color: #003300;
             color: #00ff00;
@@ -107,6 +138,10 @@
             <span id="marketStatus" class="market-status">...</span>
         </div>
         <div class="controls">
+            <div class="controls-status">
+                <span id="pauseStatus" class="status-indicator">...</span>
+                <span id="speedStatus" class="status-indicator speed-indicator">...</span>
+            </div>
             <button onclick="togglePause()">⏯ Pause/Resume</button>
             <button onclick="setSpeed(60)">🐌 Slow (1s = 1min)</button>
             <button onclick="setSpeed(3600)">⚡ Normal (1s = 1hr)</button>
@@ -154,6 +189,30 @@
                 statusEl.textContent = '🔴 MARKET CLOSED';
                 statusEl.className = 'market-status market-closed';
             }
+            
+            // Update pause status
+            const pauseStatusEl = document.getElementById('pauseStatus');
+            if (data.isPaused) {
+                pauseStatusEl.textContent = '⏸ PAUSED';
+                pauseStatusEl.className = 'status-indicator paused-indicator';
+            } else {
+                pauseStatusEl.textContent = '▶ RUNNING';
+                pauseStatusEl.className = 'status-indicator running-indicator';
+            }
+            
+            // Update speed status
+            const speedStatusEl = document.getElementById('speedStatus');
+            let speedText = '';
+            if (data.timeMultiplier === 60) {
+                speedText = '🐌 SLOW (1s = 1min)';
+            } else if (data.timeMultiplier === 3600) {
+                speedText = '⚡ NORMAL (1s = 1hr)';
+            } else if (data.timeMultiplier === 86400) {
+                speedText = '🚀 FAST (1s = 1day)';
+            } else {
+                speedText = `⏱ CUSTOM (1s = ${data.timeMultiplier}s)`;
+            }
+            speedStatusEl.textContent = speedText;
         }
         
         async function togglePause() {
@@ -167,6 +226,7 @@
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ multiplier })
             });
+            updateTime();
         }
         
         updateTime();

@@ -48,7 +48,43 @@ function isMarketOpen(date) {
 // Time simulation
 setInterval(() => {
   if (!isPaused) {
-    gameTime = new Date(gameTime.getTime() + (timeMultiplier * 1000));
+    const newTime = new Date(gameTime.getTime() + (timeMultiplier * 1000));
+    
+    // If market is currently closed and we're using fast speed (1s = 1day)
+    // Check if we would skip over market open hours
+    if (!isMarketOpen(gameTime) && timeMultiplier >= 86400) {
+      const marketWasClosed = !isMarketOpen(gameTime);
+      const marketWillBeOpen = isMarketOpen(newTime);
+      
+      // If we're about to skip from closed to closed (potentially skipping open hours)
+      // or if we're transitioning from closed to open, advance more carefully
+      if (marketWasClosed) {
+        // Advance time in smaller increments to avoid skipping market hours
+        let checkTime = new Date(gameTime.getTime());
+        const increment = 3600 * 1000; // 1 hour increments
+        const maxAdvance = timeMultiplier * 1000;
+        let totalAdvanced = 0;
+        
+        while (totalAdvanced < maxAdvance && !isMarketOpen(checkTime)) {
+          checkTime = new Date(checkTime.getTime() + increment);
+          totalAdvanced += increment;
+          
+          // Stop if we hit market open time
+          if (isMarketOpen(checkTime)) {
+            gameTime = checkTime;
+            return;
+          }
+        }
+        
+        // If we still haven't found market open, use the calculated time
+        if (totalAdvanced >= maxAdvance) {
+          gameTime = newTime;
+        }
+        return;
+      }
+    }
+    
+    gameTime = newTime;
   }
 }, 1000);
 
@@ -59,6 +95,7 @@ app.get('/api/time', (req, res) => {
     currentTime: gameTime,
     isMarketOpen: isMarketOpen(gameTime),
     isPaused,
+    timeMultiplier,
     tradeHalt: haltStatus
   });
 });
