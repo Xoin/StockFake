@@ -742,8 +742,40 @@ const VOLATILITY_WINDOW = 5; // Track 5 periods for volatility
 const VOLATILITY_THRESHOLD = 1.8; // Average volatility threshold
 const NEWS_COOLDOWN_MS = 24 * 60 * 60 * 1000; // 1 day cooldown per stock
 
+// Cleanup thresholds to prevent memory leaks
+const MAX_PRICE_HISTORY_DAYS = 90; // Keep only last 90 days of price history
+const MAX_DYNAMIC_NEWS_ITEMS = 1000; // Maximum dynamic news items to retain
+
 // Track when we last generated news for each stock
 let lastNewsGenerated = {};
+
+function cleanupOldData(currentTime) {
+  // Clean up old price history
+  const cutoffDate = new Date(currentTime.getTime() - (MAX_PRICE_HISTORY_DAYS * 24 * 60 * 60 * 1000));
+  const cutoffKey = cutoffDate.toISOString().split('T')[0];
+  
+  Object.keys(priceHistory).forEach(dateKey => {
+    if (dateKey < cutoffKey) {
+      delete priceHistory[dateKey];
+    }
+  });
+  
+  // Clean up old dynamic news events (keep only most recent)
+  if (dynamicNewsEvents.length > MAX_DYNAMIC_NEWS_ITEMS) {
+    dynamicNewsEvents.sort((a, b) => b.date - a.date);
+    dynamicNewsEvents = dynamicNewsEvents.slice(0, MAX_DYNAMIC_NEWS_ITEMS);
+  }
+  
+  // Clean up old news generation timestamps
+  const timestamps = Object.keys(lastNewsGenerated);
+  if (timestamps.length > 500) {
+    timestamps.forEach(key => {
+      if (currentTime - lastNewsGenerated[key] > 30 * 24 * 60 * 60 * 1000) { // 30 days
+        delete lastNewsGenerated[key];
+      }
+    });
+  }
+}
 
 function updatePriceHistory(currentTime) {
   const currentStocks = stocks.getStockData(currentTime);
@@ -766,6 +798,9 @@ function updatePriceHistory(currentTime) {
   
   // Generate dynamic news based on significant movements
   generateDynamicNews(currentTime, currentStocks, dateKey);
+  
+  // Periodically clean up old data to prevent memory leaks
+  cleanupOldData(currentTime);
 }
 
 function generateDynamicNews(currentTime, currentStocks, dateKey) {
@@ -800,11 +835,12 @@ function generateDynamicNews(currentTime, currentStocks, dateKey) {
     
     // Check for volatility patterns (multiple days of high movement)
     const volatility = calculateVolatility(stock.symbol, dateKey);
-    if (volatility > VOLATILITY_THRESHOLD && !lastNewsGenerated[stock.symbol + '_volatility']) {
+    const volatilityKey = `${stock.symbol}:volatility`;
+    if (volatility > VOLATILITY_THRESHOLD && !lastNewsGenerated[volatilityKey]) {
       const newsItem = createVolatilityNews(stock, volatility, currentTime);
       if (newsItem) {
         dynamicNewsEvents.push(newsItem);
-        lastNewsGenerated[stock.symbol + '_volatility'] = currentTime;
+        lastNewsGenerated[volatilityKey] = currentTime;
       }
     }
   });
@@ -814,8 +850,13 @@ function generateDynamicNews(currentTime, currentStocks, dateKey) {
 }
 
 function calculateVolatility(symbol, currentDateKey) {
-  const dates = Object.keys(priceHistory).sort().reverse();
-  const recentDates = dates.slice(0, VOLATILITY_WINDOW);
+  // Get sorted dates efficiently by filtering recent dates
+  const allDates = Object.keys(priceHistory);
+  const recentDates = allDates
+    .filter(d => d <= currentDateKey)
+    .sort()
+    .reverse()
+    .slice(0, VOLATILITY_WINDOW);
   
   let totalChange = 0;
   let count = 0;
@@ -923,7 +964,7 @@ function generateSectorNews(currentTime, currentStocks, yesterdayKey) {
     
     // Only generate if sector has significant average movement and we haven't recently
     if (Math.abs(avgMove) >= 1.5 && sectorCounts[sector] >= 3) {
-      const sectorKey = sector + '_sector';
+      const sectorKey = `sector:${sector}`;
       const lastNews = lastNewsGenerated[sectorKey];
       
       if (!lastNews || (currentTime - lastNews) >= NEWS_COOLDOWN_MS * 3) { // 3-day cooldown for sectors
