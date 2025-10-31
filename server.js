@@ -4,6 +4,14 @@ const path = require('path');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// Load data modules
+const stocks = require('./data/stocks');
+const emailGenerator = require('./data/emails');
+const companies = require('./data/companies');
+const loanCompanies = require('./data/loan-companies');
+const tradeHalts = require('./data/trade-halts');
+const shareAvailability = require('./data/share-availability');
+
 // Middleware
 app.use(express.json());
 app.use(express.static('public'));
@@ -100,14 +108,6 @@ app.get('/company/:symbol', (req, res) => {
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
-
-// Stock data API
-const stocks = require('./data/stocks');
-const emailGenerator = require('./data/emails');
-const companies = require('./data/companies');
-const loanCompanies = require('./data/loan-companies');
-const tradeHalts = require('./data/trade-halts');
-const shareAvailability = require('./data/share-availability');
 
 app.get('/api/stocks', (req, res) => {
   const stockData = stocks.getStockData(gameTime);
@@ -504,7 +504,7 @@ function processLoans() {
     // Accrue interest daily
     if (daysSinceLastPayment >= 1) {
       const dailyRate = loan.interestRate / 365;
-      const interest = loan.balance * dailyRate * Math.floor(daysSinceLastPayment);
+      const interest = loan.balance * dailyRate * daysSinceLastPayment;
       loan.balance += interest;
       loan.lastInterestAccrual = new Date(gameTime);
     }
