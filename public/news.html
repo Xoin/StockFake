@@ -91,11 +91,11 @@
         
         <div class="time-display" id="timeDisplay">Loading...</div>
         
-        <div id="paginationControls"></div>
+        <div class="pagination-controls-container"></div>
         <div class="news-container" id="newsContainer">
             <div class="no-news">Loading news...</div>
         </div>
-        <div id="paginationControls"></div>
+        <div class="pagination-controls-container"></div>
     </div>
     
     <script>
@@ -163,7 +163,7 @@
             }
             
             // Update pagination controls
-            const paginationDivs = document.querySelectorAll('#paginationControls');
+            const paginationDivs = document.querySelectorAll('.pagination-controls-container');
             paginationDivs.forEach(div => {
                 div.innerHTML = newsPaginator.renderControls();
             });
