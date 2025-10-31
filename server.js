@@ -11,6 +11,7 @@ const companies = require('./data/companies');
 const loanCompanies = require('./data/loan-companies');
 const tradeHalts = require('./data/trade-halts');
 const shareAvailability = require('./data/share-availability');
+const indexFunds = require('./data/index-funds');
 
 // Middleware
 app.use(express.json());
@@ -99,6 +100,10 @@ app.get('/graphs', (req, res) => {
 
 app.get('/loans', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'loans.html'));
+});
+
+app.get('/taxes', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'taxes.html'));
 });
 
 app.get('/company/:symbol', (req, res) => {
@@ -226,6 +231,7 @@ app.get('/api/news', (req, res) => {
 let userAccount = {
   cash: 10000,
   portfolio: {},
+  indexFundHoldings: {}, // Track index fund shares: {symbol: {shares, purchaseHistory}}
   shortPositions: {}, // Track short positions (symbol: {shares, borrowPrice, borrowDate})
   purchaseHistory: {}, // Track purchase prices for tax calculation
   transactions: [], // History of all transactions
@@ -519,6 +525,8 @@ function getInitialMarginRequirement(currentTime) {
 // Calculate current portfolio value
 function calculatePortfolioValue() {
   let totalValue = 0;
+  
+  // Add individual stock positions
   for (const [symbol, shares] of Object.entries(userAccount.portfolio)) {
     if (shares > 0) {
       const stockPrice = stocks.getStockPrice(symbol, gameTime);
@@ -527,6 +535,20 @@ function calculatePortfolioValue() {
       }
     }
   }
+  
+  // Add index fund positions
+  for (const [symbol, holding] of Object.entries(userAccount.indexFundHoldings)) {
+    if (holding.shares > 0) {
+      const fundPrice = indexFunds.calculateIndexPrice(
+        indexFunds.indexFunds.find(f => f.symbol === symbol),
+        gameTime
+      );
+      if (fundPrice) {
+        totalValue += fundPrice * holding.shares;
+      }
+    }
+  }
+  
   return totalValue;
 }
 
@@ -835,6 +857,7 @@ app.get('/api/account', (req, res) => {
   res.json({
     cash: userAccount.cash,
     portfolio: userAccount.portfolio,
+    indexFundHoldings: userAccount.indexFundHoldings,
     shortPositions: userAccount.shortPositions,
     transactions: userAccount.transactions.slice(-20), // Last 20 transactions
     dividends: userAccount.dividends.slice(-10), // Last 10 dividend payments
@@ -1583,6 +1606,317 @@ app.post('/api/margin/calculate', (req, res) => {
     newLeverage: newLeverage,
     leverageLimit: userAccount.riskControls.maxLeverage,
     wouldExceedLeverage: newLeverage > userAccount.riskControls.maxLeverage
+  });
+});
+
+// Index Funds API endpoints
+
+// Get all available index funds
+app.get('/api/indexfunds', (req, res) => {
+  const availableFunds = indexFunds.getAvailableIndexFunds(gameTime);
+  res.json(availableFunds);
+});
+
+// Get specific index fund details
+app.get('/api/indexfunds/:symbol', (req, res) => {
+  const { symbol } = req.params;
+  const fundDetails = indexFunds.getIndexFundDetails(symbol, gameTime);
+  
+  if (!fundDetails) {
+    return res.status(404).json({ error: 'Index fund not found or not available yet' });
+  }
+  
+  res.json(fundDetails);
+});
+
+// Get index fund history
+app.get('/api/indexfunds/:symbol/history', (req, res) => {
+  const { symbol } = req.params;
+  const { days } = req.query;
+  
+  const daysToFetch = parseInt(days) || 30;
+  const history = indexFunds.getIndexFundHistory(symbol, gameTime, daysToFetch);
+  
+  res.json(history);
+});
+
+// Trade index funds (buy/sell)
+app.post('/api/indexfunds/trade', (req, res) => {
+  const { symbol, action, shares } = req.body;
+  
+  if (!isMarketOpen(gameTime)) {
+    return res.status(400).json({ error: 'Market is closed' });
+  }
+  
+  const fund = indexFunds.indexFunds.find(f => f.symbol === symbol);
+  if (!fund) {
+    return res.status(404).json({ error: 'Index fund not found' });
+  }
+  
+  if (gameTime < fund.inceptionDate) {
+    return res.status(400).json({ error: 'This index fund is not available yet' });
+  }
+  
+  const fundPrice = indexFunds.calculateIndexPrice(fund, gameTime);
+  if (!fundPrice) {
+    return res.status(404).json({ error: 'Unable to calculate fund price' });
+  }
+  
+  const totalCost = fundPrice * shares;
+  const tradingFee = getTradingFee(totalCost, gameTime);
+  
+  if (action === 'buy') {
+    const totalWithFee = totalCost + tradingFee;
+    
+    if (userAccount.cash < totalWithFee) {
+      return res.status(400).json({ error: 'Insufficient funds' });
+    }
+    
+    userAccount.cash -= totalWithFee;
+    
+    // Initialize index fund holding if needed
+    if (!userAccount.indexFundHoldings[symbol]) {
+      userAccount.indexFundHoldings[symbol] = {
+        shares: 0,
+        purchaseHistory: []
+      };
+    }
+    
+    userAccount.indexFundHoldings[symbol].shares += shares;
+    userAccount.indexFundHoldings[symbol].purchaseHistory.push({
+      date: new Date(gameTime),
+      shares: shares,
+      pricePerShare: fundPrice
+    });
+    
+    // Record transaction
+    userAccount.transactions.push({
+      date: new Date(gameTime),
+      type: 'buy-indexfund',
+      symbol,
+      name: fund.name,
+      shares,
+      pricePerShare: fundPrice,
+      tradingFee: tradingFee,
+      total: totalWithFee
+    });
+    
+    // Record fee
+    if (tradingFee > 0) {
+      userAccount.fees.push({
+        date: new Date(gameTime),
+        type: 'trading',
+        amount: tradingFee,
+        description: `Trading fee for buying ${shares} shares of ${fund.name}`
+      });
+    }
+    
+  } else if (action === 'sell') {
+    const holding = userAccount.indexFundHoldings[symbol];
+    if (!holding || holding.shares < shares) {
+      return res.status(400).json({ error: 'Insufficient shares' });
+    }
+    
+    // Calculate capital gains tax using FIFO
+    let remainingShares = shares;
+    let totalCostBasis = 0;
+    let taxAmount = 0;
+    
+    const purchases = holding.purchaseHistory.slice();
+    
+    while (remainingShares > 0 && purchases.length > 0) {
+      const purchase = purchases[0];
+      const sharesToSell = Math.min(remainingShares, purchase.shares);
+      const costBasis = sharesToSell * purchase.pricePerShare;
+      totalCostBasis += costBasis;
+      
+      // Calculate holding period
+      const purchaseDate = new Date(purchase.date);
+      const currentDate = new Date(gameTime);
+      const holdingDays = (currentDate - purchaseDate) / (1000 * 60 * 60 * 24);
+      const isLongTerm = holdingDays >= 365;
+      
+      // Calculate gain/loss
+      const saleProceeds = sharesToSell * fundPrice;
+      const capitalGain = saleProceeds - costBasis;
+      
+      if (capitalGain > 0) {
+        const taxRate = isLongTerm ? LONG_TERM_TAX_RATE : SHORT_TERM_TAX_RATE;
+        taxAmount += capitalGain * taxRate;
+      }
+      
+      // Update purchase history
+      purchase.shares -= sharesToSell;
+      if (purchase.shares <= 0) {
+        purchases.shift();
+      }
+      
+      remainingShares -= sharesToSell;
+    }
+    
+    // Update holding purchase history
+    holding.purchaseHistory = purchases;
+    
+    // Calculate expense ratio fee for time held
+    const oldestPurchase = holding.purchaseHistory[0];
+    if (oldestPurchase) {
+      const daysHeld = (gameTime - new Date(oldestPurchase.date)) / (1000 * 60 * 60 * 24);
+      const expenseFee = indexFunds.calculateExpenseRatioFee(fund, shares, daysHeld);
+      
+      if (expenseFee > 0) {
+        userAccount.fees.push({
+          date: new Date(gameTime),
+          type: 'index-fund-expense',
+          amount: expenseFee,
+          description: `Expense ratio fee (${(fund.expenseRatio * 100).toFixed(2)}%) for ${fund.name}`
+        });
+        taxAmount += expenseFee; // Deduct from proceeds
+      }
+    }
+    
+    // Apply sale and deduct tax and fee
+    const grossSaleAmount = totalCost;
+    const netSaleProceeds = grossSaleAmount - taxAmount - tradingFee;
+    userAccount.cash += netSaleProceeds;
+    holding.shares -= shares;
+    
+    // Clean up if no shares left
+    if (holding.shares <= 0) {
+      delete userAccount.indexFundHoldings[symbol];
+    }
+    
+    // Record transaction
+    userAccount.transactions.push({
+      date: new Date(gameTime),
+      type: 'sell-indexfund',
+      symbol,
+      name: fund.name,
+      shares,
+      pricePerShare: fundPrice,
+      total: grossSaleAmount,
+      tax: taxAmount,
+      tradingFee: tradingFee,
+      netProceeds: netSaleProceeds
+    });
+    
+    // Record fee
+    if (tradingFee > 0) {
+      userAccount.fees.push({
+        date: new Date(gameTime),
+        type: 'trading',
+        amount: tradingFee,
+        description: `Trading fee for selling ${shares} shares of ${fund.name}`
+      });
+    }
+    
+    // Record tax if any
+    if (taxAmount > 0) {
+      userAccount.taxes.push({
+        date: new Date(gameTime),
+        type: 'capital-gains',
+        amount: taxAmount,
+        description: `Capital gains tax on ${shares} shares of ${fund.name}`
+      });
+    }
+  }
+  
+  res.json(userAccount);
+});
+
+// Tax summary API endpoint
+app.get('/api/taxes', (req, res) => {
+  const { year } = req.query;
+  const targetYear = year ? parseInt(year) : gameTime.getFullYear();
+  
+  // Filter taxes by year
+  const yearlyTaxes = userAccount.taxes.filter(tax => {
+    const taxYear = new Date(tax.date).getFullYear();
+    return taxYear === targetYear;
+  });
+  
+  // Calculate tax breakdown by type
+  const taxBreakdown = {
+    capitalGains: 0,
+    shortGains: 0,
+    dividends: 0,
+    total: 0
+  };
+  
+  const detailedTaxes = [];
+  
+  yearlyTaxes.forEach(tax => {
+    if (tax.type === 'capital-gains') {
+      taxBreakdown.capitalGains += tax.amount;
+    } else if (tax.type === 'short-gains') {
+      taxBreakdown.shortGains += tax.amount;
+    } else if (tax.type === 'dividend') {
+      taxBreakdown.dividends += tax.amount;
+    }
+    taxBreakdown.total += tax.amount;
+    
+    detailedTaxes.push({
+      date: tax.date,
+      type: tax.type,
+      amount: tax.amount,
+      description: tax.description
+    });
+  });
+  
+  // Get dividend summary for the year
+  const yearlyDividends = userAccount.dividends.filter(div => {
+    const divYear = new Date(div.date).getFullYear();
+    return divYear === targetYear;
+  });
+  
+  const dividendSummary = {
+    totalGross: 0,
+    totalTax: 0,
+    totalNet: 0,
+    count: yearlyDividends.length
+  };
+  
+  yearlyDividends.forEach(div => {
+    dividendSummary.totalGross += div.grossAmount;
+    dividendSummary.totalTax += div.tax;
+    dividendSummary.totalNet += div.netAmount;
+  });
+  
+  // Get transaction summary for capital gains calculations
+  const yearlyTransactions = userAccount.transactions.filter(tx => {
+    const txYear = new Date(tx.date).getFullYear();
+    return txYear === targetYear && (tx.type === 'sell' || tx.type === 'sell-indexfund');
+  });
+  
+  const capitalGainsSummary = {
+    totalSales: yearlyTransactions.length,
+    totalProceeds: 0,
+    totalTax: 0,
+    shortTermGains: 0,
+    longTermGains: 0
+  };
+  
+  yearlyTransactions.forEach(tx => {
+    capitalGainsSummary.totalProceeds += tx.total || 0;
+    capitalGainsSummary.totalTax += tx.tax || 0;
+  });
+  
+  // Get all years with tax data
+  const yearsWithTaxes = [...new Set(
+    userAccount.taxes.map(tax => new Date(tax.date).getFullYear())
+  )].sort((a, b) => b - a);
+  
+  res.json({
+    year: targetYear,
+    taxBreakdown,
+    dividendSummary,
+    capitalGainsSummary,
+    detailedTaxes,
+    yearsWithTaxes,
+    currentTaxRates: {
+      shortTermCapitalGains: SHORT_TERM_TAX_RATE * 100,
+      longTermCapitalGains: LONG_TERM_TAX_RATE * 100,
+      dividends: DIVIDEND_TAX_RATE * 100
+    }
   });
 });
 
