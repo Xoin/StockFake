@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>StockFake - Market Graphs</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Courier New', monospace;
+            background-color: #1a1a1a;
+            color: #00ff00;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        h1 {
+            text-align: center;
+            margin-bottom: 20px;
+            color: #00ff00;
+            text-shadow: 0 0 10px #00ff00;
+        }
+        .nav {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        .nav a {
+            color: #00ff00;
+            margin: 0 10px;
+            text-decoration: none;
+        }
+        .nav a:hover {
+            text-decoration: underline;
+        }
+        .chart-container {
+            background-color: #000;
+            border: 2px solid #00ff00;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        .controls {
+            background-color: #000;
+            border: 2px solid #00ff00;
+            padding: 15px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        select, button {
+            background-color: #000;
+            color: #00ff00;
+            border: 1px solid #00ff00;
+            padding: 8px 12px;
+            margin: 5px;
+            font-family: 'Courier New', monospace;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #003300;
+        }
+        canvas {
+            max-height: 400px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📊 MARKET GRAPHS</h1>
+        <div class="nav">
+            <a href="/">← Back to Portal</a> |
+            <a href="/trading">Trading</a> |
+            <a href="/bank">Bank</a> |
+            <a href="/news">News</a> |
+            <a href="/email">Email</a>
+        </div>
+        
+        <div class="controls">
+            <label for="stockSelect">Select Stock:</label>
+            <select id="stockSelect">
+                <option value="">Loading...</option>
+            </select>
+            <label for="daysSelect">Time Period:</label>
+            <select id="daysSelect">
+                <option value="7">7 Days</option>
+                <option value="30" selected>30 Days</option>
+                <option value="90">90 Days</option>
+                <option value="180">6 Months</option>
+                <option value="365">1 Year</option>
+            </select>
+            <button onclick="updateCharts()">Update Charts</button>
+        </div>
+        
+        <div class="chart-container">
+            <h2>Market Index</h2>
+            <canvas id="marketChart"></canvas>
+        </div>
+        
+        <div class="chart-container">
+            <h2>Stock Price History</h2>
+            <canvas id="stockChart"></canvas>
+        </div>
+    </div>
+    
+    <script>
+        let marketChart = null;
+        let stockChart = null;
+        
+        async function loadStocks() {
+            const response = await fetch('/api/stocks');
+            const stocks = await response.json();
+            
+            const select = document.getElementById('stockSelect');
+            select.innerHTML = '<option value="">Select Stock</option>' + 
+                stocks.map(s => `<option value="${s.symbol}">${s.symbol} - ${s.name}</option>`).join('');
+            
+            if (stocks.length > 0) {
+                select.value = stocks[0].symbol;
+            }
+        }
+        
+        async function updateCharts() {
+            const days = document.getElementById('daysSelect').value;
+            const symbol = document.getElementById('stockSelect').value;
+            
+            // Update market index chart
+            const marketResponse = await fetch(`/api/market/index?days=${days}`);
+            const marketData = await marketResponse.json();
+            
+            if (marketChart) {
+                marketChart.destroy();
+            }
+            
+            const marketCtx = document.getElementById('marketChart').getContext('2d');
+            marketChart = new Chart(marketCtx, {
+                type: 'line',
+                data: {
+                    labels: marketData.map(d => new Date(d.date).toLocaleDateString()),
+                    datasets: [{
+                        label: 'Market Index',
+                        data: marketData.map(d => d.value),
+                        borderColor: '#00ff00',
+                        backgroundColor: 'rgba(0, 255, 0, 0.1)',
+                        tension: 0.1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    plugins: {
+                        legend: {
+                            labels: {
+                                color: '#00ff00',
+                                font: {
+                                    family: 'Courier New'
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            ticks: {
+                                color: '#00ff00',
+                                font: {
+                                    family: 'Courier New'
+                                },
+                                maxTicksLimit: 10
+                            },
+                            grid: {
+                                color: '#003300'
+                            }
+                        },
+                        y: {
+                            ticks: {
+                                color: '#00ff00',
+                                font: {
+                                    family: 'Courier New'
+                                }
+                            },
+                            grid: {
+                                color: '#003300'
+                            }
+                        }
+                    }
+                }
+            });
+            
+            // Update stock chart if symbol is selected
+            if (symbol) {
+                const stockResponse = await fetch(`/api/stocks/${symbol}/history?days=${days}`);
+                const stockData = await stockResponse.json();
+                
+                if (stockChart) {
+                    stockChart.destroy();
+                }
+                
+                const stockCtx = document.getElementById('stockChart').getContext('2d');
+                stockChart = new Chart(stockCtx, {
+                    type: 'line',
+                    data: {
+                        labels: stockData.map(d => new Date(d.date).toLocaleDateString()),
+                        datasets: [{
+                            label: `${symbol} Price`,
+                            data: stockData.map(d => d.price),
+                            borderColor: '#00ff00',
+                            backgroundColor: 'rgba(0, 255, 0, 0.1)',
+                            tension: 0.1
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: true,
+                        plugins: {
+                            legend: {
+                                labels: {
+                                    color: '#00ff00',
+                                    font: {
+                                        family: 'Courier New'
+                                    }
+                                }
+                            }
+                        },
+                        scales: {
+                            x: {
+                                ticks: {
+                                    color: '#00ff00',
+                                    font: {
+                                        family: 'Courier New'
+                                    },
+                                    maxTicksLimit: 10
+                                },
+                                grid: {
+                                    color: '#003300'
+                                }
+                            },
+                            y: {
+                                ticks: {
+                                    color: '#00ff00',
+                                    font: {
+                                        family: 'Courier New'
+                                    },
+                                    callback: function(value) {
+                                        return '$' + value.toFixed(2);
+                                    }
+                                },
+                                grid: {
+                                    color: '#003300'
+                                }
+                            }
+                        }
+                    }
+                });
+            }
+        }
+        
+        // Initial load
+        loadStocks().then(() => updateCharts());
+        
+        // Auto-refresh every 10 seconds
+        setInterval(updateCharts, 10000);
+    </script>
+</body>
+</html>

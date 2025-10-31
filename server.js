@@ -83,12 +83,18 @@ app.get('/trading', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'trading.html'));
 });
 
+app.get('/graphs', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'graphs.html'));
+});
+
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
 // Stock data API
 const stocks = require('./data/stocks');
+const emailGenerator = require('./data/emails');
+
 app.get('/api/stocks', (req, res) => {
   res.json(stocks.getStockData(gameTime));
 });
@@ -96,6 +102,53 @@ app.get('/api/stocks', (req, res) => {
 app.get('/api/stocks/:symbol', (req, res) => {
   const { symbol } = req.params;
   res.json(stocks.getStockPrice(symbol, gameTime));
+});
+
+// Stock history API for charts
+app.get('/api/stocks/:symbol/history', (req, res) => {
+  const { symbol } = req.params;
+  const { days } = req.query;
+  
+  const daysToFetch = parseInt(days) || 30;
+  const history = [];
+  
+  // Get historical prices for the specified number of days
+  for (let i = daysToFetch; i >= 0; i--) {
+    const date = new Date(gameTime.getTime() - (i * 24 * 60 * 60 * 1000));
+    const price = stocks.getStockPrice(symbol, date);
+    if (price) {
+      history.push({
+        date: date.toISOString(),
+        price: price.price
+      });
+    }
+  }
+  
+  res.json(history);
+});
+
+// Market index API for market overview charts
+app.get('/api/market/index', (req, res) => {
+  const { days } = req.query;
+  const daysToFetch = parseInt(days) || 30;
+  const history = [];
+  
+  // Calculate simple market index based on average of all stocks
+  for (let i = daysToFetch; i >= 0; i--) {
+    const date = new Date(gameTime.getTime() - (i * 24 * 60 * 60 * 1000));
+    const allStocks = stocks.getStockData(date);
+    
+    if (allStocks.length > 0) {
+      const avgPrice = allStocks.reduce((sum, s) => sum + s.price, 0) / allStocks.length;
+      history.push({
+        date: date.toISOString(),
+        value: avgPrice,
+        count: allStocks.length
+      });
+    }
+  }
+  
+  res.json(history);
 });
 
 // News API
@@ -109,11 +162,14 @@ app.get('/api/news', (req, res) => {
 let userAccount = {
   cash: 10000,
   portfolio: {},
+  shortPositions: {}, // Track short positions (symbol: {shares, borrowPrice, borrowDate})
   purchaseHistory: {}, // Track purchase prices for tax calculation
   transactions: [], // History of all transactions
   dividends: [], // History of dividend payments
   taxes: [], // History of tax payments
-  lastTradeTime: {} // Track last trade time per symbol for cooldown
+  fees: [], // History of fees charged
+  lastTradeTime: {}, // Track last trade time per symbol for cooldown
+  shareholderInfluence: {} // Track voting power by company
 };
 
 // Trading restrictions
@@ -123,6 +179,29 @@ const TRADE_COOLDOWN_MS = 5 * 60 * 1000; // 5 minutes cooldown between trades fo
 const SHORT_TERM_TAX_RATE = 0.30; // 30% for holdings < 1 year
 const LONG_TERM_TAX_RATE = 0.15; // 15% for holdings >= 1 year
 const DIVIDEND_TAX_RATE = 0.15; // 15% on dividends
+
+// Fee structure
+const TRADING_FEE_FLAT = 9.99; // Flat fee per trade in 1970s, will decrease over time
+const TRADING_FEE_PERCENTAGE = 0.001; // 0.1% of trade value
+const MONTHLY_ACCOUNT_FEE = 5.00; // Monthly maintenance fee (starts in 1990s)
+const MINIMUM_BALANCE = 1000; // Minimum balance to avoid fees (starts in 1990s)
+const SHORT_BORROW_FEE_ANNUAL = 0.05; // 5% annual fee to borrow shares for shorting
+
+// Inflation tracking (CPI-based, annual rate)
+const inflationRates = {
+  1970: 5.9, 1971: 4.3, 1972: 3.3, 1973: 6.2, 1974: 11.1, 1975: 9.1, 1976: 5.8,
+  1977: 6.5, 1978: 7.6, 1979: 11.3, 1980: 13.5, 1981: 10.3, 1982: 6.2, 1983: 3.2,
+  1984: 4.3, 1985: 3.6, 1986: 1.9, 1987: 3.6, 1988: 4.1, 1989: 4.8, 1990: 5.4,
+  1991: 4.2, 1992: 3.0, 1993: 3.0, 1994: 2.6, 1995: 2.8, 1996: 3.0, 1997: 2.3,
+  1998: 1.6, 1999: 2.2, 2000: 3.4, 2001: 2.8, 2002: 1.6, 2003: 2.3, 2004: 2.7,
+  2005: 3.4, 2006: 3.2, 2007: 2.8, 2008: 3.8, 2009: -0.4, 2010: 1.6, 2011: 3.2,
+  2012: 2.1, 2013: 1.5, 2014: 1.6, 2015: 0.1, 2016: 1.3, 2017: 2.1, 2018: 2.4,
+  2019: 1.8, 2020: 1.2, 2021: 4.7, 2022: 8.0, 2023: 4.1, 2024: 2.9
+};
+
+let lastMonthlyFeeCheck = null;
+let lastInflationCheck = null;
+let cumulativeInflation = 1.0; // Tracks purchasing power relative to 1970
 
 // Dividend data (quarterly payouts per share)
 // Companies with consistent dividend history
@@ -247,13 +326,113 @@ function checkAndPayDividends() {
 // Call this periodically
 setInterval(checkAndPayDividends, 5000);
 
+// Calculate trading fee based on year (fees decreased over time)
+function getTradingFee(tradeValue, currentTime) {
+  const year = currentTime.getFullYear();
+  let flatFee = TRADING_FEE_FLAT;
+  
+  // Fees decreased over time due to deregulation and technology
+  if (year >= 1975) flatFee = 7.99; // After May Day 1975
+  if (year >= 1990) flatFee = 4.99; // Discount brokers emerge
+  if (year >= 2000) flatFee = 2.99; // Online trading boom
+  if (year >= 2013) flatFee = 0.99; // Low-cost brokers
+  if (year >= 2019) flatFee = 0; // Commission-free trading era
+  
+  const percentageFee = tradeValue * TRADING_FEE_PERCENTAGE;
+  return flatFee + percentageFee;
+}
+
+// Check and charge monthly account fees
+function checkAndChargeMonthlyFee() {
+  const currentDate = new Date(gameTime);
+  const currentMonth = `${currentDate.getFullYear()}-${currentDate.getMonth()}`;
+  
+  if (lastMonthlyFeeCheck !== currentMonth) {
+    lastMonthlyFeeCheck = currentMonth;
+    
+    // Monthly fees started in the 1990s
+    if (currentDate.getFullYear() >= 1990) {
+      // Charge fee if balance is below minimum
+      if (userAccount.cash < MINIMUM_BALANCE) {
+        userAccount.cash -= MONTHLY_ACCOUNT_FEE;
+        
+        userAccount.fees.push({
+          date: new Date(gameTime),
+          type: 'monthly-maintenance',
+          amount: MONTHLY_ACCOUNT_FEE,
+          description: `Monthly account maintenance fee (balance below $${MINIMUM_BALANCE})`
+        });
+      }
+    }
+  }
+}
+
+// Track inflation and purchasing power
+function trackInflation() {
+  const currentYear = gameTime.getFullYear();
+  const yearKey = `${currentYear}`;
+  
+  if (lastInflationCheck !== yearKey && inflationRates[currentYear]) {
+    lastInflationCheck = yearKey;
+    
+    // Update cumulative inflation (compounds)
+    const annualInflationRate = inflationRates[currentYear] / 100;
+    cumulativeInflation *= (1 + annualInflationRate);
+  }
+}
+
+// Update short positions (charge borrowing fees)
+function updateShortPositions() {
+  const currentTime = new Date(gameTime);
+  
+  for (const [symbol, position] of Object.entries(userAccount.shortPositions)) {
+    if (position.shares > 0) {
+      const borrowDate = new Date(position.borrowDate);
+      const daysSinceBorrow = (currentTime - borrowDate) / (1000 * 60 * 60 * 24);
+      
+      // Charge daily borrowing fee (annual rate / 365)
+      const dailyFeeRate = SHORT_BORROW_FEE_ANNUAL / 365;
+      const borrowValue = position.shares * position.borrowPrice;
+      const dailyFee = borrowValue * dailyFeeRate;
+      
+      // Only charge if at least a day has passed since last check
+      if (daysSinceBorrow >= 1 && (!position.lastFeeDate || 
+          (currentTime - new Date(position.lastFeeDate)) >= 1000 * 60 * 60 * 24)) {
+        userAccount.cash -= dailyFee;
+        position.lastFeeDate = new Date(gameTime);
+        
+        userAccount.fees.push({
+          date: new Date(gameTime),
+          type: 'short-borrow',
+          amount: dailyFee,
+          description: `Daily borrowing fee for ${position.shares} shares of ${symbol}`
+        });
+      }
+    }
+  }
+}
+
+// Call these periodically
+setInterval(checkAndChargeMonthlyFee, 10000);
+setInterval(trackInflation, 5000);
+setInterval(updateShortPositions, 10000);
+
 app.get('/api/account', (req, res) => {
   res.json({
     cash: userAccount.cash,
     portfolio: userAccount.portfolio,
+    shortPositions: userAccount.shortPositions,
     transactions: userAccount.transactions.slice(-20), // Last 20 transactions
     dividends: userAccount.dividends.slice(-10), // Last 10 dividend payments
-    taxes: userAccount.taxes.slice(-10) // Last 10 tax payments
+    taxes: userAccount.taxes.slice(-10), // Last 10 tax payments
+    fees: userAccount.fees.slice(-10), // Last 10 fees
+    shareholderInfluence: userAccount.shareholderInfluence,
+    inflationData: {
+      cumulativeInflation: cumulativeInflation,
+      realValue: userAccount.cash / cumulativeInflation, // Purchasing power in 1970 dollars
+      inflationYear: gameTime.getFullYear(),
+      currentRate: inflationRates[gameTime.getFullYear()] || 0
+    }
   });
 });
 
@@ -281,12 +460,14 @@ app.post('/api/trade', (req, res) => {
   }
   
   const totalCost = stockPrice.price * shares;
+  const tradingFee = getTradingFee(totalCost, gameTime);
   
   if (action === 'buy') {
-    if (userAccount.cash < totalCost) {
-      return res.status(400).json({ error: 'Insufficient funds' });
+    const totalWithFee = totalCost + tradingFee;
+    if (userAccount.cash < totalWithFee) {
+      return res.status(400).json({ error: 'Insufficient funds (including trading fee)' });
     }
-    userAccount.cash -= totalCost;
+    userAccount.cash -= totalWithFee;
     userAccount.portfolio[symbol] = (userAccount.portfolio[symbol] || 0) + shares;
     
     // Track purchase for tax calculation
@@ -299,6 +480,9 @@ app.post('/api/trade', (req, res) => {
       pricePerShare: stockPrice.price
     });
     
+    // Update shareholder influence
+    userAccount.shareholderInfluence[symbol] = (userAccount.shareholderInfluence[symbol] || 0) + shares;
+    
     // Record transaction
     userAccount.transactions.push({
       date: new Date(gameTime),
@@ -306,8 +490,19 @@ app.post('/api/trade', (req, res) => {
       symbol,
       shares,
       pricePerShare: stockPrice.price,
-      total: totalCost
+      tradingFee: tradingFee,
+      total: totalWithFee
     });
+    
+    // Record fee
+    if (tradingFee > 0) {
+      userAccount.fees.push({
+        date: new Date(gameTime),
+        type: 'trading',
+        amount: tradingFee,
+        description: `Trading fee for buying ${shares} shares of ${symbol}`
+      });
+    }
     
   } else if (action === 'sell') {
     if ((userAccount.portfolio[symbol] || 0) < shares) {
@@ -356,11 +551,17 @@ app.post('/api/trade', (req, res) => {
       userAccount.purchaseHistory[symbol] = purchases;
     }
     
-    // Apply sale and deduct tax
+    // Apply sale and deduct tax and fee
     const grossSaleAmount = totalCost;
-    const netSaleProceeds = grossSaleAmount - taxAmount;
+    const netSaleProceeds = grossSaleAmount - taxAmount - tradingFee;
     userAccount.cash += netSaleProceeds;
     userAccount.portfolio[symbol] -= shares;
+    
+    // Update shareholder influence
+    userAccount.shareholderInfluence[symbol] = (userAccount.shareholderInfluence[symbol] || 0) - shares;
+    if (userAccount.shareholderInfluence[symbol] <= 0) {
+      delete userAccount.shareholderInfluence[symbol];
+    }
     
     // Record transaction
     userAccount.transactions.push({
@@ -371,8 +572,19 @@ app.post('/api/trade', (req, res) => {
       pricePerShare: stockPrice.price,
       total: grossSaleAmount,
       tax: taxAmount,
+      tradingFee: tradingFee,
       netProceeds: netSaleProceeds
     });
+    
+    // Record fee
+    if (tradingFee > 0) {
+      userAccount.fees.push({
+        date: new Date(gameTime),
+        type: 'trading',
+        amount: tradingFee,
+        description: `Trading fee for selling ${shares} shares of ${symbol}`
+      });
+    }
     
     // Record tax if any
     if (taxAmount > 0) {
@@ -381,6 +593,123 @@ app.post('/api/trade', (req, res) => {
         type: 'capital-gains',
         amount: taxAmount,
         description: `Capital gains tax on ${shares} shares of ${symbol}`
+      });
+    }
+  } else if (action === 'short') {
+    // Short selling: borrow and sell shares
+    const saleProceeds = totalCost;
+    const totalWithFee = saleProceeds - tradingFee;
+    
+    userAccount.cash += totalWithFee;
+    
+    // Track short position
+    if (!userAccount.shortPositions[symbol]) {
+      userAccount.shortPositions[symbol] = {
+        shares: 0,
+        borrowPrice: 0,
+        borrowDate: new Date(gameTime)
+      };
+    }
+    
+    const currentShortShares = userAccount.shortPositions[symbol].shares;
+    const currentBorrowValue = currentShortShares * userAccount.shortPositions[symbol].borrowPrice;
+    const newBorrowValue = shares * stockPrice.price;
+    const totalShares = currentShortShares + shares;
+    
+    // Calculate weighted average borrow price
+    userAccount.shortPositions[symbol].shares = totalShares;
+    if (totalShares > 0) {
+      userAccount.shortPositions[symbol].borrowPrice = (currentBorrowValue + newBorrowValue) / totalShares;
+    }
+    if (currentShortShares === 0) {
+      userAccount.shortPositions[symbol].borrowDate = new Date(gameTime);
+    }
+    
+    // Record transaction
+    userAccount.transactions.push({
+      date: new Date(gameTime),
+      type: 'short',
+      symbol,
+      shares,
+      pricePerShare: stockPrice.price,
+      tradingFee: tradingFee,
+      netProceeds: totalWithFee
+    });
+    
+    // Record fee
+    if (tradingFee > 0) {
+      userAccount.fees.push({
+        date: new Date(gameTime),
+        type: 'trading',
+        amount: tradingFee,
+        description: `Trading fee for shorting ${shares} shares of ${symbol}`
+      });
+    }
+  } else if (action === 'cover') {
+    // Cover short: buy back shares to close short position
+    if (!userAccount.shortPositions[symbol] || userAccount.shortPositions[symbol].shares < shares) {
+      return res.status(400).json({ error: 'Insufficient short position to cover' });
+    }
+    
+    const totalWithFee = totalCost + tradingFee;
+    if (userAccount.cash < totalWithFee) {
+      return res.status(400).json({ error: 'Insufficient funds to cover short position' });
+    }
+    
+    userAccount.cash -= totalWithFee;
+    
+    const position = userAccount.shortPositions[symbol];
+    const borrowPrice = position.borrowPrice;
+    const profit = (borrowPrice - stockPrice.price) * shares;
+    
+    // Calculate tax on profit (if any)
+    let taxAmount = 0;
+    if (profit > 0) {
+      const borrowDate = new Date(position.borrowDate);
+      const holdingDays = (gameTime - borrowDate) / (1000 * 60 * 60 * 24);
+      const isLongTerm = holdingDays >= 365;
+      const taxRate = isLongTerm ? LONG_TERM_TAX_RATE : SHORT_TERM_TAX_RATE;
+      taxAmount = profit * taxRate;
+      userAccount.cash -= taxAmount;
+    }
+    
+    // Update short position
+    position.shares -= shares;
+    if (position.shares <= 0) {
+      delete userAccount.shortPositions[symbol];
+    }
+    
+    // Record transaction
+    userAccount.transactions.push({
+      date: new Date(gameTime),
+      type: 'cover',
+      symbol,
+      shares,
+      pricePerShare: stockPrice.price,
+      borrowPrice: borrowPrice,
+      profit: profit,
+      tax: taxAmount,
+      tradingFee: tradingFee,
+      total: totalWithFee
+    });
+    
+    // Record fee
+    if (tradingFee > 0) {
+      userAccount.fees.push({
+        date: new Date(gameTime),
+        type: 'trading',
+        amount: tradingFee,
+        description: `Trading fee for covering ${shares} shares of ${symbol}`
+      });
+    }
+    
+    // Record tax if profit
+    if (taxAmount > 0) {
+      userAccount.taxes.push({
+        date: new Date(gameTime),
+        type: 'short-gains',
+        amount: taxAmount,
+        description: `Tax on short sale profit for ${shares} shares of ${symbol}`
       });
     }
   }
@@ -399,7 +728,8 @@ app.get('/api/emails', (req, res) => {
       from: 'support@stockfake.com',
       subject: 'Welcome to StockFake Trading!',
       body: 'Welcome to the trading platform. You have been credited with $10,000 to start trading.',
-      date: new Date('1970-01-01')
+      date: new Date('1970-01-01'),
+      spam: false
     }
   ];
   
@@ -410,21 +740,63 @@ app.get('/api/emails', (req, res) => {
       from: 'dividends@stockfake.com',
       subject: `Dividend Payment - ${dividend.quarter}`,
       body: `You have received $${dividend.netAmount.toFixed(2)} in dividends (Gross: $${dividend.grossAmount.toFixed(2)}, Tax: $${dividend.tax.toFixed(2)}). Payment details: ${dividend.details.map(d => `${d.symbol}: ${d.shares} shares × $${d.dividend.toFixed(2)}`).join(', ')}`,
-      date: dividend.date
+      date: dividend.date,
+      spam: false
     });
   });
   
   // Add tax notification emails
   userAccount.taxes.forEach((tax, index) => {
-    if (tax.type === 'capital-gains') {
+    if (tax.type === 'capital-gains' || tax.type === 'short-gains') {
       emails.push({
         id: 200 + index,
         from: 'tax@stockfake.com',
-        subject: `Tax Payment - Capital Gains`,
-        body: `A capital gains tax of $${tax.amount.toFixed(2)} has been deducted from your sale. ${tax.description}`,
-        date: tax.date
+        subject: `Tax Payment - ${tax.type === 'short-gains' ? 'Short Sale Gains' : 'Capital Gains'}`,
+        body: `A ${tax.type === 'short-gains' ? 'short sale' : 'capital gains'} tax of $${tax.amount.toFixed(2)} has been deducted. ${tax.description}`,
+        date: tax.date,
+        spam: false
       });
     }
+  });
+  
+  // Add fee notification emails for significant fees
+  userAccount.fees.forEach((fee, index) => {
+    if (fee.type === 'monthly-maintenance') {
+      emails.push({
+        id: 300 + index,
+        from: 'fees@stockfake.com',
+        subject: `Account Fee Charged - ${fee.type}`,
+        body: `A fee of $${fee.amount.toFixed(2)} has been charged to your account. ${fee.description}`,
+        date: fee.date,
+        spam: false
+      });
+    }
+  });
+  
+  // Add investment opportunity emails
+  const opportunities = emailGenerator.generateInvestmentOpportunities(gameTime, stocks);
+  opportunities.forEach((opp, index) => {
+    emails.push({
+      id: 400 + index,
+      from: opp.from,
+      subject: opp.subject,
+      body: opp.body,
+      date: opp.date,
+      spam: false
+    });
+  });
+  
+  // Add spam emails
+  const spamEmails = emailGenerator.generateSpamEmails(gameTime);
+  spamEmails.forEach((spam, index) => {
+    emails.push({
+      id: 1000 + index,
+      from: spam.from,
+      subject: spam.subject,
+      body: spam.body,
+      date: spam.date,
+      spam: true
+    });
   });
   
   res.json(emails.filter(email => email.date <= gameTime).sort((a, b) => b.date - a.date));

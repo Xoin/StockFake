@@ -161,7 +161,13 @@
                 <input type="number" id="shares" placeholder="Shares" min="1" required>
                 <button type="submit" name="action" value="buy" class="buy-btn">BUY</button>
                 <button type="button" onclick="placeTrade(event, 'sell')" class="sell-btn">SELL</button>
+                <button type="button" onclick="placeTrade(event, 'short')" class="sell-btn" style="background-color: #330033; border-color: #ff00ff; color: #ff00ff;">SHORT</button>
+                <button type="button" onclick="placeTrade(event, 'cover')" class="buy-btn" style="background-color: #003333; border-color: #00ffff; color: #00ffff;">COVER</button>
             </form>
+            <div style="margin-top: 10px; font-size: 0.9em; color: #00aa00;">
+                <p>SHORT: Borrow and sell shares, profit if price drops</p>
+                <p>COVER: Buy back shares to close short position</p>
+            </div>
         </div>
     </div>
     
