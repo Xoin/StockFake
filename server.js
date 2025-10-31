@@ -4,6 +4,12 @@ const path = require('path');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// Load database module
+const dbModule = require('./database');
+
+// Initialize database
+dbModule.initializeDatabase();
+
 // Load data modules
 const stocks = require('./data/stocks');
 const emailGenerator = require('./data/emails');
@@ -45,9 +51,89 @@ function isMarketOpen(date) {
   return currentMinutes >= openMinutes && currentMinutes < closeMinutes;
 }
 
+// Track last market state to detect transitions
+let wasMarketOpen = isMarketOpen(gameTime);
+
+// Process pending orders when market opens
+function processPendingOrders() {
+  const pendingOrders = dbModule.getPendingOrders().all('pending');
+  
+  if (pendingOrders.length === 0) return;
+  
+  console.log(`Processing ${pendingOrders.length} pending orders...`);
+  
+  for (const order of pendingOrders) {
+    try {
+      let success = false;
+      let executionPrice = null;
+      let errorMessage = null;
+      
+      if (order.order_type === 'stock') {
+        const stockPrice = stocks.getStockPrice(order.symbol, gameTime);
+        if (!stockPrice) {
+          errorMessage = 'Stock not found or not available';
+        } else {
+          executionPrice = stockPrice.price;
+          // Execute the order using the same logic as the trade endpoint
+          // We'll need to pass the order details to a helper function
+          const result = executeStockOrder(order.symbol, order.action, order.shares, stockPrice);
+          success = result.success;
+          errorMessage = result.error;
+        }
+      } else if (order.order_type === 'indexfund') {
+        const fund = indexFunds.indexFunds.find(f => f.symbol === order.symbol);
+        if (!fund) {
+          errorMessage = 'Index fund not found';
+        } else {
+          const fundPrice = indexFunds.calculateIndexPrice(fund, gameTime);
+          if (!fundPrice) {
+            errorMessage = 'Unable to calculate fund price';
+          } else {
+            executionPrice = fundPrice;
+            const result = executeIndexFundOrder(order.symbol, order.action, order.shares, fundPrice, fund);
+            success = result.success;
+            errorMessage = result.error;
+          }
+        }
+      }
+      
+      // Update the order status
+      if (success) {
+        dbModule.updatePendingOrderStatus.run(
+          'executed',
+          gameTime.toISOString(),
+          executionPrice,
+          null,
+          order.id
+        );
+        console.log(`✓ Executed pending order #${order.id}: ${order.action} ${order.shares} ${order.symbol} at $${executionPrice}`);
+      } else {
+        dbModule.updatePendingOrderStatus.run(
+          'failed',
+          gameTime.toISOString(),
+          null,
+          errorMessage,
+          order.id
+        );
+        console.log(`✗ Failed to execute pending order #${order.id}: ${errorMessage}`);
+      }
+    } catch (error) {
+      console.error(`Error processing pending order #${order.id}:`, error);
+      dbModule.updatePendingOrderStatus.run(
+        'failed',
+        gameTime.toISOString(),
+        null,
+        error.message,
+        order.id
+      );
+    }
+  }
+}
+
 // Time simulation
 setInterval(() => {
   if (!isPaused) {
+    const oldTime = new Date(gameTime.getTime());
     const newTime = new Date(gameTime.getTime() + (timeMultiplier * 1000));
     
     // If market is currently closed and we're using fast speed (1s = 1day)
@@ -78,6 +164,14 @@ setInterval(() => {
     }
     
     gameTime = newTime;
+    
+    // Check if market just opened (transition from closed to open)
+    const isMarketCurrentlyOpen = isMarketOpen(gameTime);
+    if (!wasMarketOpen && isMarketCurrentlyOpen) {
+      console.log(`Market just opened at ${gameTime.toISOString()}. Processing pending orders...`);
+      processPendingOrders();
+    }
+    wasMarketOpen = isMarketCurrentlyOpen;
   }
 }, 1000);
 
@@ -928,11 +1022,573 @@ app.get('/api/account', (req, res) => {
   });
 });
 
+// Helper function to execute stock orders (used by both direct trading and pending orders)
+function executeStockOrder(symbol, action, shares, stockPrice) {
+  const totalCost = stockPrice.price * shares;
+  const tradingFee = getTradingFee(totalCost, gameTime);
+  
+  try {
+    if (action === 'buy' || action === 'buy-margin') {
+      // Check share availability
+      const availabilityCheck = shareAvailability.canPurchaseShares(symbol, shares);
+      if (!availabilityCheck.canPurchase) {
+        return { 
+          success: false, 
+          error: availabilityCheck.reason 
+        };
+      }
+      
+      const totalWithFee = totalCost + tradingFee;
+      const useMargin = action === 'buy-margin' || (userAccount.marginAccount.hasMarginEnabled && userAccount.cash < totalWithFee);
+      
+      // Check position concentration limits
+      const futureShares = (userAccount.portfolio[symbol] || 0) + shares;
+      const futurePositionValue = futureShares * stockPrice.price;
+      const currentPortfolioValue = calculatePortfolioValue();
+      const futurePortfolioValue = currentPortfolioValue + totalCost;
+      
+      if (futurePortfolioValue > 0 && currentPortfolioValue > 0) {
+        const futureConcentration = futurePositionValue / futurePortfolioValue;
+        
+        if (futureConcentration > userAccount.riskControls.maxPositionSize) {
+          return { 
+            success: false, 
+            error: `Position would exceed maximum concentration limit of ${(userAccount.riskControls.maxPositionSize * 100).toFixed(0)}%` 
+          };
+        }
+      }
+      
+      // Handle margin trading
+      if (useMargin) {
+        const initialMarginReq = getInitialMarginRequirement(gameTime);
+        const requiredCash = totalWithFee * initialMarginReq;
+        const marginAmount = totalWithFee - requiredCash;
+        
+        if (userAccount.cash < requiredCash) {
+          return { 
+            success: false, 
+            error: `Insufficient funds for margin purchase. Need ${(initialMarginReq * 100).toFixed(0)}% initial margin` 
+          };
+        }
+        
+        const currentEquity = calculateAccountEquity();
+        const newMarginBalance = userAccount.marginAccount.marginBalance + marginAmount;
+        const newPortfolioValue = calculatePortfolioValue() + totalCost;
+        const newLeverage = currentEquity > 0 ? newPortfolioValue / currentEquity : 0;
+        
+        if (newLeverage > userAccount.riskControls.maxLeverage) {
+          return { 
+            success: false, 
+            error: `Trade would exceed maximum leverage of ${userAccount.riskControls.maxLeverage}:1` 
+          };
+        }
+        
+        userAccount.cash -= requiredCash;
+        userAccount.marginAccount.marginBalance += marginAmount;
+        if (!userAccount.marginAccount.hasMarginEnabled) {
+          userAccount.marginAccount.hasMarginEnabled = true;
+          userAccount.marginAccount.lastMarginInterestDate = new Date(gameTime);
+        }
+        
+        shareAvailability.recordPurchase(symbol, shares);
+        userAccount.portfolio[symbol] = (userAccount.portfolio[symbol] || 0) + shares;
+        
+        if (!userAccount.purchaseHistory[symbol]) {
+          userAccount.purchaseHistory[symbol] = [];
+        }
+        userAccount.purchaseHistory[symbol].push({
+          date: new Date(gameTime),
+          shares: shares,
+          pricePerShare: stockPrice.price
+        });
+        
+        userAccount.shareholderInfluence[symbol] = (userAccount.shareholderInfluence[symbol] || 0) + shares;
+        
+        userAccount.transactions.push({
+          date: new Date(gameTime),
+          type: 'buy-margin',
+          symbol,
+          shares,
+          pricePerShare: stockPrice.price,
+          tradingFee: tradingFee,
+          total: totalWithFee,
+          cashPaid: requiredCash,
+          marginUsed: marginAmount,
+          initialMarginPercent: initialMarginReq * 100
+        });
+        
+        if (tradingFee > 0) {
+          userAccount.fees.push({
+            date: new Date(gameTime),
+            type: 'trading',
+            amount: tradingFee,
+            description: `Trading fee for buying ${shares} shares of ${symbol} on margin`
+          });
+        }
+      } else {
+        // Regular cash purchase
+        if (userAccount.cash < totalWithFee) {
+          return { 
+            success: false, 
+            error: 'Insufficient funds (including trading fee)' 
+          };
+        }
+        
+        shareAvailability.recordPurchase(symbol, shares);
+        userAccount.cash -= totalWithFee;
+        userAccount.portfolio[symbol] = (userAccount.portfolio[symbol] || 0) + shares;
+        
+        if (!userAccount.purchaseHistory[symbol]) {
+          userAccount.purchaseHistory[symbol] = [];
+        }
+        userAccount.purchaseHistory[symbol].push({
+          date: new Date(gameTime),
+          shares: shares,
+          pricePerShare: stockPrice.price
+        });
+        
+        userAccount.shareholderInfluence[symbol] = (userAccount.shareholderInfluence[symbol] || 0) + shares;
+        
+        userAccount.transactions.push({
+          date: new Date(gameTime),
+          type: 'buy',
+          symbol,
+          shares,
+          pricePerShare: stockPrice.price,
+          tradingFee: tradingFee,
+          total: totalWithFee
+        });
+        
+        if (tradingFee > 0) {
+          userAccount.fees.push({
+            date: new Date(gameTime),
+            type: 'trading',
+            amount: tradingFee,
+            description: `Trading fee for buying ${shares} shares of ${symbol}`
+          });
+        }
+      }
+      
+      return { success: true };
+      
+    } else if (action === 'sell') {
+      if ((userAccount.portfolio[symbol] || 0) < shares) {
+        return { success: false, error: 'Insufficient shares' };
+      }
+      
+      shareAvailability.recordSale(symbol, shares);
+      
+      let remainingShares = shares;
+      let totalCostBasis = 0;
+      let taxAmount = 0;
+      
+      if (userAccount.purchaseHistory[symbol]) {
+        const purchases = userAccount.purchaseHistory[symbol].slice();
+        
+        while (remainingShares > 0 && purchases.length > 0) {
+          const purchase = purchases[0];
+          const sharesToSell = Math.min(remainingShares, purchase.shares);
+          const costBasis = sharesToSell * purchase.pricePerShare;
+          totalCostBasis += costBasis;
+          
+          const purchaseDate = new Date(purchase.date);
+          const currentDate = new Date(gameTime);
+          const holdingDays = (currentDate - purchaseDate) / (1000 * 60 * 60 * 24);
+          const isLongTerm = holdingDays >= 365;
+          
+          const saleProceeds = sharesToSell * stockPrice.price;
+          const capitalGain = saleProceeds - costBasis;
+          
+          if (capitalGain > 0) {
+            const taxRate = isLongTerm ? LONG_TERM_TAX_RATE : SHORT_TERM_TAX_RATE;
+            taxAmount += capitalGain * taxRate;
+          }
+          
+          purchase.shares -= sharesToSell;
+          if (purchase.shares <= 0) {
+            purchases.shift();
+          }
+          
+          remainingShares -= sharesToSell;
+        }
+        
+        userAccount.purchaseHistory[symbol] = purchases;
+      }
+      
+      const grossSaleAmount = stockPrice.price * shares;
+      const netSaleProceeds = grossSaleAmount - taxAmount - tradingFee;
+      userAccount.cash += netSaleProceeds;
+      userAccount.portfolio[symbol] -= shares;
+      
+      userAccount.shareholderInfluence[symbol] = (userAccount.shareholderInfluence[symbol] || 0) - shares;
+      if (userAccount.shareholderInfluence[symbol] <= 0) {
+        delete userAccount.shareholderInfluence[symbol];
+      }
+      
+      userAccount.transactions.push({
+        date: new Date(gameTime),
+        type: 'sell',
+        symbol,
+        shares,
+        pricePerShare: stockPrice.price,
+        total: grossSaleAmount,
+        tax: taxAmount,
+        tradingFee: tradingFee,
+        netProceeds: netSaleProceeds
+      });
+      
+      if (tradingFee > 0) {
+        userAccount.fees.push({
+          date: new Date(gameTime),
+          type: 'trading',
+          amount: tradingFee,
+          description: `Trading fee for selling ${shares} shares of ${symbol}`
+        });
+      }
+      
+      if (taxAmount > 0) {
+        userAccount.taxes.push({
+          date: new Date(gameTime),
+          type: 'capital-gains',
+          amount: taxAmount,
+          description: `Capital gains tax on ${shares} shares of ${symbol}`
+        });
+      }
+      
+      return { success: true };
+      
+    } else if (action === 'short') {
+      const saleProceeds = totalCost;
+      const totalWithFee = saleProceeds - tradingFee;
+      
+      userAccount.cash += totalWithFee;
+      
+      if (!userAccount.shortPositions[symbol]) {
+        userAccount.shortPositions[symbol] = {
+          shares: 0,
+          borrowPrice: 0,
+          borrowDate: new Date(gameTime)
+        };
+      }
+      
+      const currentShortShares = userAccount.shortPositions[symbol].shares;
+      const currentBorrowValue = currentShortShares * userAccount.shortPositions[symbol].borrowPrice;
+      const newBorrowValue = shares * stockPrice.price;
+      const totalShares = currentShortShares + shares;
+      
+      userAccount.shortPositions[symbol].shares = totalShares;
+      if (totalShares > 0) {
+        userAccount.shortPositions[symbol].borrowPrice = (currentBorrowValue + newBorrowValue) / totalShares;
+      }
+      if (currentShortShares === 0) {
+        userAccount.shortPositions[symbol].borrowDate = new Date(gameTime);
+      }
+      
+      userAccount.transactions.push({
+        date: new Date(gameTime),
+        type: 'short',
+        symbol,
+        shares,
+        pricePerShare: stockPrice.price,
+        tradingFee: tradingFee,
+        netProceeds: totalWithFee
+      });
+      
+      if (tradingFee > 0) {
+        userAccount.fees.push({
+          date: new Date(gameTime),
+          type: 'trading',
+          amount: tradingFee,
+          description: `Trading fee for shorting ${shares} shares of ${symbol}`
+        });
+      }
+      
+      return { success: true };
+      
+    } else if (action === 'cover') {
+      if (!userAccount.shortPositions[symbol] || userAccount.shortPositions[symbol].shares < shares) {
+        return { success: false, error: 'Insufficient short position to cover' };
+      }
+      
+      const totalWithFee = totalCost + tradingFee;
+      if (userAccount.cash < totalWithFee) {
+        return { success: false, error: 'Insufficient funds to cover short position' };
+      }
+      
+      userAccount.cash -= totalWithFee;
+      
+      const position = userAccount.shortPositions[symbol];
+      const borrowPrice = position.borrowPrice;
+      const profit = (borrowPrice - stockPrice.price) * shares;
+      
+      let taxAmount = 0;
+      if (profit > 0) {
+        const borrowDate = new Date(position.borrowDate);
+        const holdingDays = (gameTime - borrowDate) / (1000 * 60 * 60 * 24);
+        const isLongTerm = holdingDays >= 365;
+        const taxRate = isLongTerm ? LONG_TERM_TAX_RATE : SHORT_TERM_TAX_RATE;
+        taxAmount = profit * taxRate;
+        userAccount.cash -= taxAmount;
+      }
+      
+      position.shares -= shares;
+      if (position.shares <= 0) {
+        delete userAccount.shortPositions[symbol];
+      }
+      
+      userAccount.transactions.push({
+        date: new Date(gameTime),
+        type: 'cover',
+        symbol,
+        shares,
+        pricePerShare: stockPrice.price,
+        borrowPrice: borrowPrice,
+        profit: profit,
+        tax: taxAmount,
+        tradingFee: tradingFee,
+        total: totalWithFee
+      });
+      
+      if (tradingFee > 0) {
+        userAccount.fees.push({
+          date: new Date(gameTime),
+          type: 'trading',
+          amount: tradingFee,
+          description: `Trading fee for covering ${shares} shares of ${symbol}`
+        });
+      }
+      
+      if (taxAmount > 0) {
+        userAccount.taxes.push({
+          date: new Date(gameTime),
+          type: 'short-gains',
+          amount: taxAmount,
+          description: `Tax on short sale profit for ${shares} shares of ${symbol}`
+        });
+      }
+      
+      return { success: true };
+    }
+    
+    return { success: false, error: 'Invalid action' };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+}
+
+// Helper function to execute index fund orders
+function executeIndexFundOrder(symbol, action, shares, fundPrice, fund) {
+  const totalCost = fundPrice * shares;
+  const tradingFee = getTradingFee(totalCost, gameTime);
+  
+  try {
+    if (action === 'buy') {
+      const totalWithFee = totalCost + tradingFee;
+      
+      if (userAccount.cash < totalWithFee) {
+        return { success: false, error: 'Insufficient funds' };
+      }
+      
+      userAccount.cash -= totalWithFee;
+      
+      if (!userAccount.indexFundHoldings[symbol]) {
+        userAccount.indexFundHoldings[symbol] = {
+          shares: 0,
+          purchaseHistory: []
+        };
+      }
+      
+      userAccount.indexFundHoldings[symbol].shares += shares;
+      userAccount.indexFundHoldings[symbol].purchaseHistory.push({
+        date: new Date(gameTime),
+        shares: shares,
+        pricePerShare: fundPrice
+      });
+      
+      userAccount.transactions.push({
+        date: new Date(gameTime),
+        type: 'buy-indexfund',
+        symbol,
+        name: fund.name,
+        shares,
+        pricePerShare: fundPrice,
+        tradingFee: tradingFee,
+        total: totalWithFee
+      });
+      
+      if (tradingFee > 0) {
+        userAccount.fees.push({
+          date: new Date(gameTime),
+          type: 'trading',
+          amount: tradingFee,
+          description: `Trading fee for buying ${shares} shares of ${fund.name}`
+        });
+      }
+      
+      return { success: true };
+      
+    } else if (action === 'sell') {
+      const holding = userAccount.indexFundHoldings[symbol];
+      if (!holding || holding.shares < shares) {
+        return { success: false, error: 'Insufficient shares' };
+      }
+      
+      let remainingShares = shares;
+      let totalCostBasis = 0;
+      let taxAmount = 0;
+      
+      const purchases = holding.purchaseHistory.slice();
+      
+      while (remainingShares > 0 && purchases.length > 0) {
+        const purchase = purchases[0];
+        const sharesToSell = Math.min(remainingShares, purchase.shares);
+        const costBasis = sharesToSell * purchase.pricePerShare;
+        totalCostBasis += costBasis;
+        
+        const purchaseDate = new Date(purchase.date);
+        const currentDate = new Date(gameTime);
+        const holdingDays = (currentDate - purchaseDate) / (1000 * 60 * 60 * 24);
+        const isLongTerm = holdingDays >= 365;
+        
+        const saleProceeds = sharesToSell * fundPrice;
+        const capitalGain = saleProceeds - costBasis;
+        
+        if (capitalGain > 0) {
+          const taxRate = isLongTerm ? LONG_TERM_TAX_RATE : SHORT_TERM_TAX_RATE;
+          taxAmount += capitalGain * taxRate;
+        }
+        
+        purchase.shares -= sharesToSell;
+        if (purchase.shares <= 0) {
+          purchases.shift();
+        }
+        
+        remainingShares -= sharesToSell;
+      }
+      
+      const purchasesUsedInSale = [];
+      let remainingForExpense = shares;
+      
+      for (const purchase of holding.purchaseHistory) {
+        if (remainingForExpense <= 0) break;
+        
+        const sharesFromThisPurchase = Math.min(remainingForExpense, purchase.shares);
+        purchasesUsedInSale.push({
+          shares: sharesFromThisPurchase,
+          pricePerShare: purchase.pricePerShare,
+          date: purchase.date
+        });
+        remainingForExpense -= sharesFromThisPurchase;
+      }
+      
+      holding.purchaseHistory = purchases;
+      
+      let totalExpenseFee = 0;
+      
+      purchasesUsedInSale.forEach(purchase => {
+        const daysHeld = (gameTime - new Date(purchase.date)) / (1000 * 60 * 60 * 24);
+        const dailyFeeRate = fund.expenseRatio / 365;
+        const purchaseValue = purchase.shares * purchase.pricePerShare;
+        const fee = purchaseValue * dailyFeeRate * daysHeld;
+        totalExpenseFee += fee;
+      });
+      
+      if (totalExpenseFee > 0) {
+        userAccount.fees.push({
+          date: new Date(gameTime),
+          type: 'index-fund-expense',
+          amount: totalExpenseFee,
+          description: `Expense ratio fee (${(fund.expenseRatio * 100).toFixed(2)}%) for ${fund.name}`
+        });
+      }
+      
+      const grossSaleAmount = fundPrice * shares;
+      const netSaleProceeds = grossSaleAmount - taxAmount - tradingFee - totalExpenseFee;
+      userAccount.cash += netSaleProceeds;
+      holding.shares -= shares;
+      
+      if (holding.shares <= 0) {
+        delete userAccount.indexFundHoldings[symbol];
+      }
+      
+      userAccount.transactions.push({
+        date: new Date(gameTime),
+        type: 'sell-indexfund',
+        symbol,
+        name: fund.name,
+        shares,
+        pricePerShare: fundPrice,
+        total: grossSaleAmount,
+        tax: taxAmount,
+        tradingFee: tradingFee,
+        netProceeds: netSaleProceeds
+      });
+      
+      if (tradingFee > 0) {
+        userAccount.fees.push({
+          date: new Date(gameTime),
+          type: 'trading',
+          amount: tradingFee,
+          description: `Trading fee for selling ${shares} shares of ${fund.name}`
+        });
+      }
+      
+      if (taxAmount > 0) {
+        userAccount.taxes.push({
+          date: new Date(gameTime),
+          type: 'capital-gains',
+          amount: taxAmount,
+          description: `Capital gains tax on ${shares} shares of ${fund.name}`
+        });
+      }
+      
+      return { success: true };
+    }
+    
+    return { success: false, error: 'Invalid action' };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+}
+
 app.post('/api/trade', (req, res) => {
   const { symbol, action, shares } = req.body;
   
+  // If market is closed, queue the order instead of rejecting it
   if (!isMarketOpen(gameTime)) {
-    return res.status(400).json({ error: 'Market is closed' });
+    try {
+      // Validate inputs
+      if (!symbol || !action || !shares || shares <= 0) {
+        return res.status(400).json({ error: 'Invalid trade parameters' });
+      }
+      
+      // Validate action
+      if (!['buy', 'sell', 'short', 'cover', 'buy-margin'].includes(action)) {
+        return res.status(400).json({ error: 'Invalid action' });
+      }
+      
+      // Queue the order
+      const result = dbModule.insertPendingOrder.run(
+        symbol,
+        action,
+        shares,
+        'stock',
+        gameTime.toISOString(),
+        'pending'
+      );
+      
+      return res.json({ 
+        success: true,
+        message: 'Market is closed. Order has been queued and will be executed when market opens.',
+        pendingOrderId: result.lastInsertRowid,
+        symbol,
+        action,
+        shares,
+        queuedAt: gameTime.toISOString()
+      });
+    } catch (error) {
+      return res.status(500).json({ error: 'Failed to queue order: ' + error.message });
+    }
   }
   
   // Check for trade halts
@@ -1682,8 +2338,46 @@ app.get('/api/indexfunds/:symbol/history', (req, res) => {
 app.post('/api/indexfunds/trade', (req, res) => {
   const { symbol, action, shares } = req.body;
   
+  // If market is closed, queue the order instead of rejecting it
   if (!isMarketOpen(gameTime)) {
-    return res.status(400).json({ error: 'Market is closed' });
+    try {
+      // Validate inputs
+      if (!symbol || !action || !shares || shares <= 0) {
+        return res.status(400).json({ error: 'Invalid trade parameters' });
+      }
+      
+      // Validate action
+      if (!['buy', 'sell'].includes(action)) {
+        return res.status(400).json({ error: 'Invalid action for index fund' });
+      }
+      
+      // Validate symbol to prevent prototype pollution
+      if (typeof symbol !== 'string' || symbol === '__proto__' || symbol === 'constructor' || symbol === 'prototype') {
+        return res.status(400).json({ error: 'Invalid symbol' });
+      }
+      
+      // Queue the order
+      const result = dbModule.insertPendingOrder.run(
+        symbol,
+        action,
+        shares,
+        'indexfund',
+        gameTime.toISOString(),
+        'pending'
+      );
+      
+      return res.json({ 
+        success: true,
+        message: 'Market is closed. Order has been queued and will be executed when market opens.',
+        pendingOrderId: result.lastInsertRowid,
+        symbol,
+        action,
+        shares,
+        queuedAt: gameTime.toISOString()
+      });
+    } catch (error) {
+      return res.status(500).json({ error: 'Failed to queue order: ' + error.message });
+    }
   }
   
   const fund = indexFunds.indexFunds.find(f => f.symbol === symbol);
@@ -1985,6 +2679,99 @@ app.get('/api/taxes', (req, res) => {
       dividends: DIVIDEND_TAX_RATE * 100
     }
   });
+});
+
+// Pending Orders API endpoints
+
+// Get all pending orders
+app.get('/api/pendingorders', (req, res) => {
+  try {
+    const pendingOrders = dbModule.getAllPendingOrders().all();
+    
+    const formattedOrders = pendingOrders.map(order => ({
+      id: order.id,
+      symbol: order.symbol,
+      action: order.action,
+      shares: order.shares,
+      orderType: order.order_type,
+      createdAt: order.created_at,
+      status: order.status,
+      executedAt: order.executed_at,
+      executionPrice: order.execution_price,
+      error: order.error
+    }));
+    
+    res.json(formattedOrders);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to retrieve pending orders: ' + error.message });
+  }
+});
+
+// Get pending orders by status
+app.get('/api/pendingorders/status/:status', (req, res) => {
+  try {
+    const { status } = req.params;
+    const pendingOrders = dbModule.getPendingOrders().all(status);
+    
+    const formattedOrders = pendingOrders.map(order => ({
+      id: order.id,
+      symbol: order.symbol,
+      action: order.action,
+      shares: order.shares,
+      orderType: order.order_type,
+      createdAt: order.created_at,
+      status: order.status,
+      executedAt: order.executed_at,
+      executionPrice: order.execution_price,
+      error: order.error
+    }));
+    
+    res.json(formattedOrders);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to retrieve pending orders: ' + error.message });
+  }
+});
+
+// Cancel a pending order
+app.delete('/api/pendingorders/:id', (req, res) => {
+  try {
+    const { id } = req.params;
+    const orderId = parseInt(id);
+    
+    if (isNaN(orderId)) {
+      return res.status(400).json({ error: 'Invalid order ID' });
+    }
+    
+    // Get the order to check if it's pending
+    const order = dbModule.getPendingOrder().get(orderId);
+    
+    if (!order) {
+      return res.status(404).json({ error: 'Order not found' });
+    }
+    
+    if (order.status !== 'pending') {
+      return res.status(400).json({ 
+        error: `Cannot cancel order with status '${order.status}'. Only pending orders can be cancelled.` 
+      });
+    }
+    
+    // Mark the order as cancelled
+    dbModule.updatePendingOrderStatus.run(
+      'cancelled',
+      gameTime.toISOString(),
+      null,
+      'Cancelled by user',
+      orderId
+    );
+    
+    res.json({ 
+      success: true,
+      message: 'Order cancelled successfully',
+      orderId: orderId
+    });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to cancel order: ' + error.message });
+  }
 });
 
 // Email API (generate emails based on game events)

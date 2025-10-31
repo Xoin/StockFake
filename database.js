@@ -211,6 +211,22 @@ function initializeDatabase() {
     )
   `);
 
+  // Create pending_orders table for orders placed when market is closed
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS pending_orders (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      symbol TEXT NOT NULL,
+      action TEXT NOT NULL,
+      shares REAL NOT NULL,
+      order_type TEXT NOT NULL DEFAULT 'stock',
+      created_at TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'pending',
+      executed_at TEXT,
+      execution_price REAL,
+      error TEXT
+    )
+  `);
+
   // Insert default game state if not exists
   const gameStateCount = db.prepare('SELECT COUNT(*) as count FROM game_state').get();
   if (gameStateCount.count === 0) {
@@ -394,6 +410,21 @@ const upsertLastTradeTime = db.prepare(`
   ON CONFLICT(symbol) DO UPDATE SET last_trade_time = excluded.last_trade_time
 `);
 
+// Pending orders functions
+const getPendingOrders = db.prepare('SELECT * FROM pending_orders WHERE status = ? ORDER BY created_at ASC');
+const getAllPendingOrders = db.prepare('SELECT * FROM pending_orders ORDER BY created_at DESC');
+const getPendingOrder = db.prepare('SELECT * FROM pending_orders WHERE id = ?');
+const insertPendingOrder = db.prepare(`
+  INSERT INTO pending_orders (symbol, action, shares, order_type, created_at, status)
+  VALUES (?, ?, ?, ?, ?, ?)
+`);
+const updatePendingOrderStatus = db.prepare(`
+  UPDATE pending_orders 
+  SET status = ?, executed_at = ?, execution_price = ?, error = ?
+  WHERE id = ?
+`);
+const deletePendingOrder = db.prepare('DELETE FROM pending_orders WHERE id = ?');
+
 module.exports = {
   db,
   initializeDatabase,
@@ -476,5 +507,13 @@ module.exports = {
   
   // Last trade time
   getLastTradeTime,
-  upsertLastTradeTime
+  upsertLastTradeTime,
+  
+  // Pending orders
+  getPendingOrders,
+  getAllPendingOrders,
+  getPendingOrder,
+  insertPendingOrder,
+  updatePendingOrderStatus,
+  deletePendingOrder
 };
