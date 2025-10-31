@@ -1557,14 +1557,14 @@ app.post('/api/trade', (req, res) => {
   // If market is closed, queue the order instead of rejecting it
   if (!isMarketOpen(gameTime)) {
     try {
+      // Validate inputs first
+      if (!symbol || !action || !shares || shares <= 0) {
+        return res.status(400).json({ error: 'Invalid trade parameters' });
+      }
+      
       // Validate symbol to prevent prototype pollution
       if (typeof symbol !== 'string' || symbol === '__proto__' || symbol === 'constructor' || symbol === 'prototype') {
         return res.status(400).json({ error: 'Invalid symbol' });
-      }
-      
-      // Validate inputs
-      if (!symbol || !action || !shares || shares <= 0) {
-        return res.status(400).json({ error: 'Invalid trade parameters' });
       }
       
       // Validate action
@@ -2942,6 +2942,8 @@ app.post('/api/debug/settime', (req, res) => {
   
   try {
     gameTime = new Date(time);
+    // Update market state tracker to prevent false transitions
+    wasMarketOpen = isMarketOpen(gameTime);
     res.json({ success: true, newTime: gameTime });
   } catch (error) {
     res.status(400).json({ error: 'Invalid time format' });
@@ -2969,6 +2971,8 @@ app.post('/api/debug/skiptime', (req, res) => {
   }
   
   gameTime = new Date(gameTime.getTime() + (amount * multipliers[unit]));
+  // Update market state tracker to prevent false transitions
+  wasMarketOpen = isMarketOpen(gameTime);
   res.json({ success: true, newTime: gameTime });
 });
 
