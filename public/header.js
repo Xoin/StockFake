@@ -1,6 +1,13 @@
 // Shared header component
 // This creates a consistent header across all pages
 
+// Helper to escape HTML to prevent XSS
+function escapeHtmlAttr(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
 function createHeader(options = {}) {
     const {
         title = 'StockFake',
@@ -16,11 +23,11 @@ function createHeader(options = {}) {
     } = options;
 
     const headerHTML = `
-        ${title ? `<h1>${title}</h1>` : ''}
+        ${title ? `<h1>${escapeHtmlAttr(title)}</h1>` : ''}
         ${showNavigation ? `
         <div class="nav">
             ${navigationLinks.map((link, index) => 
-                `${index > 0 ? '|' : ''} <a href="${link.href}">${link.text}</a>`
+                `${index > 0 ? '|' : ''} <a href="${escapeHtmlAttr(link.href)}">${escapeHtmlAttr(link.text)}</a>`
             ).join(' ')}
         </div>
         ` : ''}

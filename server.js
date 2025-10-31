@@ -53,35 +53,28 @@ setInterval(() => {
     // If market is currently closed and we're using fast speed (1s = 1day)
     // Check if we would skip over market open hours
     if (!isMarketOpen(gameTime) && timeMultiplier >= 86400) {
-      const marketWasClosed = !isMarketOpen(gameTime);
-      const marketWillBeOpen = isMarketOpen(newTime);
+      // Advance time in smaller increments to avoid skipping market hours
+      let checkTime = new Date(gameTime.getTime());
+      const increment = 3600 * 1000; // 1 hour increments
+      const maxAdvance = timeMultiplier * 1000;
+      let totalAdvanced = 0;
       
-      // If we're about to skip from closed to closed (potentially skipping open hours)
-      // or if we're transitioning from closed to open, advance more carefully
-      if (marketWasClosed) {
-        // Advance time in smaller increments to avoid skipping market hours
-        let checkTime = new Date(gameTime.getTime());
-        const increment = 3600 * 1000; // 1 hour increments
-        const maxAdvance = timeMultiplier * 1000;
-        let totalAdvanced = 0;
+      while (totalAdvanced < maxAdvance && !isMarketOpen(checkTime)) {
+        checkTime = new Date(checkTime.getTime() + increment);
+        totalAdvanced += increment;
         
-        while (totalAdvanced < maxAdvance && !isMarketOpen(checkTime)) {
-          checkTime = new Date(checkTime.getTime() + increment);
-          totalAdvanced += increment;
-          
-          // Stop if we hit market open time
-          if (isMarketOpen(checkTime)) {
-            gameTime = checkTime;
-            return;
-          }
+        // Stop if we hit market open time
+        if (isMarketOpen(checkTime)) {
+          gameTime = checkTime;
+          return;
         }
-        
-        // If we still haven't found market open, use the calculated time
-        if (totalAdvanced >= maxAdvance) {
-          gameTime = newTime;
-        }
-        return;
       }
+      
+      // If we still haven't found market open, use the calculated time
+      if (totalAdvanced >= maxAdvance) {
+        gameTime = newTime;
+      }
+      return;
     }
     
     gameTime = newTime;
@@ -2269,7 +2262,7 @@ app.post('/api/debug/clearholdings', (req, res) => {
 
 // Reset game to initial state
 app.post('/api/debug/reset', (req, res) => {
-  gameTime = new Date('1970-01-01T09:30:00');
+  gameTime = new Date('1970-01-01T09:30:00Z'); // Use UTC timezone
   isPaused = false;
   timeMultiplier = 3600;
   

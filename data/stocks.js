@@ -27,10 +27,14 @@ for (const [symbol, stockInfo] of Object.entries(historicalStockData.data)) {
 // This ensures the same time always produces the same price
 function seededRandom(symbol, time) {
   // Create a hash from symbol and time (rounded to nearest minute for stability)
-  const roundedTime = Math.floor(time / 60000) * 60000; // Round to minute
+  const MILLISECONDS_PER_MINUTE = 60000;
+  const MAX_STRING_LENGTH = 1000; // Prevent excessive loop iterations
+  const roundedTime = Math.floor(time / MILLISECONDS_PER_MINUTE) * MILLISECONDS_PER_MINUTE;
   let hash = 0;
   const str = symbol + roundedTime.toString();
-  for (let i = 0; i < str.length; i++) {
+  const safeLength = Math.min(str.length, MAX_STRING_LENGTH);
+  
+  for (let i = 0; i < safeLength; i++) {
     const char = str.charCodeAt(i);
     hash = ((hash << 5) - hash) + char;
     hash = hash & hash; // Convert to 32bit integer
