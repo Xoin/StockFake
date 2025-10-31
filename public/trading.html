@@ -39,13 +39,6 @@
         .nav a:hover {
             text-decoration: underline;
         }
-        .time-display {
-            background-color: #000;
-            border: 2px solid #00ff00;
-            padding: 10px;
-            margin-bottom: 20px;
-            text-align: center;
-        }
         .halt-warning {
             background-color: #440000;
             border: 2px solid #ff0000;
@@ -139,15 +132,9 @@
 </head>
 <body>
     <div class="container">
-        <h1>📈 TRADING PLATFORM</h1>
-        <div class="nav">
-            <a href="/">← Back to Portal</a> |
-            <a href="/bank">Bank</a> |
-            <a href="/loans">Loans</a> |
-            <a href="/news">News</a> |
-            <a href="/email">Email</a>
-        </div>
-        <div class="time-display" id="timeDisplay">Loading...</div>
+        <!-- Header will be loaded here -->
+        <div id="page-header"></div>
+        
         <div id="haltWarning" class="halt-warning" style="display: none;"></div>
         
         <div class="stocks-container">
@@ -191,18 +178,16 @@
         </div>
     </div>
     
+    <script src="header.js"></script>
     <script>
         let stocks = [];
         let paginator;
         
-        async function updateTime() {
+        // Check for trade halts (called by interval)
+        async function updateTradeHaltWarning() {
             const response = await fetch('/api/time');
             const data = await response.json();
-            const date = new Date(data.currentTime);
-            const status = data.isMarketOpen ? '🟢 MARKET OPEN' : '🔴 MARKET CLOSED';
-            document.getElementById('timeDisplay').textContent = `${date.toLocaleString()} - ${status}`;
             
-            // Check for trade halts
             const haltWarning = document.getElementById('haltWarning');
             if (data.tradeHalt && data.tradeHalt.status === 'current') {
                 const halt = data.tradeHalt.halt;
@@ -256,9 +241,6 @@
                 document.getElementById('message').innerHTML = `<div class="message error">Error: ${error.message}</div>`;
             }
         }
-        
-        updateTime();
-        setInterval(updateTime, 1000);
     </script>
     <script src="common.js"></script>
     <script>
@@ -304,11 +286,28 @@
             stocks = await response.json();
             
             const stockSelect = document.getElementById('stockSymbol');
+            // Preserve the currently selected value
+            const currentSelection = stockSelect.value;
+            
             stockSelect.innerHTML = '<option value="">Select Stock</option>' + 
                 stocks.map(s => `<option value="${escapeHtml(s.symbol)}">${escapeHtml(s.symbol)} - ${escapeHtml(s.name)}</option>`).join('');
             
-            // Initialize paginator
+            // Restore the selection if it still exists in the updated list
+            if (currentSelection && stocks.find(s => s.symbol === currentSelection)) {
+                stockSelect.value = currentSelection;
+            }
+            
+            // Preserve current page if paginator exists
+            const currentPage = paginator ? paginator.currentPage : 1;
+            
+            // Initialize paginator with new data
             paginator = new Paginator(stocks, 20);
+            
+            // Restore the page number if it's still valid
+            if (currentPage <= paginator.totalPages) {
+                paginator.currentPage = currentPage;
+            }
+            
             renderPage();
         }
         
@@ -321,10 +320,26 @@
             applyEraTheme(year);
         }
         
+        // Initialize page with header
+        loadHeader('page-header', {
+            title: '📈 TRADING PLATFORM',
+            navigationLinks: [
+                { href: '/', text: '← Back to Portal' },
+                { href: '/bank', text: 'Bank' },
+                { href: '/loans', text: 'Loans' },
+                { href: '/news', text: 'News' },
+                { href: '/email', text: 'Email' }
+            ]
+        });
+        
         updateStocks();
         updateEraTheme();
+        updateTradeHaltWarning();
+        updateNavNotifications(); // Initial update
         setInterval(updateStocks, 2000);
         setInterval(updateEraTheme, 10000);
+        setInterval(updateTradeHaltWarning, 1000);
+        setInterval(updateNavNotifications, 3000); // Update every 3 seconds
     </script>
 </body>
 </html>

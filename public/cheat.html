@@ -1,0 +1,567 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>StockFake - Debug Console</title>
+    <link rel="stylesheet" href="era-themes.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Courier New', monospace;
+            background-color: #1a1a1a;
+            color: #00ff00;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        h1 {
+            text-align: center;
+            margin-bottom: 20px;
+            color: #ff00ff;
+            text-shadow: 0 0 10px #ff00ff;
+        }
+        h2 {
+            color: #00ffff;
+            margin-top: 20px;
+            margin-bottom: 10px;
+            border-bottom: 2px solid #00ffff;
+            padding-bottom: 5px;
+        }
+        .nav {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        .nav a {
+            color: #00ff00;
+            margin: 0 10px;
+            text-decoration: none;
+        }
+        .nav a:hover {
+            text-decoration: underline;
+        }
+        .warning {
+            background-color: #440000;
+            border: 2px solid #ff0000;
+            padding: 15px;
+            margin-bottom: 20px;
+            text-align: center;
+            color: #ff0000;
+            font-weight: bold;
+        }
+        .panel {
+            background-color: #000;
+            border: 2px solid #00ffff;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        .control-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: inline-block;
+            width: 200px;
+            color: #00ffff;
+        }
+        input, select {
+            background-color: #000;
+            color: #00ff00;
+            border: 1px solid #00ff00;
+            padding: 8px;
+            margin: 5px;
+            font-family: 'Courier New', monospace;
+            width: 250px;
+        }
+        button {
+            background-color: #003333;
+            color: #00ffff;
+            border: 2px solid #00ffff;
+            padding: 10px 20px;
+            margin: 5px;
+            cursor: pointer;
+            font-family: 'Courier New', monospace;
+        }
+        button:hover {
+            background-color: #00ffff;
+            color: #000;
+        }
+        button.danger {
+            background-color: #330000;
+            border-color: #ff0000;
+            color: #ff0000;
+        }
+        button.danger:hover {
+            background-color: #ff0000;
+            color: #000;
+        }
+        .message {
+            padding: 10px;
+            margin: 10px 0;
+            border: 1px solid #00ff00;
+        }
+        .error {
+            border-color: #ff0000;
+            color: #ff0000;
+        }
+        .success {
+            border-color: #00ff00;
+            color: #00ff00;
+        }
+        .info-display {
+            background-color: #001100;
+            border: 1px solid #00ff00;
+            padding: 10px;
+            margin: 10px 0;
+            font-size: 0.9em;
+        }
+        .button-group {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔧 DEBUG CONSOLE 🔧</h1>
+        <div class="nav">
+            <a href="/">← Back to Portal</a> |
+            <a href="/trading">Trading</a> |
+            <a href="/bank">Bank</a>
+        </div>
+        
+        <div class="warning">
+            ⚠️ WARNING: This page is for debugging purposes only. Changes made here can break your game state!
+        </div>
+
+        <div id="message"></div>
+
+        <!-- Time Controls -->
+        <div class="panel">
+            <h2>⏰ Time Controls</h2>
+            <div class="info-display" id="currentTimeDisplay">Loading...</div>
+            
+            <div class="control-group">
+                <label>Jump to Date:</label>
+                <input type="datetime-local" id="jumpToDate">
+                <button onclick="jumpToDate()">Jump</button>
+            </div>
+            
+            <div class="button-group">
+                <button onclick="skipTime(1, 'hour')">+1 Hour</button>
+                <button onclick="skipTime(1, 'day')">+1 Day</button>
+                <button onclick="skipTime(7, 'day')">+1 Week</button>
+                <button onclick="skipTime(30, 'day')">+1 Month</button>
+                <button onclick="skipTime(365, 'day')">+1 Year</button>
+                <button onclick="skipTime(10, 'year')">+10 Years</button>
+            </div>
+        </div>
+
+        <!-- Account Manipulation -->
+        <div class="panel">
+            <h2>💰 Account Manipulation</h2>
+            <div class="info-display" id="accountDisplay">Loading...</div>
+            
+            <div class="control-group">
+                <label>Add Cash:</label>
+                <input type="number" id="addCash" value="10000" step="1000">
+                <button onclick="modifyCash()">Add Cash</button>
+            </div>
+            
+            <div class="control-group">
+                <label>Set Credit Score:</label>
+                <input type="number" id="creditScore" value="750" min="300" max="850">
+                <button onclick="setCreditScore()">Set Score</button>
+            </div>
+            
+            <div class="button-group">
+                <button onclick="modifyCash(100000)">+$100,000</button>
+                <button onclick="modifyCash(1000000)">+$1,000,000</button>
+                <button class="danger" onclick="modifyCash(-1000000)">-$1,000,000</button>
+                <button class="danger" onclick="clearAllHoldings()">Clear All Holdings</button>
+            </div>
+        </div>
+
+        <!-- Stock Manipulation -->
+        <div class="panel">
+            <h2>📈 Stock Manipulation</h2>
+            
+            <div class="control-group">
+                <label>Stock Symbol:</label>
+                <input type="text" id="stockSymbol" placeholder="e.g., IBM">
+            </div>
+            
+            <div class="control-group">
+                <label>Shares:</label>
+                <input type="number" id="stockShares" value="100" min="1">
+            </div>
+            
+            <div class="button-group">
+                <button onclick="addStock()">Add to Portfolio</button>
+                <button class="danger" onclick="removeStock()">Remove from Portfolio</button>
+            </div>
+        </div>
+
+        <!-- Market Controls -->
+        <div class="panel">
+            <h2>🎮 Game State</h2>
+            
+            <div class="button-group">
+                <button onclick="togglePause()">Toggle Pause</button>
+                <button onclick="setSpeed(60)">Slow Speed</button>
+                <button onclick="setSpeed(3600)">Normal Speed</button>
+                <button onclick="setSpeed(86400)">Fast Speed</button>
+            </div>
+            
+            <div class="button-group">
+                <button class="danger" onclick="resetGame()">Reset Game (Careful!)</button>
+                <button onclick="refreshAll()">Refresh Data</button>
+            </div>
+        </div>
+
+        <!-- Information Display -->
+        <div class="panel">
+            <h2>📊 Debug Information</h2>
+            <div class="info-display" id="debugInfo">
+                <pre id="debugData">Loading...</pre>
+            </div>
+            <button onclick="updateDebugInfo()">Refresh Debug Info</button>
+        </div>
+
+    </div>
+    
+    <script>
+        // Helper to escape HTML
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+        
+        function showMessage(text, type = 'success') {
+            const messageDiv = document.getElementById('message');
+            messageDiv.innerHTML = `<div class="message ${type}">${escapeHtml(text)}</div>`;
+            setTimeout(() => messageDiv.innerHTML = '', 5000);
+        }
+
+        async function updateTimeDisplay() {
+            try {
+                const response = await fetch('/api/time');
+                const data = await response.json();
+                const date = new Date(data.currentTime);
+                const status = data.isMarketOpen ? '🟢 MARKET OPEN' : '🔴 MARKET CLOSED';
+                const pauseStatus = data.isPaused ? '⏸ PAUSED' : '▶ RUNNING';
+                
+                document.getElementById('currentTimeDisplay').innerHTML = `
+                    Current Time: ${date.toLocaleString()}<br>
+                    Status: ${status} | ${pauseStatus}<br>
+                    Speed: ${data.timeMultiplier}x (${getSpeedName(data.timeMultiplier)})
+                `;
+            } catch (error) {
+                console.error('Error updating time:', error);
+            }
+        }
+
+        function getSpeedName(multiplier) {
+            if (multiplier === 60) return '1s = 1min';
+            if (multiplier === 3600) return '1s = 1hr';
+            if (multiplier === 86400) return '1s = 1day';
+            return 'custom';
+        }
+
+        async function updateAccountDisplay() {
+            try {
+                const response = await fetch('/api/account');
+                const data = await response.json();
+                
+                document.getElementById('accountDisplay').innerHTML = `
+                    Cash: $${data.cash.toLocaleString()}<br>
+                    Credit Score: ${data.creditScore}<br>
+                    Portfolio Value: $${(data.portfolioValue || 0).toLocaleString()}<br>
+                    Total Assets: $${(data.totalAssets || 0).toLocaleString()}
+                `;
+            } catch (error) {
+                console.error('Error updating account:', error);
+            }
+        }
+
+        async function jumpToDate() {
+            const dateInput = document.getElementById('jumpToDate').value;
+            if (!dateInput) {
+                showMessage('Please select a date and time', 'error');
+                return;
+            }
+
+            try {
+                const targetDate = new Date(dateInput);
+                
+                // Validate the date
+                if (isNaN(targetDate.getTime())) {
+                    showMessage('Invalid date format', 'error');
+                    return;
+                }
+                
+                const response = await fetch('/api/debug/settime', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ time: targetDate.toISOString() })
+                });
+
+                if (response.ok) {
+                    showMessage('Time jumped successfully!');
+                    updateTimeDisplay();
+                } else {
+                    const data = await response.json();
+                    showMessage(data.error || 'Failed to jump time', 'error');
+                }
+            } catch (error) {
+                showMessage('Error: ' + error.message, 'error');
+            }
+        }
+
+        async function skipTime(amount, unit) {
+            try {
+                const response = await fetch('/api/debug/skiptime', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ amount, unit })
+                });
+
+                if (response.ok) {
+                    showMessage(`Skipped ${amount} ${unit}(s)!`);
+                    updateTimeDisplay();
+                } else {
+                    const data = await response.json();
+                    showMessage(data.error || 'Failed to skip time', 'error');
+                }
+            } catch (error) {
+                showMessage('Error: ' + error.message, 'error');
+            }
+        }
+
+        async function modifyCash(amount) {
+            if (!amount) {
+                amount = parseFloat(document.getElementById('addCash').value);
+            }
+            
+            try {
+                const response = await fetch('/api/debug/modifycash', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ amount })
+                });
+
+                if (response.ok) {
+                    showMessage(`Cash ${amount > 0 ? 'added' : 'removed'}: $${Math.abs(amount).toLocaleString()}`);
+                    updateAccountDisplay();
+                } else {
+                    const data = await response.json();
+                    showMessage(data.error || 'Failed to modify cash', 'error');
+                }
+            } catch (error) {
+                showMessage('Error: ' + error.message, 'error');
+            }
+        }
+
+        async function setCreditScore() {
+            const score = parseInt(document.getElementById('creditScore').value);
+            
+            try {
+                const response = await fetch('/api/debug/setcreditscore', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ score })
+                });
+
+                if (response.ok) {
+                    showMessage(`Credit score set to ${score}`);
+                    updateAccountDisplay();
+                } else {
+                    const data = await response.json();
+                    showMessage(data.error || 'Failed to set credit score', 'error');
+                }
+            } catch (error) {
+                showMessage('Error: ' + error.message, 'error');
+            }
+        }
+
+        async function addStock() {
+            const symbol = document.getElementById('stockSymbol').value.toUpperCase();
+            const shares = parseInt(document.getElementById('stockShares').value);
+
+            if (!symbol || !shares) {
+                showMessage('Please enter symbol and shares', 'error');
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/debug/addstock', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ symbol, shares })
+                });
+
+                if (response.ok) {
+                    showMessage(`Added ${shares} shares of ${symbol}`);
+                    updateAccountDisplay();
+                } else {
+                    const data = await response.json();
+                    showMessage(data.error || 'Failed to add stock', 'error');
+                }
+            } catch (error) {
+                showMessage('Error: ' + error.message, 'error');
+            }
+        }
+
+        async function removeStock() {
+            const symbol = document.getElementById('stockSymbol').value.toUpperCase();
+
+            if (!symbol) {
+                showMessage('Please enter a symbol', 'error');
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/debug/removestock', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ symbol })
+                });
+
+                if (response.ok) {
+                    showMessage(`Removed ${symbol} from portfolio`);
+                    updateAccountDisplay();
+                } else {
+                    const data = await response.json();
+                    showMessage(data.error || 'Failed to remove stock', 'error');
+                }
+            } catch (error) {
+                showMessage('Error: ' + error.message, 'error');
+            }
+        }
+
+        async function clearAllHoldings() {
+            if (!confirm('Are you sure you want to clear ALL holdings? This cannot be undone!')) {
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/debug/clearholdings', {
+                    method: 'POST'
+                });
+
+                if (response.ok) {
+                    showMessage('All holdings cleared');
+                    updateAccountDisplay();
+                } else {
+                    const data = await response.json();
+                    showMessage(data.error || 'Failed to clear holdings', 'error');
+                }
+            } catch (error) {
+                showMessage('Error: ' + error.message, 'error');
+            }
+        }
+
+        async function togglePause() {
+            try {
+                await fetch('/api/time/pause', { method: 'POST' });
+                showMessage('Pause toggled');
+                updateTimeDisplay();
+            } catch (error) {
+                showMessage('Error: ' + error.message, 'error');
+            }
+        }
+
+        async function setSpeed(multiplier) {
+            try {
+                await fetch('/api/time/speed', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ multiplier })
+                });
+                showMessage(`Speed set to ${getSpeedName(multiplier)}`);
+                updateTimeDisplay();
+            } catch (error) {
+                showMessage('Error: ' + error.message, 'error');
+            }
+        }
+
+        async function resetGame() {
+            if (!confirm('Are you ABSOLUTELY SURE you want to reset the entire game? This CANNOT be undone!')) {
+                return;
+            }
+            if (!confirm('Last chance! Reset game and lose all progress?')) {
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/debug/reset', {
+                    method: 'POST'
+                });
+
+                if (response.ok) {
+                    showMessage('Game reset! Reloading...', 'success');
+                    setTimeout(() => window.location.href = '/', 2000);
+                } else {
+                    const data = await response.json();
+                    showMessage(data.error || 'Failed to reset game', 'error');
+                }
+            } catch (error) {
+                showMessage('Error: ' + error.message, 'error');
+            }
+        }
+
+        async function updateDebugInfo() {
+            try {
+                const responses = await Promise.all([
+                    fetch('/api/time'),
+                    fetch('/api/account')
+                ]);
+
+                const [timeData, accountData] = await Promise.all(responses.map(r => r.json()));
+
+                const debugData = {
+                    time: {
+                        current: timeData.currentTime,
+                        isPaused: timeData.isPaused,
+                        multiplier: timeData.timeMultiplier,
+                        isMarketOpen: timeData.isMarketOpen
+                    },
+                    account: {
+                        cash: accountData.cash,
+                        creditScore: accountData.creditScore,
+                        portfolioSize: Object.keys(accountData.portfolio || {}).length,
+                        loansCount: (accountData.loans || []).length,
+                        transactionsCount: (accountData.transactions || []).length
+                    }
+                };
+
+                document.getElementById('debugData').textContent = JSON.stringify(debugData, null, 2);
+            } catch (error) {
+                document.getElementById('debugData').textContent = 'Error loading debug info: ' + error.message;
+            }
+        }
+
+        function refreshAll() {
+            updateTimeDisplay();
+            updateAccountDisplay();
+            updateDebugInfo();
+            showMessage('Data refreshed');
+        }
+
+        // Initialize
+        updateTimeDisplay();
+        updateAccountDisplay();
+        updateDebugInfo();
+        setInterval(updateTimeDisplay, 2000);
+        setInterval(updateAccountDisplay, 5000);
+    </script>
+</body>
+</html>

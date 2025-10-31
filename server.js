@@ -48,7 +48,36 @@ function isMarketOpen(date) {
 // Time simulation
 setInterval(() => {
   if (!isPaused) {
-    gameTime = new Date(gameTime.getTime() + (timeMultiplier * 1000));
+    const newTime = new Date(gameTime.getTime() + (timeMultiplier * 1000));
+    
+    // If market is currently closed and we're using fast speed (1s = 1day)
+    // Check if we would skip over market open hours
+    if (!isMarketOpen(gameTime) && timeMultiplier >= 86400) {
+      // Advance time in smaller increments to avoid skipping market hours
+      let checkTime = new Date(gameTime.getTime());
+      const increment = 3600 * 1000; // 1 hour increments
+      const maxAdvance = timeMultiplier * 1000;
+      let totalAdvanced = 0;
+      
+      while (totalAdvanced < maxAdvance && !isMarketOpen(checkTime)) {
+        checkTime = new Date(checkTime.getTime() + increment);
+        totalAdvanced += increment;
+        
+        // Stop if we hit market open time
+        if (isMarketOpen(checkTime)) {
+          gameTime = checkTime;
+          return;
+        }
+      }
+      
+      // If we still haven't found market open, use the calculated time
+      if (totalAdvanced >= maxAdvance) {
+        gameTime = newTime;
+      }
+      return;
+    }
+    
+    gameTime = newTime;
   }
 }, 1000);
 
@@ -59,6 +88,7 @@ app.get('/api/time', (req, res) => {
     currentTime: gameTime,
     isMarketOpen: isMarketOpen(gameTime),
     isPaused,
+    timeMultiplier,
     tradeHalt: haltStatus
   });
 });
@@ -2096,6 +2126,176 @@ app.get('/api/emails', (req, res) => {
   });
   
   res.json(emails.filter(email => email.date <= gameTime).sort((a, b) => b.date - a.date));
+});
+
+// Debug/Cheat API Endpoints
+// These endpoints are for debugging and testing purposes only
+
+// Set game time to a specific date
+app.post('/api/debug/settime', (req, res) => {
+  const { time } = req.body;
+  if (!time) {
+    return res.status(400).json({ error: 'Time is required' });
+  }
+  
+  try {
+    gameTime = new Date(time);
+    res.json({ success: true, newTime: gameTime });
+  } catch (error) {
+    res.status(400).json({ error: 'Invalid time format' });
+  }
+});
+
+// Skip time forward
+app.post('/api/debug/skiptime', (req, res) => {
+  const { amount, unit } = req.body;
+  
+  if (!amount || !unit) {
+    return res.status(400).json({ error: 'Amount and unit are required' });
+  }
+  
+  const multipliers = {
+    'hour': 60 * 60 * 1000,
+    'day': 24 * 60 * 60 * 1000,
+    'week': 7 * 24 * 60 * 60 * 1000,
+    'month': 30 * 24 * 60 * 60 * 1000,
+    'year': 365 * 24 * 60 * 60 * 1000
+  };
+  
+  if (!multipliers[unit]) {
+    return res.status(400).json({ error: 'Invalid unit. Use: hour, day, week, month, year' });
+  }
+  
+  gameTime = new Date(gameTime.getTime() + (amount * multipliers[unit]));
+  res.json({ success: true, newTime: gameTime });
+});
+
+// Modify cash balance
+app.post('/api/debug/modifycash', (req, res) => {
+  const { amount } = req.body;
+  
+  if (typeof amount !== 'number') {
+    return res.status(400).json({ error: 'Amount must be a number' });
+  }
+  
+  userAccount.cash += amount;
+  res.json({ success: true, newCash: userAccount.cash });
+});
+
+// Set credit score
+app.post('/api/debug/setcreditscore', (req, res) => {
+  const { score } = req.body;
+  
+  if (typeof score !== 'number' || score < 300 || score > 850) {
+    return res.status(400).json({ error: 'Score must be between 300 and 850' });
+  }
+  
+  userAccount.creditScore = score;
+  res.json({ success: true, newScore: userAccount.creditScore });
+});
+
+// Add stock to portfolio
+app.post('/api/debug/addstock', (req, res) => {
+  const { symbol, shares } = req.body;
+  
+  if (!symbol || typeof shares !== 'number' || shares <= 0) {
+    return res.status(400).json({ error: 'Valid symbol and positive shares required' });
+  }
+  
+  // Check if stock exists
+  const stockPrice = stocks.getStockPrice(symbol, gameTime);
+  if (!stockPrice) {
+    return res.status(404).json({ error: 'Stock not found or not available at current time' });
+  }
+  
+  if (!userAccount.portfolio[symbol]) {
+    userAccount.portfolio[symbol] = 0;
+  }
+  
+  userAccount.portfolio[symbol] += shares;
+  
+  // Add to purchase history with current price (for tax purposes)
+  if (!userAccount.purchaseHistory[symbol]) {
+    userAccount.purchaseHistory[symbol] = [];
+  }
+  userAccount.purchaseHistory[symbol].push({
+    shares,
+    price: stockPrice.price,
+    date: gameTime
+  });
+  
+  res.json({ 
+    success: true, 
+    symbol, 
+    totalShares: userAccount.portfolio[symbol] 
+  });
+});
+
+// Remove stock from portfolio
+app.post('/api/debug/removestock', (req, res) => {
+  const { symbol } = req.body;
+  
+  if (!symbol) {
+    return res.status(400).json({ error: 'Symbol is required' });
+  }
+  
+  if (!userAccount.portfolio[symbol]) {
+    return res.status(404).json({ error: 'Stock not in portfolio' });
+  }
+  
+  delete userAccount.portfolio[symbol];
+  delete userAccount.purchaseHistory[symbol];
+  
+  res.json({ success: true, symbol });
+});
+
+// Clear all holdings
+app.post('/api/debug/clearholdings', (req, res) => {
+  userAccount.portfolio = {};
+  userAccount.indexFundHoldings = {};
+  userAccount.shortPositions = {};
+  userAccount.purchaseHistory = {};
+  userAccount.shareholderInfluence = {};
+  
+  res.json({ success: true });
+});
+
+// Reset game to initial state
+app.post('/api/debug/reset', (req, res) => {
+  gameTime = new Date('1970-01-01T09:30:00Z'); // Use UTC timezone
+  isPaused = false;
+  timeMultiplier = 3600;
+  
+  userAccount = {
+    cash: 10000,
+    portfolio: {},
+    indexFundHoldings: {},
+    shortPositions: {},
+    purchaseHistory: {},
+    transactions: [],
+    dividends: [],
+    taxes: [],
+    fees: [],
+    lastTradeTime: {},
+    shareholderInfluence: {},
+    creditScore: 750,
+    loans: [],
+    loanHistory: [],
+    marginAccount: {
+      marginBalance: 0,
+      marginInterestRate: 0.08,
+      lastInterestDate: gameTime,
+      isEnabled: false,
+      marginCalls: []
+    }
+  };
+  
+  res.json({ success: true, message: 'Game reset to initial state' });
+});
+
+// Add route for cheat page
+app.get('/cheat', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'cheat.html'));
 });
 
 app.listen(PORT, () => {

@@ -212,6 +212,9 @@
             const response = await fetch('/api/emails');
             allEmails = await response.json();
             
+            // Update localStorage with current count (mark as viewed)
+            localStorage.setItem('lastEmailCount', allEmails.length);
+            
             emailPaginator = new Paginator(allEmails, 15);
             renderEmailPage();
         }
