@@ -89,6 +89,10 @@ app.get('/graphs', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'graphs.html'));
 });
 
+app.get('/loans', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'loans.html'));
+});
+
 app.get('/company/:symbol', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'company.html'));
 });
@@ -103,14 +107,43 @@ const emailGenerator = require('./data/emails');
 const companies = require('./data/companies');
 const loanCompanies = require('./data/loan-companies');
 const tradeHalts = require('./data/trade-halts');
+const shareAvailability = require('./data/share-availability');
 
 app.get('/api/stocks', (req, res) => {
-  res.json(stocks.getStockData(gameTime));
+  const stockData = stocks.getStockData(gameTime);
+  
+  // Add share availability info to each stock
+  const stocksWithAvailability = stockData.map(stock => {
+    const availability = shareAvailability.getAvailableShares(stock.symbol);
+    return {
+      ...stock,
+      sharesAvailable: availability ? availability.availableForTrading : 0,
+      ownershipPercent: availability ? shareAvailability.getOwnershipPercentage(stock.symbol) : 0
+    };
+  });
+  
+  res.json(stocksWithAvailability);
 });
 
 app.get('/api/stocks/:symbol', (req, res) => {
   const { symbol } = req.params;
-  res.json(stocks.getStockPrice(symbol, gameTime));
+  const stockPrice = stocks.getStockPrice(symbol, gameTime);
+  
+  if (!stockPrice) {
+    return res.status(404).json({ error: 'Stock not found' });
+  }
+  
+  // Add share availability info
+  const availability = shareAvailability.getAvailableShares(symbol);
+  const result = {
+    ...stockPrice,
+    sharesAvailable: availability ? availability.availableForTrading : 0,
+    ownershipPercent: availability ? shareAvailability.getOwnershipPercentage(symbol) : 0,
+    publicFloat: availability ? availability.publicFloat : 0,
+    totalOutstanding: availability ? availability.totalOutstanding : 0
+  };
+  
+  res.json(result);
 });
 
 // Stock history API for charts
@@ -590,10 +623,23 @@ app.post('/api/trade', (req, res) => {
   const tradingFee = getTradingFee(totalCost, gameTime);
   
   if (action === 'buy') {
+    // Check share availability
+    const availabilityCheck = shareAvailability.canPurchaseShares(symbol, shares);
+    if (!availabilityCheck.canPurchase) {
+      return res.status(400).json({ 
+        error: availabilityCheck.reason,
+        availableShares: availabilityCheck.availableShares
+      });
+    }
+    
     const totalWithFee = totalCost + tradingFee;
     if (userAccount.cash < totalWithFee) {
       return res.status(400).json({ error: 'Insufficient funds (including trading fee)' });
     }
+    
+    // Record the share purchase in availability tracking
+    shareAvailability.recordPurchase(symbol, shares);
+    
     userAccount.cash -= totalWithFee;
     userAccount.portfolio[symbol] = (userAccount.portfolio[symbol] || 0) + shares;
     
@@ -635,6 +681,9 @@ app.post('/api/trade', (req, res) => {
     if ((userAccount.portfolio[symbol] || 0) < shares) {
       return res.status(400).json({ error: 'Insufficient shares' });
     }
+    
+    // Record the share sale in availability tracking
+    shareAvailability.recordSale(symbol, shares);
     
     // Calculate capital gains tax using FIFO method
     let remainingShares = shares;

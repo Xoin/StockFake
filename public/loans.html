@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>StockFake - Loans</title>
+    <link rel="stylesheet" href="era-themes.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Courier New', monospace;
+            background-color: #1a1a1a;
+            color: #00ff00;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        h1 {
+            text-align: center;
+            margin-bottom: 20px;
+            color: #00ff00;
+            text-shadow: 0 0 10px #00ff00;
+        }
+        .nav {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        .nav a {
+            color: #00ff00;
+            margin: 0 10px;
+            text-decoration: none;
+        }
+        .nav a:hover {
+            text-decoration: underline;
+        }
+        .credit-score {
+            background-color: #000;
+            border: 2px solid #00ff00;
+            padding: 20px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        .score-display {
+            font-size: 3em;
+            margin: 10px 0;
+        }
+        .score-excellent { color: #00ff00; }
+        .score-good { color: #88ff00; }
+        .score-fair { color: #ffff00; }
+        .score-poor { color: #ff8800; }
+        .score-bad { color: #ff0000; }
+        
+        .active-loans {
+            background-color: #000;
+            border: 2px solid #00ff00;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        .loan-card {
+            background-color: #001100;
+            border: 1px solid #00ff00;
+            padding: 15px;
+            margin-bottom: 15px;
+            border-radius: 5px;
+        }
+        .loan-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 10px;
+            font-size: 1.2em;
+        }
+        .loan-details {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+        .loan-detail {
+            padding: 5px;
+        }
+        .payment-form {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            margin-top: 10px;
+        }
+        input {
+            background-color: #000;
+            border: 1px solid #00ff00;
+            color: #00ff00;
+            padding: 8px;
+            font-family: 'Courier New', monospace;
+            flex: 1;
+        }
+        button {
+            background-color: #003300;
+            color: #00ff00;
+            border: 2px solid #00ff00;
+            padding: 8px 20px;
+            cursor: pointer;
+            font-family: 'Courier New', monospace;
+        }
+        button:hover {
+            background-color: #00ff00;
+            color: #000;
+        }
+        .available-companies {
+            background-color: #000;
+            border: 2px solid #00ff00;
+            padding: 20px;
+        }
+        .company-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+            gap: 15px;
+            margin-top: 15px;
+        }
+        .company-card {
+            background-color: #001100;
+            border: 1px solid #00ff00;
+            padding: 15px;
+            border-radius: 5px;
+        }
+        .company-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 10px;
+        }
+        .trust-level {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 3px;
+            font-size: 0.9em;
+        }
+        .trust-high { background-color: #004400; color: #00ff00; }
+        .trust-medium { background-color: #444400; color: #ffff00; }
+        .trust-low { background-color: #440000; color: #ff8800; }
+        
+        .company-details {
+            font-size: 0.9em;
+            color: #00aa00;
+            margin-bottom: 10px;
+        }
+        .company-details div {
+            margin: 5px 0;
+        }
+        .loan-form {
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
+        }
+        .message {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+            text-align: center;
+        }
+        .success {
+            background-color: #004400;
+            border: 1px solid #00ff00;
+        }
+        .error {
+            background-color: #440000;
+            border: 1px solid #ff0000;
+            color: #ff0000;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>💰 LOANS</h1>
+        <div class="nav">
+            <a href="/">← Back to Portal</a> |
+            <a href="/bank">Bank</a> |
+            <a href="/trading">Trading</a> |
+            <a href="/news">News</a>
+        </div>
+        
+        <div class="credit-score">
+            <h2>Your Credit Score</h2>
+            <div id="creditScore" class="score-display">---</div>
+            <div id="creditRating">Loading...</div>
+        </div>
+
+        <div class="active-loans">
+            <h2>Active Loans</h2>
+            <div id="activeLoans">
+                <p style="text-align: center; color: #00aa00;">No active loans</p>
+            </div>
+        </div>
+
+        <div class="available-companies">
+            <h2>Available Loan Companies</h2>
+            <div id="message"></div>
+            <div id="companies" class="company-grid">
+                Loading...
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let accountData = null;
+
+        function getCreditRating(score) {
+            if (score >= 800) return { text: 'Excellent', class: 'score-excellent' };
+            if (score >= 740) return { text: 'Very Good', class: 'score-good' };
+            if (score >= 670) return { text: 'Good', class: 'score-good' };
+            if (score >= 580) return { text: 'Fair', class: 'score-fair' };
+            if (score >= 500) return { text: 'Poor', class: 'score-poor' };
+            return { text: 'Very Poor', class: 'score-bad' };
+        }
+
+        function getTrustClass(level) {
+            if (level >= 7) return 'trust-high';
+            if (level >= 4) return 'trust-medium';
+            return 'trust-low';
+        }
+
+        async function loadAccountData() {
+            const response = await fetch('/api/account');
+            accountData = await response.json();
+            
+            const score = accountData.creditScore;
+            const rating = getCreditRating(score);
+            
+            document.getElementById('creditScore').textContent = score;
+            document.getElementById('creditScore').className = `score-display ${rating.class}`;
+            document.getElementById('creditRating').textContent = rating.text;
+        }
+
+        async function loadActiveLoans() {
+            const response = await fetch('/api/loans/active');
+            const loans = await response.json();
+            
+            const container = document.getElementById('activeLoans');
+            
+            if (loans.length === 0) {
+                container.innerHTML = '<p style="text-align: center; color: #00aa00;">No active loans</p>';
+                return;
+            }
+            
+            container.innerHTML = loans.map(loan => {
+                const dueDate = new Date(loan.dueDate);
+                const startDate = new Date(loan.startDate);
+                const daysRemaining = Math.ceil((dueDate - new Date()) / (1000 * 60 * 60 * 24));
+                
+                return `
+                    <div class="loan-card">
+                        <div class="loan-header">
+                            <strong>Loan #${loan.id} - ${loan.companyName}</strong>
+                            <span>Balance: $${loan.balance.toFixed(2)}</span>
+                        </div>
+                        <div class="loan-details">
+                            <div class="loan-detail">Principal: $${loan.principal.toFixed(2)}</div>
+                            <div class="loan-detail">Interest Rate: ${(loan.interestRate * 100).toFixed(2)}%</div>
+                            <div class="loan-detail">Started: ${startDate.toLocaleDateString()}</div>
+                            <div class="loan-detail">Due: ${dueDate.toLocaleDateString()} (${daysRemaining} days)</div>
+                            <div class="loan-detail">Missed Payments: ${loan.missedPayments}</div>
+                        </div>
+                        <div class="payment-form">
+                            <input type="number" id="payment-${loan.id}" placeholder="Payment amount" min="1" step="0.01">
+                            <button onclick="makePayment(${loan.id})">Make Payment</button>
+                            <button onclick="payOffLoan(${loan.id}, ${loan.balance})">Pay Off</button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        async function loadCompanies() {
+            const response = await fetch('/api/loans/companies');
+            const companies = await response.json();
+            
+            const container = document.getElementById('companies');
+            
+            container.innerHTML = companies.map(company => {
+                const trustClass = getTrustClass(company.trustLevel);
+                const rate = (company.adjustedInterestRate * 100).toFixed(2);
+                
+                return `
+                    <div class="company-card">
+                        <div class="company-header">
+                            <strong>${company.name}</strong>
+                            <span class="trust-level ${trustClass}">Trust: ${company.trustLevel}/10</span>
+                        </div>
+                        <div class="company-details">
+                            <div>${company.description}</div>
+                            <div><strong>Interest Rate:</strong> ${rate}% APR</div>
+                            <div><strong>Loan Range:</strong> $${company.minLoan.toLocaleString()} - $${company.maxLoan.toLocaleString()}</div>
+                            <div><strong>Term:</strong> ${company.termDays} days (${Math.floor(company.termDays / 365)} years)</div>
+                            <div><strong>Origination Fee:</strong> ${(company.originationFee * 100).toFixed(1)}%</div>
+                            <div><strong>Late Penalty:</strong> ${(company.latePaymentPenalty * 100).toFixed(0)}%</div>
+                            <div><strong>Min Credit Score:</strong> ${company.minCreditScore}</div>
+                        </div>
+                        <div class="loan-form">
+                            <input type="number" id="amount-${company.id}" placeholder="Amount" min="${company.minLoan}" max="${company.maxLoan}" step="100">
+                            <button onclick="takeLoan('${company.id}')">Apply</button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        async function takeLoan(companyId) {
+            const amountInput = document.getElementById(`amount-${companyId}`);
+            const amount = parseFloat(amountInput.value);
+            
+            if (!amount || amount <= 0) {
+                showMessage('Please enter a valid loan amount', 'error');
+                return;
+            }
+            
+            const response = await fetch('/api/loans/take', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ companyId, amount })
+            });
+            
+            const data = await response.json();
+            
+            if (response.ok) {
+                showMessage(data.message, 'success');
+                amountInput.value = '';
+                loadAccountData();
+                loadActiveLoans();
+            } else {
+                showMessage(data.error, 'error');
+            }
+        }
+
+        async function makePayment(loanId) {
+            const amountInput = document.getElementById(`payment-${loanId}`);
+            const amount = parseFloat(amountInput.value);
+            
+            if (!amount || amount <= 0) {
+                showMessage('Please enter a valid payment amount', 'error');
+                return;
+            }
+            
+            const response = await fetch('/api/loans/pay', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ loanId, amount })
+            });
+            
+            const data = await response.json();
+            
+            if (response.ok) {
+                showMessage(data.message, 'success');
+                amountInput.value = '';
+                loadAccountData();
+                loadActiveLoans();
+            } else {
+                showMessage(data.error, 'error');
+            }
+        }
+
+        async function payOffLoan(loanId, balance) {
+            const response = await fetch('/api/loans/pay', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ loanId, amount: balance })
+            });
+            
+            const data = await response.json();
+            
+            if (response.ok) {
+                showMessage(data.message, 'success');
+                loadAccountData();
+                loadActiveLoans();
+            } else {
+                showMessage(data.error, 'error');
+            }
+        }
+
+        function showMessage(text, type) {
+            const messageDiv = document.getElementById('message');
+            messageDiv.innerHTML = `<div class="message ${type}">${text}</div>`;
+            setTimeout(() => {
+                messageDiv.innerHTML = '';
+            }, 5000);
+        }
+
+        // Load data on page load
+        loadAccountData();
+        loadActiveLoans();
+        loadCompanies();
+        
+        // Refresh every 10 seconds
+        setInterval(() => {
+            loadAccountData();
+            loadActiveLoans();
+        }, 10000);
+    </script>
+    <script src="common.js"></script>
+    <script>
+        async function updateEraTheme() {
+            const response = await fetch('/api/time');
+            const data = await response.json();
+            const gameDate = new Date(data.currentTime);
+            const year = gameDate.getFullYear();
+            applyEraTheme(year);
+        }
+        
+        updateEraTheme();
+        setInterval(updateEraTheme, 10000);
+    </script>
+</body>
+</html>
