@@ -86,6 +86,45 @@
             color: #00cc00;
             line-height: 1.5;
             white-space: pre-wrap;
+            display: none;
+            margin-top: 10px;
+            padding-top: 10px;
+            border-top: 1px solid #003300;
+        }
+        .news-item.expanded .news-body {
+            display: block;
+        }
+        .market-update-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+        .market-update-table th {
+            background-color: #002200;
+            padding: 8px;
+            text-align: left;
+            border: 1px solid #003300;
+            color: #00ff00;
+            font-weight: bold;
+        }
+        .market-update-table td {
+            padding: 8px;
+            border: 1px solid #003300;
+        }
+        .market-update-table tr:hover {
+            background-color: #001a00;
+        }
+        .positive-change {
+            color: #00ff00;
+        }
+        .negative-change {
+            color: #ff4444;
+        }
+        .news-item.market-update {
+            background-color: #001a1a;
+        }
+        .news-item.market-update .news-headline::before {
+            content: "📊 ";
         }
         .no-news {
             text-align: center;
@@ -111,12 +150,107 @@
         let paginator;
         let allNews = [];
         let readNewsIds = new Set(JSON.parse(localStorage.getItem('readNewsIds') || '[]'));
+        let expandedNewsIds = new Set();
+        
+        // Toggle news item expansion
+        function toggleNews(newsId) {
+            if (expandedNewsIds.has(newsId)) {
+                expandedNewsIds.delete(newsId);
+            } else {
+                expandedNewsIds.add(newsId);
+                // Mark as read when expanded
+                markNewsAsRead(newsId);
+            }
+            renderNewsPage();
+        }
         
         // Mark news as read
         function markNewsAsRead(newsId) {
             readNewsIds.add(newsId);
             localStorage.setItem('readNewsIds', JSON.stringify([...readNewsIds]));
-            renderNewsPage();
+            // Don't re-render to avoid collapsing expanded items
+        }
+        
+        // Format market update body as a table
+        function formatMarketUpdateTable(bodyText) {
+            // Parse numbered list format: "1. Company (SYMBOL) text... 2. Company text..."
+            const items = bodyText.split(/\d+\.\s+/).filter(item => item.trim());
+            
+            if (items.length === 0) {
+                return `<div class="news-body">${escapeHtml(bodyText)}</div>`;
+            }
+            
+            // Parse each item to extract stock info and movement
+            const movements = items.map(item => {
+                // Try to extract company name, symbol, and change percentage
+                const symbolMatch = item.match(/\(([A-Z]+)\)/);
+                const changeMatch = item.match(/(gained|advanced|declined|lost|moved|up|down)\s+([\d.]+)%/i);
+                const upMatch = item.match(/(surges|surged|jump|jumped|rally|rallied|gains|gained|advanced)/i);
+                const downMatch = item.match(/(plunges|plunged|drop|dropped|decline|declined|losses|lost|tumbled)/i);
+                
+                let symbol = symbolMatch ? symbolMatch[1] : '';
+                let change = changeMatch ? parseFloat(changeMatch[2]) : 0;
+                
+                // Determine direction from text if not in change match
+                if (upMatch && change === 0) {
+                    const percentMatch = item.match(/([\d.]+)%/);
+                    if (percentMatch) change = parseFloat(percentMatch[1]);
+                }
+                if (downMatch && change === 0) {
+                    const percentMatch = item.match(/([\d.]+)%/);
+                    if (percentMatch) change = -parseFloat(percentMatch[1]);
+                }
+                
+                // Extract company name (text before symbol or first few words)
+                let company = item;
+                if (symbolMatch) {
+                    company = item.substring(0, item.indexOf('(')).trim();
+                } else {
+                    company = item.split(/\s+/).slice(0, 3).join(' ');
+                }
+                
+                // Clean up company name
+                company = company.replace(/^(Shares of|Investors|Market)\s+/i, '').trim();
+                
+                return { company, symbol, change, text: item.trim() };
+            });
+            
+            let tableHtml = `
+                <div class="news-body">
+                    <table class="market-update-table">
+                        <thead>
+                            <tr>
+                                <th>Company</th>
+                                <th>Symbol</th>
+                                <th>Change</th>
+                                <th>Details</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+            `;
+            
+            movements.forEach(m => {
+                const changeClass = m.change >= 0 ? 'positive-change' : 'negative-change';
+                const changeSymbol = m.change >= 0 ? '▲' : '▼';
+                const changeText = m.change !== 0 ? `${escapeHtml(changeSymbol)} ${Math.abs(m.change).toFixed(1)}%` : 'N/A';
+                
+                tableHtml += `
+                    <tr>
+                        <td>${escapeHtml(m.company)}</td>
+                        <td>${escapeHtml(m.symbol)}</td>
+                        <td class="${changeClass}">${changeText}</td>
+                        <td>${escapeHtml(m.text.substring(0, 100))}${m.text.length > 100 ? '...' : ''}</td>
+                    </tr>
+                `;
+            });
+            
+            tableHtml += `
+                        </tbody>
+                    </table>
+                </div>
+            `;
+            
+            return tableHtml;
         }
         
         // Pagination render function - used by pagination controls in common.js
@@ -137,12 +271,25 @@
             } else {
                 container.innerHTML = pageNews.map(item => {
                     const isUnread = !readNewsIds.has(item.id);
+                    const isExpanded = expandedNewsIds.has(item.id);
                     const unreadClass = isUnread ? 'unread' : '';
+                    const expandedClass = isExpanded ? 'expanded' : '';
+                    const isMarketUpdate = item.headline && item.headline.includes('Market Update');
+                    const marketUpdateClass = isMarketUpdate ? 'market-update' : '';
+                    
+                    // Format body - parse market updates into table format
+                    let bodyHtml = '';
+                    if (isMarketUpdate && item.body) {
+                        bodyHtml = formatMarketUpdateTable(item.body);
+                    } else {
+                        bodyHtml = `<div class="news-body">${escapeHtml(item.body)}</div>`;
+                    }
+                    
                     return `
-                        <div class="news-item ${unreadClass}" onclick="markNewsAsRead(${item.id})">
+                        <div class="news-item ${unreadClass} ${expandedClass} ${marketUpdateClass}" onclick="toggleNews(${item.id})">
                             <div class="news-date">${new Date(item.date).toLocaleDateString()}</div>
                             <div class="news-headline">${escapeHtml(item.headline)}</div>
-                            <div class="news-body">${escapeHtml(item.body)}</div>
+                            ${bodyHtml}
                         </div>
                     `;
                 }).join('');
