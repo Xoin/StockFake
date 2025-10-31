@@ -1150,6 +1150,47 @@ app.get('/api/emails', (req, res) => {
     }
   });
   
+  // Add loan notification emails
+  userAccount.loanHistory.forEach((loanEvent, index) => {
+    if (loanEvent.type === 'taken') {
+      emails.push({
+        id: 500 + index,
+        from: 'loans@stockfake.com',
+        subject: `Loan Approved - $${loanEvent.amount.toFixed(2)}`,
+        body: `Your loan application has been approved! Net amount deposited: $${loanEvent.netAmount.toFixed(2)} (Interest Rate: ${(loanEvent.interestRate * 100).toFixed(2)}%, Origination Fee: $${loanEvent.originationFee.toFixed(2)})`,
+        date: loanEvent.date,
+        spam: false
+      });
+    } else if (loanEvent.type === 'paid-off') {
+      emails.push({
+        id: 600 + index,
+        from: 'loans@stockfake.com',
+        subject: `Loan Paid Off - Congratulations!`,
+        body: `Loan #${loanEvent.loanId} has been successfully paid off. Your credit score has increased by ${loanEvent.creditScoreChange} points. ${loanEvent.wasOnTime ? 'Thank you for paying on time!' : 'Payment received.'}`,
+        date: loanEvent.date,
+        spam: false
+      });
+    } else if (loanEvent.type === 'missed-payment') {
+      emails.push({
+        id: 700 + index,
+        from: 'loans@stockfake.com',
+        subject: `⚠️ Missed Payment - Loan #${loanEvent.loanId}`,
+        body: `You have missed a payment on Loan #${loanEvent.loanId}. A late fee of $${loanEvent.penalty.toFixed(2)} has been applied. Your credit score has decreased by ${Math.abs(loanEvent.creditScoreChange)} points. Please make a payment as soon as possible.`,
+        date: loanEvent.date,
+        spam: false
+      });
+    } else if (loanEvent.type === 'default') {
+      emails.push({
+        id: 800 + index,
+        from: 'loans@stockfake.com',
+        subject: `🚨 LOAN DEFAULT - Loan #${loanEvent.loanId}`,
+        body: `Your loan (Loan #${loanEvent.loanId}) has gone into default after multiple missed payments. Remaining balance: $${loanEvent.remainingBalance.toFixed(2)}. Your credit score has been severely impacted (-${Math.abs(loanEvent.creditScoreChange)} points). This will affect your ability to obtain future loans.`,
+        date: loanEvent.date,
+        spam: false
+      });
+    }
+  });
+  
   // Add investment opportunity emails
   const opportunities = emailGenerator.generateInvestmentOpportunities(gameTime, stocks);
   opportunities.forEach((opp, index) => {

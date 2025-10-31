@@ -46,6 +46,20 @@
             margin-bottom: 20px;
             text-align: center;
         }
+        .halt-warning {
+            background-color: #440000;
+            border: 2px solid #ff0000;
+            padding: 15px;
+            margin-bottom: 20px;
+            text-align: center;
+            color: #ff0000;
+            font-weight: bold;
+            animation: blink 1s infinite;
+        }
+        @keyframes blink {
+            0%, 50% { opacity: 1; }
+            51%, 100% { opacity: 0.5; }
+        }
         .stocks-container {
             background-color: #000;
             border: 2px solid #00ff00;
@@ -129,10 +143,12 @@
         <div class="nav">
             <a href="/">← Back to Portal</a> |
             <a href="/bank">Bank</a> |
+            <a href="/loans">Loans</a> |
             <a href="/news">News</a> |
             <a href="/email">Email</a>
         </div>
         <div class="time-display" id="timeDisplay">Loading...</div>
+        <div id="haltWarning" class="halt-warning" style="display: none;"></div>
         
         <div class="stocks-container">
             <h2>Available Stocks</h2>
@@ -144,11 +160,12 @@
                         <th>Name</th>
                         <th>Price</th>
                         <th>Change %</th>
+                        <th>Available</th>
                         <th>Actions</th>
                     </tr>
                 </thead>
                 <tbody id="stocksList">
-                    <tr><td colspan="5">Loading...</td></tr>
+                    <tr><td colspan="6">Loading...</td></tr>
                 </tbody>
             </table>
             <div class="pagination-controls-container"></div>
@@ -184,6 +201,17 @@
             const date = new Date(data.currentTime);
             const status = data.isMarketOpen ? '🟢 MARKET OPEN' : '🔴 MARKET CLOSED';
             document.getElementById('timeDisplay').textContent = `${date.toLocaleString()} - ${status}`;
+            
+            // Check for trade halts
+            const haltWarning = document.getElementById('haltWarning');
+            if (data.tradeHalt && data.tradeHalt.status === 'current') {
+                const halt = data.tradeHalt.halt;
+                const endDate = new Date(halt.endDate);
+                haltWarning.textContent = `⚠️ TRADING HALTED: ${halt.reason} (Until ${endDate.toLocaleString()})`;
+                haltWarning.style.display = 'block';
+            } else {
+                haltWarning.style.display = 'none';
+            }
         }
         
         function selectStock(symbol) {
@@ -239,7 +267,13 @@
             
             const pageStocks = paginator.getCurrentPageItems();
             const tbody = document.getElementById('stocksList');
-            tbody.innerHTML = pageStocks.map(stock => `
+            tbody.innerHTML = pageStocks.map(stock => {
+                const sharesAvailable = stock.sharesAvailable || 0;
+                const sharesDisplay = sharesAvailable > 1000000 
+                    ? `${(sharesAvailable / 1000000).toFixed(1)}M`
+                    : sharesAvailable.toLocaleString();
+                
+                return `
                 <tr>
                     <td>${escapeHtml(stock.symbol)}</td>
                     <td>${escapeHtml(stock.name)}</td>
@@ -247,12 +281,16 @@
                     <td class="${stock.change >= 0 ? 'positive' : 'negative'}">
                         ${stock.change >= 0 ? '+' : ''}${stock.change.toFixed(2)}%
                     </td>
+                    <td style="color: ${sharesAvailable > 100000 ? '#00ff00' : sharesAvailable > 10000 ? '#ffff00' : '#ff8800'}">
+                        ${sharesDisplay}
+                    </td>
                     <td>
                         <button onclick="selectStock('${escapeHtml(stock.symbol)}')" class="buy-btn">Trade</button>
                         <a href="/company/${escapeHtml(stock.symbol)}" style="margin-left: 5px; color: #00ff00; text-decoration: none; border: 1px solid #00ff00; padding: 5px 10px; display: inline-block;">Info</a>
                     </td>
                 </tr>
-            `).join('');
+                `;
+            }).join('');
             
             // Add pagination controls
             const paginationDivs = document.querySelectorAll('.pagination-controls-container');
