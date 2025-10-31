@@ -195,51 +195,101 @@ function getCompanyInfo(symbol) {
   return companyData[symbol] || null;
 }
 
+// Generate dynamic company info for stocks without detailed data
+function generateDynamicCompanyInfo(symbol, stockInfo, currentYear) {
+  if (!stockInfo) return null;
+  
+  // Estimate founding year based on when stock first appeared
+  const estimatedFounded = Math.max(1800, currentYear - 50);
+  
+  // Generate basic company info
+  return {
+    name: stockInfo.name,
+    sector: stockInfo.sector,
+    founded: estimatedFounded,
+    headquarters: 'United States', // Default
+    description: `${stockInfo.name} is a company in the ${stockInfo.sector} sector.`,
+    products: [
+      {
+        name: `${stockInfo.sector} Products`,
+        category: stockInfo.sector,
+        yearIntroduced: estimatedFounded
+      }
+    ],
+    intellectualProperty: {
+      patents: Math.floor(100 + Math.random() * 400), // Random between 100-500
+      trademarks: [stockInfo.name]
+    },
+    financials: {
+      revenue: Math.floor(500 + Math.random() * 4500), // Random revenue
+      netIncome: Math.floor(50 + Math.random() * 450), // Random net income
+      assets: Math.floor(800 + Math.random() * 4200), // Random assets
+      year: currentYear
+    },
+    employees: Math.floor(5000 + Math.random() * 45000), // Random employee count
+    employeeYear: currentYear,
+    isAvailable: true,
+    isDynamic: true // Flag to indicate this is generated data
+  };
+}
+
 // Get company information filtered by time (only show products/data available at that time)
 function getCompanyInfoAtTime(symbol, currentTime) {
   const company = companyData[symbol];
-  if (!company) return null;
-
   const currentYear = currentTime.getFullYear();
   
-  // Filter products by year introduced
-  const availableProducts = company.products.filter(p => p.yearIntroduced <= currentYear);
+  // If we have detailed company data, use it
+  if (company) {
+    // Filter products by year introduced
+    const availableProducts = company.products.filter(p => p.yearIntroduced <= currentYear);
+    
+    // Get financial data for the closest year
+    const financialYears = Object.keys(company.financials.revenue).map(Number).sort((a, b) => a - b);
+    const closestYear = financialYears.reduce((prev, curr) => {
+      return Math.abs(curr - currentYear) < Math.abs(prev - currentYear) ? curr : prev;
+    });
+    
+    // Get IP data for the closest year
+    const patentYears = Object.keys(company.intellectualProperty.patents).map(Number).sort((a, b) => a - b);
+    const closestPatentYear = patentYears.reduce((prev, curr) => {
+      return Math.abs(curr - currentYear) < Math.abs(prev - currentYear) ? curr : prev;
+    });
+    
+    // Get employee count for the closest year
+    const employeeYears = Object.keys(company.employees).map(Number).sort((a, b) => a - b);
+    const closestEmployeeYear = employeeYears.reduce((prev, curr) => {
+      return Math.abs(curr - currentYear) < Math.abs(prev - currentYear) ? curr : prev;
+    });
+    
+    return {
+      ...company,
+      products: availableProducts,
+      intellectualProperty: {
+        ...company.intellectualProperty,
+        patents: company.intellectualProperty.patents[closestPatentYear]
+      },
+      financials: {
+        revenue: company.financials.revenue[closestYear],
+        netIncome: company.financials.netIncome[closestYear],
+        assets: company.financials.assets[closestYear],
+        year: closestYear
+      },
+      employees: company.employees[closestEmployeeYear],
+      employeeYear: closestEmployeeYear,
+      isAvailable: currentYear >= company.founded,
+      isDynamic: false
+    };
+  }
   
-  // Get financial data for the closest year
-  const financialYears = Object.keys(company.financials.revenue).map(Number).sort((a, b) => a - b);
-  const closestYear = financialYears.reduce((prev, curr) => {
-    return Math.abs(curr - currentYear) < Math.abs(prev - currentYear) ? curr : prev;
-  });
+  // Otherwise, try to generate dynamic company info from stock data
+  const stocks = require('./stocks');
+  const stockInfo = stocks.getStockPrice(symbol, currentTime);
   
-  // Get IP data for the closest year
-  const patentYears = Object.keys(company.intellectualProperty.patents).map(Number).sort((a, b) => a - b);
-  const closestPatentYear = patentYears.reduce((prev, curr) => {
-    return Math.abs(curr - currentYear) < Math.abs(prev - currentYear) ? curr : prev;
-  });
+  if (stockInfo) {
+    return generateDynamicCompanyInfo(symbol, stockInfo, currentYear);
+  }
   
-  // Get employee count for the closest year
-  const employeeYears = Object.keys(company.employees).map(Number).sort((a, b) => a - b);
-  const closestEmployeeYear = employeeYears.reduce((prev, curr) => {
-    return Math.abs(curr - currentYear) < Math.abs(prev - currentYear) ? curr : prev;
-  });
-  
-  return {
-    ...company,
-    products: availableProducts,
-    intellectualProperty: {
-      ...company.intellectualProperty,
-      patents: company.intellectualProperty.patents[closestPatentYear]
-    },
-    financials: {
-      revenue: company.financials.revenue[closestYear],
-      netIncome: company.financials.netIncome[closestYear],
-      assets: company.financials.assets[closestYear],
-      year: closestYear
-    },
-    employees: company.employees[closestEmployeeYear],
-    employeeYear: closestEmployeeYear,
-    isAvailable: currentYear >= company.founded
-  };
+  return null;
 }
 
 // Get all companies

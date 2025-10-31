@@ -68,6 +68,9 @@
             font-size: 1.1em;
             margin-top: 5px;
         }
+        .negative {
+            color: #ff0000;
+        }
         .section {
             background-color: #000;
             border: 2px solid #00ff00;
@@ -210,9 +213,16 @@
         const urlPath = window.location.pathname;
         const symbol = urlPath.split('/company/')[1];
         
+        // Helper function to escape HTML
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+        
         async function loadCompanyInfo() {
             try {
-                const response = await fetch(`/api/companies/${symbol}`);
+                const response = await fetch(`/api/companies/${encodeURIComponent(symbol)}`);
                 
                 if (!response.ok) {
                     throw new Error('Company not found');
@@ -224,7 +234,7 @@
                 document.getElementById('content').innerHTML = `
                     <div class="error">
                         <h2>Error</h2>
-                        <p>Company information not available: ${error.message}</p>
+                        <p>Company information not available: ${escapeHtml(error.message)}</p>
                         <a href="/trading" class="stock-link">← Back to Trading</a>
                     </div>
                 `;
@@ -247,24 +257,25 @@
             
             const html = `
                 <div class="company-header">
-                    <h2>${company.name} (${symbol})</h2>
-                    <p>${company.description}</p>
+                    <h2>${escapeHtml(company.name)} (${escapeHtml(symbol)})</h2>
+                    <p>${escapeHtml(company.description)}</p>
+                    ${company.isDynamic ? '<p style="color: #00aa00; font-size: 0.9em; margin-top: 10px;">Note: Limited company information available. Data shown is estimated.</p>' : ''}
                     <div class="company-meta">
                         <div class="meta-item">
                             <div class="meta-label">Sector</div>
-                            <div class="meta-value">${company.sector}</div>
+                            <div class="meta-value">${escapeHtml(company.sector)}</div>
                         </div>
                         <div class="meta-item">
                             <div class="meta-label">Founded</div>
-                            <div class="meta-value">${company.founded}</div>
+                            <div class="meta-value">${escapeHtml(String(company.founded))}</div>
                         </div>
                         <div class="meta-item">
                             <div class="meta-label">Headquarters</div>
-                            <div class="meta-value">${company.headquarters}</div>
+                            <div class="meta-value">${escapeHtml(company.headquarters)}</div>
                         </div>
                         <div class="meta-item">
                             <div class="meta-label">Employees</div>
-                            <div class="meta-value">${formatNumber(company.employees)} <span style="font-size: 0.8em; color: #00aa00;">(${company.employeeYear})</span></div>
+                            <div class="meta-value">${formatNumber(company.employees)} <span style="font-size: 0.8em; color: #00aa00;">(${escapeHtml(String(company.employeeYear))})</span></div>
                         </div>
                     </div>
                     <a href="/trading" class="stock-link">View Stock Price & Trade</a>
@@ -275,9 +286,9 @@
                     <div class="products-grid">
                         ${company.products.map(product => `
                             <div class="product-card">
-                                <div class="product-name">${product.name}</div>
-                                <div class="product-category">${product.category}</div>
-                                <div class="product-year">Introduced: ${product.yearIntroduced}</div>
+                                <div class="product-name">${escapeHtml(product.name)}</div>
+                                <div class="product-category">${escapeHtml(product.category)}</div>
+                                <div class="product-year">Introduced: ${escapeHtml(String(product.yearIntroduced))}</div>
                             </div>
                         `).join('')}
                     </div>
@@ -295,7 +306,7 @@
                             <div class="ip-label">Registered Trademarks</div>
                             <div class="trademarks">
                                 ${company.intellectualProperty.trademarks.map(tm => `
-                                    <span class="trademark-badge">®️ ${tm}</span>
+                                    <span class="trademark-badge">®️ ${escapeHtml(tm)}</span>
                                 `).join('')}
                             </div>
                         </div>
@@ -304,7 +315,7 @@
                 
                 <div class="section">
                     <h3>💰 Financial Information</h3>
-                    <p style="color: #00aa00; margin-bottom: 10px;">Data as of year ${company.financials.year}</p>
+                    <p style="color: #00aa00; margin-bottom: 10px;">Data as of year ${escapeHtml(String(company.financials.year))}</p>
                     <div class="financials-grid">
                         <div class="financial-card">
                             <div class="financial-label">Revenue</div>
