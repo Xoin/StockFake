@@ -4,6 +4,14 @@ const path = require('path');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// Load data modules
+const stocks = require('./data/stocks');
+const emailGenerator = require('./data/emails');
+const companies = require('./data/companies');
+const loanCompanies = require('./data/loan-companies');
+const tradeHalts = require('./data/trade-halts');
+const shareAvailability = require('./data/share-availability');
+
 // Middleware
 app.use(express.json());
 app.use(express.static('public'));
@@ -45,10 +53,12 @@ setInterval(() => {
 
 // API Routes
 app.get('/api/time', (req, res) => {
+  const haltStatus = tradeHalts.getCurrentOrUpcomingHalt(gameTime);
   res.json({
     currentTime: gameTime,
     isMarketOpen: isMarketOpen(gameTime),
-    isPaused
+    isPaused,
+    tradeHalt: haltStatus
   });
 });
 
@@ -87,6 +97,10 @@ app.get('/graphs', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'graphs.html'));
 });
 
+app.get('/loans', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'loans.html'));
+});
+
 app.get('/company/:symbol', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'company.html'));
 });
@@ -95,18 +109,41 @@ app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-// Stock data API
-const stocks = require('./data/stocks');
-const emailGenerator = require('./data/emails');
-const companies = require('./data/companies');
-
 app.get('/api/stocks', (req, res) => {
-  res.json(stocks.getStockData(gameTime));
+  const stockData = stocks.getStockData(gameTime);
+  
+  // Add share availability info to each stock
+  const stocksWithAvailability = stockData.map(stock => {
+    const availability = shareAvailability.getAvailableShares(stock.symbol);
+    return {
+      ...stock,
+      sharesAvailable: availability ? availability.availableForTrading : 0,
+      ownershipPercent: availability ? shareAvailability.getOwnershipPercentage(stock.symbol) : 0
+    };
+  });
+  
+  res.json(stocksWithAvailability);
 });
 
 app.get('/api/stocks/:symbol', (req, res) => {
   const { symbol } = req.params;
-  res.json(stocks.getStockPrice(symbol, gameTime));
+  const stockPrice = stocks.getStockPrice(symbol, gameTime);
+  
+  if (!stockPrice) {
+    return res.status(404).json({ error: 'Stock not found' });
+  }
+  
+  // Add share availability info
+  const availability = shareAvailability.getAvailableShares(symbol);
+  const result = {
+    ...stockPrice,
+    sharesAvailable: availability ? availability.availableForTrading : 0,
+    ownershipPercent: availability ? shareAvailability.getOwnershipPercentage(symbol) : 0,
+    publicFloat: availability ? availability.publicFloat : 0,
+    totalOutstanding: availability ? availability.totalOutstanding : 0
+  };
+  
+  res.json(result);
 });
 
 // Stock history API for charts
@@ -196,7 +233,10 @@ let userAccount = {
   taxes: [], // History of tax payments
   fees: [], // History of fees charged
   lastTradeTime: {}, // Track last trade time per symbol for cooldown
-  shareholderInfluence: {} // Track voting power by company
+  shareholderInfluence: {}, // Track voting power by company
+  creditScore: 750, // Starting credit score (fair)
+  loans: [], // Active loans: { id, companyId, principal, balance, interestRate, startDate, dueDate, lastPaymentDate, missedPayments, status }
+  loanHistory: [] // History of all loan activities
 };
 
 // Trading restrictions
@@ -444,6 +484,87 @@ setInterval(checkAndChargeMonthlyFee, 10000);
 setInterval(trackInflation, 5000);
 setInterval(updateShortPositions, 10000);
 
+// Loan processing functions
+let loanIdCounter = 1;
+
+// Process loan interest accrual and check for missed payments
+function processLoans() {
+  const currentDate = new Date(gameTime);
+  
+  for (const loan of userAccount.loans) {
+    if (loan.status !== 'active') continue;
+    
+    const company = loanCompanies.getCompany(loan.companyId);
+    if (!company) continue;
+    
+    // Calculate days since last payment
+    const lastPayment = loan.lastPaymentDate ? new Date(loan.lastPaymentDate) : new Date(loan.startDate);
+    const daysSinceLastPayment = (currentDate - lastPayment) / (1000 * 60 * 60 * 24);
+    
+    // Accrue interest daily
+    if (daysSinceLastPayment >= 1) {
+      const dailyRate = loan.interestRate / 365;
+      const interest = loan.balance * dailyRate * daysSinceLastPayment;
+      loan.balance += interest;
+      loan.lastInterestAccrual = new Date(gameTime);
+    }
+    
+    // Check if payment is overdue (30 days grace period)
+    const dueDate = new Date(loan.dueDate);
+    if (currentDate > dueDate) {
+      const daysOverdue = (currentDate - dueDate) / (1000 * 60 * 60 * 24);
+      
+      // After 30 days, mark as missed payment
+      if (daysOverdue > 30 && !loan.markedAsMissed) {
+        loan.missedPayments += 1;
+        loan.markedAsMissed = true;
+        
+        // Apply late payment penalty
+        const penalty = loan.balance * company.latePaymentPenalty;
+        loan.balance += penalty;
+        
+        // Decrease credit score
+        userAccount.creditScore = Math.max(300, userAccount.creditScore + company.creditScoreImpact.late);
+        
+        // Record fee
+        userAccount.fees.push({
+          date: new Date(gameTime),
+          type: 'loan-late-payment',
+          amount: penalty,
+          description: `Late payment penalty for loan #${loan.id} from ${company.name}`
+        });
+        
+        userAccount.loanHistory.push({
+          date: new Date(gameTime),
+          type: 'missed-payment',
+          loanId: loan.id,
+          companyId: loan.companyId,
+          penalty: penalty,
+          creditScoreChange: company.creditScoreImpact.late
+        });
+        
+        // After 3 missed payments, loan goes to default
+        if (loan.missedPayments >= 3) {
+          loan.status = 'default';
+          userAccount.creditScore = Math.max(300, userAccount.creditScore + company.creditScoreImpact.default);
+          
+          userAccount.loanHistory.push({
+            date: new Date(gameTime),
+            type: 'default',
+            loanId: loan.id,
+            companyId: loan.companyId,
+            remainingBalance: loan.balance,
+            creditScoreChange: company.creditScoreImpact.default
+          });
+        }
+      }
+    }
+  }
+}
+
+// Call this periodically
+setInterval(processLoans, 10000);
+
 app.get('/api/account', (req, res) => {
   res.json({
     cash: userAccount.cash,
@@ -454,6 +575,9 @@ app.get('/api/account', (req, res) => {
     taxes: userAccount.taxes.slice(-10), // Last 10 tax payments
     fees: userAccount.fees.slice(-10), // Last 10 fees
     shareholderInfluence: userAccount.shareholderInfluence,
+    creditScore: userAccount.creditScore,
+    loans: userAccount.loans,
+    loanHistory: userAccount.loanHistory.slice(-20), // Last 20 loan activities
     inflationData: {
       cumulativeInflation: cumulativeInflation,
       realValue: userAccount.cash / cumulativeInflation, // Purchasing power in 1970 dollars
@@ -468,6 +592,15 @@ app.post('/api/trade', (req, res) => {
   
   if (!isMarketOpen(gameTime)) {
     return res.status(400).json({ error: 'Market is closed' });
+  }
+  
+  // Check for trade halts
+  const haltStatus = tradeHalts.isTradingHalted(gameTime, symbol);
+  if (haltStatus.isHalted) {
+    return res.status(400).json({ 
+      error: `Trading is currently halted: ${haltStatus.reason}`,
+      haltEndTime: haltStatus.endTime
+    });
   }
   
   // Check for trade cooldown
@@ -490,10 +623,23 @@ app.post('/api/trade', (req, res) => {
   const tradingFee = getTradingFee(totalCost, gameTime);
   
   if (action === 'buy') {
+    // Check share availability
+    const availabilityCheck = shareAvailability.canPurchaseShares(symbol, shares);
+    if (!availabilityCheck.canPurchase) {
+      return res.status(400).json({ 
+        error: availabilityCheck.reason,
+        availableShares: availabilityCheck.availableShares
+      });
+    }
+    
     const totalWithFee = totalCost + tradingFee;
     if (userAccount.cash < totalWithFee) {
       return res.status(400).json({ error: 'Insufficient funds (including trading fee)' });
     }
+    
+    // Record the share purchase in availability tracking
+    shareAvailability.recordPurchase(symbol, shares);
+    
     userAccount.cash -= totalWithFee;
     userAccount.portfolio[symbol] = (userAccount.portfolio[symbol] || 0) + shares;
     
@@ -535,6 +681,9 @@ app.post('/api/trade', (req, res) => {
     if ((userAccount.portfolio[symbol] || 0) < shares) {
       return res.status(400).json({ error: 'Insufficient shares' });
     }
+    
+    // Record the share sale in availability tracking
+    shareAvailability.recordSale(symbol, shares);
     
     // Calculate capital gains tax using FIFO method
     let remainingShares = shares;
@@ -747,6 +896,207 @@ app.post('/api/trade', (req, res) => {
   res.json(userAccount);
 });
 
+// Loan API endpoints
+app.get('/api/loans/companies', (req, res) => {
+  const availableCompanies = loanCompanies.getAvailableCompanies(gameTime, userAccount.creditScore);
+  
+  // Add adjusted interest rates for each company
+  const companiesWithRates = availableCompanies.map(company => ({
+    ...company,
+    adjustedInterestRate: loanCompanies.getAdjustedInterestRate(company, userAccount.creditScore),
+    availableFrom: company.availableFrom.toISOString()
+  }));
+  
+  res.json(companiesWithRates);
+});
+
+app.get('/api/loans/active', (req, res) => {
+  const activeLoans = userAccount.loans.filter(loan => loan.status === 'active');
+  
+  // Add company details to each loan
+  const loansWithDetails = activeLoans.map(loan => {
+    const company = loanCompanies.getCompany(loan.companyId);
+    return {
+      ...loan,
+      companyName: company ? company.name : 'Unknown',
+      companyTrustLevel: company ? company.trustLevel : 0
+    };
+  });
+  
+  res.json(loansWithDetails);
+});
+
+app.post('/api/loans/take', (req, res) => {
+  const { companyId, amount } = req.body;
+  
+  const company = loanCompanies.getCompany(companyId);
+  if (!company) {
+    return res.status(404).json({ error: 'Loan company not found' });
+  }
+  
+  // Check if company is available yet
+  if (gameTime < company.availableFrom) {
+    return res.status(400).json({ error: 'This loan company is not yet available' });
+  }
+  
+  // Check credit score requirement
+  if (userAccount.creditScore < company.minCreditScore) {
+    return res.status(400).json({ 
+      error: `Your credit score (${userAccount.creditScore}) is too low. Minimum required: ${company.minCreditScore}` 
+    });
+  }
+  
+  // Validate loan amount
+  if (amount < company.minLoan || amount > company.maxLoan) {
+    return res.status(400).json({ 
+      error: `Loan amount must be between $${company.minLoan} and $${company.maxLoan}` 
+    });
+  }
+  
+  // Calculate interest rate based on credit score
+  const interestRate = loanCompanies.getAdjustedInterestRate(company, userAccount.creditScore);
+  
+  // Calculate origination fee
+  const originationFee = amount * company.originationFee;
+  const netAmount = amount - originationFee;
+  
+  // Create loan
+  const loan = {
+    id: loanIdCounter++,
+    companyId: company.id,
+    companyName: company.name,
+    principal: amount,
+    balance: amount,
+    interestRate: interestRate,
+    startDate: new Date(gameTime),
+    dueDate: new Date(gameTime.getTime() + (company.termDays * 24 * 60 * 60 * 1000)),
+    lastPaymentDate: null,
+    lastInterestAccrual: new Date(gameTime),
+    missedPayments: 0,
+    status: 'active',
+    markedAsMissed: false,
+    termDays: company.termDays
+  };
+  
+  // Add loan to account
+  userAccount.loans.push(loan);
+  
+  // Add cash (minus origination fee)
+  userAccount.cash += netAmount;
+  
+  // Record fee
+  if (originationFee > 0) {
+    userAccount.fees.push({
+      date: new Date(gameTime),
+      type: 'loan-origination',
+      amount: originationFee,
+      description: `Origination fee for loan #${loan.id} from ${company.name}`
+    });
+  }
+  
+  // Record loan history
+  userAccount.loanHistory.push({
+    date: new Date(gameTime),
+    type: 'taken',
+    loanId: loan.id,
+    companyId: company.id,
+    amount: amount,
+    netAmount: netAmount,
+    interestRate: interestRate,
+    originationFee: originationFee
+  });
+  
+  res.json({
+    loan: loan,
+    netAmount: netAmount,
+    originationFee: originationFee,
+    message: `Loan approved! $${netAmount.toFixed(2)} has been deposited to your account.`
+  });
+});
+
+app.post('/api/loans/pay', (req, res) => {
+  const { loanId, amount } = req.body;
+  
+  const loan = userAccount.loans.find(l => l.id === loanId);
+  if (!loan) {
+    return res.status(404).json({ error: 'Loan not found' });
+  }
+  
+  if (loan.status !== 'active') {
+    return res.status(400).json({ error: 'Loan is not active' });
+  }
+  
+  if (amount <= 0) {
+    return res.status(400).json({ error: 'Payment amount must be positive' });
+  }
+  
+  if (userAccount.cash < amount) {
+    return res.status(400).json({ error: 'Insufficient funds' });
+  }
+  
+  const company = loanCompanies.getCompany(loan.companyId);
+  if (!company) {
+    return res.status(400).json({ error: 'Loan company not found' });
+  }
+  
+  // Deduct payment from cash
+  userAccount.cash -= amount;
+  
+  // Apply payment to loan balance
+  const previousBalance = loan.balance;
+  loan.balance = Math.max(0, loan.balance - amount);
+  loan.lastPaymentDate = new Date(gameTime);
+  
+  // If this was an overdue payment, reset missed payment flag
+  if (loan.markedAsMissed) {
+    loan.markedAsMissed = false;
+  }
+  
+  // Check if loan is paid off
+  const isPaidOff = loan.balance <= 0;
+  if (isPaidOff) {
+    loan.status = 'paid';
+    loan.paidOffDate = new Date(gameTime);
+    
+    // Increase credit score for paying off loan
+    const wasOnTime = new Date(gameTime) <= new Date(loan.dueDate);
+    const creditScoreIncrease = wasOnTime ? company.creditScoreImpact.onTime : Math.floor(company.creditScoreImpact.onTime / 2);
+    userAccount.creditScore = Math.min(850, userAccount.creditScore + creditScoreIncrease);
+    
+    userAccount.loanHistory.push({
+      date: new Date(gameTime),
+      type: 'paid-off',
+      loanId: loan.id,
+      companyId: company.id,
+      finalPayment: amount,
+      wasOnTime: wasOnTime,
+      creditScoreChange: creditScoreIncrease
+    });
+  } else {
+    // Record regular payment
+    userAccount.loanHistory.push({
+      date: new Date(gameTime),
+      type: 'payment',
+      loanId: loan.id,
+      companyId: company.id,
+      amount: amount,
+      remainingBalance: loan.balance
+    });
+  }
+  
+  res.json({
+    loan: loan,
+    amountPaid: amount,
+    previousBalance: previousBalance,
+    newBalance: loan.balance,
+    isPaidOff: isPaidOff,
+    creditScore: userAccount.creditScore,
+    message: isPaidOff ? 
+      `Congratulations! Loan #${loanId} has been paid off. Your credit score increased!` :
+      `Payment of $${amount.toFixed(2)} applied. Remaining balance: $${loan.balance.toFixed(2)}`
+  });
+});
+
 // Email API (generate emails based on game events)
 app.get('/api/emails', (req, res) => {
   const emails = [
@@ -795,6 +1145,47 @@ app.get('/api/emails', (req, res) => {
         subject: `Account Fee Charged - ${fee.type}`,
         body: `A fee of $${fee.amount.toFixed(2)} has been charged to your account. ${fee.description}`,
         date: fee.date,
+        spam: false
+      });
+    }
+  });
+  
+  // Add loan notification emails
+  userAccount.loanHistory.forEach((loanEvent, index) => {
+    if (loanEvent.type === 'taken') {
+      emails.push({
+        id: 500 + index,
+        from: 'loans@stockfake.com',
+        subject: `Loan Approved - $${loanEvent.amount.toFixed(2)}`,
+        body: `Your loan application has been approved! Net amount deposited: $${loanEvent.netAmount.toFixed(2)} (Interest Rate: ${(loanEvent.interestRate * 100).toFixed(2)}%, Origination Fee: $${loanEvent.originationFee.toFixed(2)})`,
+        date: loanEvent.date,
+        spam: false
+      });
+    } else if (loanEvent.type === 'paid-off') {
+      emails.push({
+        id: 600 + index,
+        from: 'loans@stockfake.com',
+        subject: `Loan Paid Off - Congratulations!`,
+        body: `Loan #${loanEvent.loanId} has been successfully paid off. Your credit score has increased by ${loanEvent.creditScoreChange} points. ${loanEvent.wasOnTime ? 'Thank you for paying on time!' : 'Payment received.'}`,
+        date: loanEvent.date,
+        spam: false
+      });
+    } else if (loanEvent.type === 'missed-payment') {
+      emails.push({
+        id: 700 + index,
+        from: 'loans@stockfake.com',
+        subject: `⚠️ Missed Payment - Loan #${loanEvent.loanId}`,
+        body: `You have missed a payment on Loan #${loanEvent.loanId}. A late fee of $${loanEvent.penalty.toFixed(2)} has been applied. Your credit score has decreased by ${Math.abs(loanEvent.creditScoreChange)} points. Please make a payment as soon as possible.`,
+        date: loanEvent.date,
+        spam: false
+      });
+    } else if (loanEvent.type === 'default') {
+      emails.push({
+        id: 800 + index,
+        from: 'loans@stockfake.com',
+        subject: `🚨 LOAN DEFAULT - Loan #${loanEvent.loanId}`,
+        body: `Your loan (Loan #${loanEvent.loanId}) has gone into default after multiple missed payments. Remaining balance: $${loanEvent.remainingBalance.toFixed(2)}. Your credit score has been severely impacted (-${Math.abs(loanEvent.creditScoreChange)} points). This will affect your ability to obtain future loans.`,
+        date: loanEvent.date,
         spam: false
       });
     }

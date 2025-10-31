@@ -84,6 +84,7 @@
         <div class="nav">
             <a href="/">← Back to Portal</a> |
             <a href="/trading">Trading</a> |
+            <a href="/loans">Loans</a> |
             <a href="/news">News</a> |
             <a href="/email">Email</a>
         </div>
@@ -98,6 +99,9 @@
             </div>
             <div style="text-align: center; color: #00aa00; margin: 10px 0;">
                 Inflation Rate: <span id="inflationRate">0</span>% | Cumulative: <span id="cumulativeInflation">1.0</span>x
+            </div>
+            <div style="text-align: center; color: #00ff00; margin: 10px 0; font-size: 1.2em;">
+                Credit Score: <span id="creditScore">---</span>
             </div>
         </div>
         
@@ -217,6 +221,11 @@
             const stocks = await stocksRes.json();
             
             document.getElementById('cashBalance').textContent = account.cash.toFixed(2);
+            
+            // Update credit score
+            if (account.creditScore) {
+                document.getElementById('creditScore').textContent = account.creditScore;
+            }
             
             // Update inflation data
             if (account.inflationData) {
