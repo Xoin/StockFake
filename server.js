@@ -207,7 +207,7 @@ app.post('/api/trade', (req, res) => {
   
   // Check for trade cooldown
   if (userAccount.lastTradeTime[symbol]) {
-    const timeSinceLastTrade = gameTime - userAccount.lastTradeTime[symbol];
+    const timeSinceLastTrade = gameTime.getTime() - userAccount.lastTradeTime[symbol].getTime();
     if (timeSinceLastTrade < TRADE_COOLDOWN_MS) {
       const remainingCooldown = Math.ceil((TRADE_COOLDOWN_MS - timeSinceLastTrade) / 60000);
       return res.status(400).json({ 
@@ -298,8 +298,9 @@ app.post('/api/trade', (req, res) => {
     }
     
     // Apply sale and deduct tax
-    const saleProceeds = totalCost - taxAmount;
-    userAccount.cash += saleProceeds;
+    const grossSaleAmount = totalCost;
+    const netSaleProceeds = grossSaleAmount - taxAmount;
+    userAccount.cash += netSaleProceeds;
     userAccount.portfolio[symbol] -= shares;
     
     // Record transaction
@@ -309,9 +310,9 @@ app.post('/api/trade', (req, res) => {
       symbol,
       shares,
       pricePerShare: stockPrice.price,
-      total: totalCost,
+      total: grossSaleAmount,
       tax: taxAmount,
-      netProceeds: saleProceeds
+      netProceeds: netSaleProceeds
     });
     
     // Record tax if any
@@ -326,7 +327,7 @@ app.post('/api/trade', (req, res) => {
   }
   
   // Update last trade time for this symbol
-  userAccount.lastTradeTime[symbol] = gameTime;
+  userAccount.lastTradeTime[symbol] = new Date(gameTime);
   
   res.json(userAccount);
 });
