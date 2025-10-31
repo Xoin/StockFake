@@ -264,6 +264,9 @@ function initializeDatabase() {
   }
 }
 
+// Initialize database tables on module load
+initializeDatabase();
+
 // Game state functions
 const getGameState = db.prepare('SELECT * FROM game_state WHERE id = 1');
 const updateGameState = db.prepare(`

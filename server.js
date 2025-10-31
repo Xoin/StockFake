@@ -56,7 +56,7 @@ let wasMarketOpen = isMarketOpen(gameTime);
 
 // Process pending orders when market opens
 function processPendingOrders() {
-  const pendingOrders = dbModule.getPendingOrders().all('pending');
+  const pendingOrders = dbModule.getPendingOrders.all('pending');
   
   if (pendingOrders.length === 0) return;
   
@@ -2686,7 +2686,7 @@ app.get('/api/taxes', (req, res) => {
 // Get all pending orders
 app.get('/api/pendingorders', (req, res) => {
   try {
-    const pendingOrders = dbModule.getAllPendingOrders().all();
+    const pendingOrders = dbModule.getAllPendingOrders.all();
     
     const formattedOrders = pendingOrders.map(order => ({
       id: order.id,
@@ -2711,7 +2711,7 @@ app.get('/api/pendingorders', (req, res) => {
 app.get('/api/pendingorders/status/:status', (req, res) => {
   try {
     const { status } = req.params;
-    const pendingOrders = dbModule.getPendingOrders().all(status);
+    const pendingOrders = dbModule.getPendingOrders.all(status);
     
     const formattedOrders = pendingOrders.map(order => ({
       id: order.id,
@@ -2743,7 +2743,7 @@ app.delete('/api/pendingorders/:id', (req, res) => {
     }
     
     // Get the order to check if it's pending
-    const order = dbModule.getPendingOrder().get(orderId);
+    const order = dbModule.getPendingOrder.get(orderId);
     
     if (!order) {
       return res.status(404).json({ error: 'Order not found' });
