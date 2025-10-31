@@ -1,0 +1,492 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>StockFake - Index Funds</title>
+    <link rel="stylesheet" href="era-themes.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Courier New', monospace;
+            background-color: #1a1a1a;
+            color: #00ff00;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        h1 {
+            text-align: center;
+            margin-bottom: 20px;
+            color: #00ff00;
+            text-shadow: 0 0 10px #00ff00;
+        }
+        .nav {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        .nav a {
+            color: #00ff00;
+            margin: 0 10px;
+            text-decoration: none;
+        }
+        .nav a:hover {
+            text-decoration: underline;
+        }
+        .funds-container {
+            background-color: #000;
+            border: 2px solid #00ff00;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th, td {
+            padding: 10px;
+            text-align: left;
+            border-bottom: 1px solid #003300;
+        }
+        th {
+            background-color: #003300;
+        }
+        .positive {
+            color: #00ff00;
+        }
+        .negative {
+            color: #ff0000;
+        }
+        .trade-form {
+            background-color: #000;
+            border: 2px solid #00ff00;
+            padding: 20px;
+            margin-top: 20px;
+        }
+        .trade-form h3 {
+            margin-bottom: 15px;
+            color: #00ff00;
+        }
+        .form-group {
+            margin: 15px 0;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            color: #00ff00;
+        }
+        .cost-calculator {
+            margin: 15px 0;
+            padding: 10px;
+            background-color: #001100;
+            border: 1px solid #00ff00;
+            border-radius: 4px;
+        }
+        .cost-calculator .calc-row {
+            display: flex;
+            justify-content: space-between;
+            margin: 5px 0;
+            padding: 5px 0;
+        }
+        .cost-calculator .calc-total {
+            border-top: 2px solid #00ff00;
+            margin-top: 10px;
+            padding-top: 10px;
+            font-weight: bold;
+            font-size: 1.1em;
+        }
+        .affordability-info {
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 4px;
+        }
+        .can-afford {
+            background-color: #004400;
+            border: 1px solid #00ff00;
+            color: #00ff00;
+        }
+        .cannot-afford {
+            background-color: #440000;
+            border: 1px solid #ff0000;
+            color: #ff0000;
+        }
+        input, select {
+            background-color: #000;
+            color: #00ff00;
+            border: 1px solid #00ff00;
+            padding: 8px;
+            margin: 5px 0;
+            font-family: 'Courier New', monospace;
+            width: 100%;
+            max-width: 300px;
+        }
+        button {
+            background-color: #003300;
+            color: #00ff00;
+            border: 2px solid #00ff00;
+            padding: 10px 20px;
+            margin: 5px;
+            cursor: pointer;
+            font-family: 'Courier New', monospace;
+        }
+        button:hover {
+            background-color: #00ff00;
+            color: #000;
+        }
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        .buy-btn {
+            background-color: #003300;
+        }
+        .sell-btn {
+            background-color: #330000;
+            border-color: #ff0000;
+            color: #ff0000;
+        }
+        .sell-btn:hover {
+            background-color: #ff0000;
+            color: #000;
+        }
+        .message {
+            padding: 10px;
+            margin: 10px 0;
+            border: 1px solid #00ff00;
+        }
+        .error {
+            border-color: #ff0000;
+            color: #ff0000;
+            background-color: #220000;
+        }
+        .success {
+            border-color: #00ff00;
+            color: #00ff00;
+            background-color: #002200;
+        }
+        .fund-info {
+            margin: 10px 0;
+            padding: 10px;
+            background-color: #001100;
+            border: 1px solid #00aa00;
+        }
+        .fund-info p {
+            margin: 5px 0;
+            color: #00cc00;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📊 INDEX FUNDS</h1>
+        <div class="nav">
+            <a href="/">← Back to Portal</a> |
+            <a href="/trading">Stocks</a> |
+            <a href="/bank">Bank</a> |
+            <a href="/loans">Loans</a> |
+            <a href="/news">News</a>
+        </div>
+        
+        <div class="time-display" id="timeDisplay">Loading...</div>
+        
+        <div class="funds-container">
+            <h2>Available Index Funds</h2>
+            <table id="fundsTable">
+                <thead>
+                    <tr>
+                        <th>Symbol</th>
+                        <th>Name</th>
+                        <th>Price</th>
+                        <th>Change %</th>
+                        <th>Expense Ratio</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody id="fundsBody">
+                    <tr><td colspan="6" style="text-align: center;">Loading...</td></tr>
+                </tbody>
+            </table>
+        </div>
+        
+        <div class="trade-form" id="tradeForm" style="display: none;">
+            <h3 id="tradeFormTitle">Trade Index Fund</h3>
+            <div id="fundInfo" class="fund-info"></div>
+            
+            <div class="form-group">
+                <label for="tradeAction">Action:</label>
+                <select id="tradeAction" onchange="updateTradeCalculator()">
+                    <option value="buy">Buy</option>
+                    <option value="sell">Sell</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label for="shares">Shares:</label>
+                <input type="number" id="shares" min="0.01" step="0.01" value="1" oninput="updateTradeCalculator()">
+            </div>
+            
+            <div id="costCalculator" class="cost-calculator" style="display: none;">
+                <div class="calc-row">
+                    <span>Share Price:</span>
+                    <span id="calcPrice">$0.00</span>
+                </div>
+                <div class="calc-row">
+                    <span>Shares:</span>
+                    <span id="calcShares">0</span>
+                </div>
+                <div class="calc-row">
+                    <span>Trading Fee:</span>
+                    <span id="calcFee">$0.00</span>
+                </div>
+                <div class="calc-row calc-total">
+                    <span>Total Cost:</span>
+                    <span id="calcTotal">$0.00</span>
+                </div>
+            </div>
+            
+            <div id="affordabilityInfo" class="affordability-info" style="display: none;"></div>
+            
+            <div id="tradeMessage"></div>
+            
+            <button id="executeTradeBtn" onclick="executeTrade()">Execute Trade</button>
+            <button onclick="cancelTrade()">Cancel</button>
+        </div>
+    </div>
+    
+    <script src="common.js"></script>
+    <script>
+        let selectedFund = null;
+        let currentAccountData = null;
+        let currentPrice = 0;
+        let tradingFee = 0;
+        
+        async function loadFunds() {
+            try {
+                const response = await fetch('/api/indexfunds');
+                const funds = await response.json();
+                
+                const tbody = document.getElementById('fundsBody');
+                if (funds.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="6" style="text-align: center;">No index funds available yet. They will become available as time progresses.</td></tr>';
+                } else {
+                    tbody.innerHTML = funds.map(fund => `
+                        <tr>
+                            <td><strong>${escapeHtml(fund.symbol)}</strong></td>
+                            <td>${escapeHtml(fund.name)}</td>
+                            <td>$${fund.price.toFixed(2)}</td>
+                            <td class="${fund.change >= 0 ? 'positive' : 'negative'}">
+                                ${fund.change >= 0 ? '+' : ''}${fund.change.toFixed(2)}%
+                            </td>
+                            <td>${fund.expenseRatio.toFixed(2)}%</td>
+                            <td>
+                                <button class="buy-btn" onclick="openTrade('${escapeHtml(fund.symbol)}', 'buy')">Buy</button>
+                                <button class="sell-btn" onclick="openTrade('${escapeHtml(fund.symbol)}', 'sell')">Sell</button>
+                            </td>
+                        </tr>
+                    `).join('');
+                }
+            } catch (error) {
+                console.error('Error loading funds:', error);
+                document.getElementById('fundsBody').innerHTML = '<tr><td colspan="6" style="text-align: center; color: #ff0000;">Error loading index funds</td></tr>';
+            }
+        }
+        
+        async function loadAccountData() {
+            try {
+                const response = await fetch('/api/account');
+                currentAccountData = await response.json();
+            } catch (error) {
+                console.error('Error loading account data:', error);
+            }
+        }
+        
+        async function openTrade(symbol, action) {
+            selectedFund = symbol;
+            
+            try {
+                // Load account data
+                await loadAccountData();
+                
+                // Load fund details
+                const response = await fetch(`/api/indexfunds/${symbol}`);
+                const fund = await response.json();
+                currentPrice = fund.price;
+                
+                // Calculate trading fee
+                const timeResponse = await fetch('/api/time');
+                const timeData = await timeResponse.json();
+                const gameDate = new Date(timeData.currentTime);
+                const year = gameDate.getFullYear();
+                
+                // Trading fee logic (simplified)
+                if (year >= 2019) {
+                    tradingFee = 0;
+                } else if (year >= 2013) {
+                    tradingFee = 0.99;
+                } else if (year >= 2000) {
+                    tradingFee = 2.99;
+                } else if (year >= 1990) {
+                    tradingFee = 4.99;
+                } else if (year >= 1975) {
+                    tradingFee = 7.99;
+                } else {
+                    tradingFee = 9.99;
+                }
+                
+                document.getElementById('tradeFormTitle').textContent = `Trade ${fund.symbol} - ${fund.name}`;
+                document.getElementById('fundInfo').innerHTML = `
+                    <p><strong>Symbol:</strong> ${escapeHtml(fund.symbol)}</p>
+                    <p><strong>Name:</strong> ${escapeHtml(fund.name)}</p>
+                    <p><strong>Description:</strong> ${escapeHtml(fund.description)}</p>
+                    <p><strong>Current Price:</strong> $${fund.price.toFixed(2)}</p>
+                    <p><strong>Expense Ratio:</strong> ${fund.expenseRatio.toFixed(2)}% (deducted on sale)</p>
+                `;
+                
+                document.getElementById('tradeAction').value = action;
+                document.getElementById('shares').value = action === 'buy' ? '1' : '0';
+                document.getElementById('tradeForm').style.display = 'block';
+                document.getElementById('tradeMessage').innerHTML = '';
+                
+                updateTradeCalculator();
+                
+                // Scroll to form
+                document.getElementById('tradeForm').scrollIntoView({ behavior: 'smooth' });
+            } catch (error) {
+                alert('Error loading fund details: ' + error.message);
+            }
+        }
+        
+        function updateTradeCalculator() {
+            const action = document.getElementById('tradeAction').value;
+            const shares = parseFloat(document.getElementById('shares').value) || 0;
+            
+            if (shares <= 0) {
+                document.getElementById('costCalculator').style.display = 'none';
+                document.getElementById('affordabilityInfo').style.display = 'none';
+                document.getElementById('executeTradeBtn').disabled = true;
+                return;
+            }
+            
+            const subtotal = currentPrice * shares;
+            const totalCost = action === 'buy' ? subtotal + tradingFee : subtotal - tradingFee;
+            
+            // Update calculator display
+            document.getElementById('calcPrice').textContent = `$${currentPrice.toFixed(2)}`;
+            document.getElementById('calcShares').textContent = shares.toFixed(2);
+            document.getElementById('calcFee').textContent = `$${tradingFee.toFixed(2)}`;
+            document.getElementById('calcTotal').textContent = `$${totalCost.toFixed(2)}`;
+            document.getElementById('costCalculator').style.display = 'block';
+            
+            // Check affordability for buys
+            if (action === 'buy' && currentAccountData) {
+                const cash = currentAccountData.cash || 0;
+                const canAfford = cash >= totalCost;
+                const maxShares = Math.floor((cash - tradingFee) / currentPrice);
+                
+                const affordInfo = document.getElementById('affordabilityInfo');
+                affordInfo.style.display = 'block';
+                
+                if (canAfford) {
+                    affordInfo.className = 'affordability-info can-afford';
+                    affordInfo.innerHTML = `
+                        ✓ You can afford this purchase<br>
+                        Available Cash: $${cash.toFixed(2)}<br>
+                        Max Shares: ${maxShares.toFixed(2)} shares ($${(maxShares * currentPrice + tradingFee).toFixed(2)} total)
+                    `;
+                    document.getElementById('executeTradeBtn').disabled = false;
+                } else {
+                    affordInfo.className = 'affordability-info cannot-afford';
+                    affordInfo.innerHTML = `
+                        ✗ Insufficient funds<br>
+                        Available Cash: $${cash.toFixed(2)}<br>
+                        Needed: $${totalCost.toFixed(2)}<br>
+                        Short by: $${(totalCost - cash).toFixed(2)}
+                    `;
+                    document.getElementById('executeTradeBtn').disabled = true;
+                }
+            } else if (action === 'sell') {
+                document.getElementById('affordabilityInfo').style.display = 'none';
+                document.getElementById('executeTradeBtn').disabled = false;
+            } else {
+                document.getElementById('affordabilityInfo').style.display = 'none';
+                document.getElementById('executeTradeBtn').disabled = false;
+            }
+        }
+        
+        async function executeTrade() {
+            const action = document.getElementById('tradeAction').value;
+            const shares = parseFloat(document.getElementById('shares').value);
+            
+            if (!selectedFund || shares <= 0) {
+                return;
+            }
+            
+            const messageDiv = document.getElementById('tradeMessage');
+            
+            try {
+                const response = await fetch('/api/indexfunds/trade', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        symbol: selectedFund,
+                        shares: shares,
+                        action: action
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok) {
+                    messageDiv.innerHTML = `<div class="message success">${escapeHtml(result.message)}</div>`;
+                    setTimeout(() => {
+                        cancelTrade();
+                        loadFunds();
+                        loadAccountData();
+                    }, 2000);
+                } else {
+                    messageDiv.innerHTML = `<div class="message error">${escapeHtml(result.error)}</div>`;
+                }
+            } catch (error) {
+                messageDiv.innerHTML = `<div class="message error">Error: ${escapeHtml(error.message)}</div>`;
+            }
+        }
+        
+        function cancelTrade() {
+            document.getElementById('tradeForm').style.display = 'none';
+            selectedFund = null;
+        }
+        
+        async function updateTime() {
+            const response = await fetch('/api/time');
+            const data = await response.json();
+            const date = new Date(data.currentTime);
+            const status = data.isMarketOpen ? '🟢 MARKET OPEN' : '🔴 MARKET CLOSED';
+            document.getElementById('timeDisplay').textContent = `${date.toLocaleString()} - ${status}`;
+        }
+        
+        async function updateEraTheme() {
+            const response = await fetch('/api/time');
+            const data = await response.json();
+            const gameDate = new Date(data.currentTime);
+            const year = gameDate.getFullYear();
+            applyEraTheme(year);
+        }
+        
+        // Initialize
+        loadFunds();
+        loadAccountData();
+        updateTime();
+        updateEraTheme();
+        
+        setInterval(loadFunds, 10000);
+        setInterval(updateTime, 1000);
+        setInterval(updateEraTheme, 10000);
+    </script>
+</body>
+</html>

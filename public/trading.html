@@ -82,6 +82,41 @@
             border: 2px solid #00ff00;
             padding: 20px;
         }
+        .cost-calculator {
+            margin: 15px 0;
+            padding: 10px;
+            background-color: #001100;
+            border: 1px solid #00ff00;
+            border-radius: 4px;
+        }
+        .cost-calculator .calc-row {
+            display: flex;
+            justify-content: space-between;
+            margin: 5px 0;
+            padding: 5px 0;
+        }
+        .cost-calculator .calc-total {
+            border-top: 2px solid #00ff00;
+            margin-top: 10px;
+            padding-top: 10px;
+            font-weight: bold;
+            font-size: 1.1em;
+        }
+        .affordability-info {
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 4px;
+        }
+        .can-afford {
+            background-color: #004400;
+            border: 1px solid #00ff00;
+            color: #00ff00;
+        }
+        .cannot-afford {
+            background-color: #440000;
+            border: 1px solid #ff0000;
+            color: #ff0000;
+        }
         input, select {
             background-color: #000;
             color: #00ff00;
@@ -162,10 +197,32 @@
             <h2>Place Trade</h2>
             <div id="message"></div>
             <form onsubmit="placeTrade(event)">
-                <select id="stockSymbol" required>
+                <select id="stockSymbol" required onchange="updateCostCalculator()">
                     <option value="">Select Stock</option>
                 </select>
-                <input type="number" id="shares" placeholder="Shares" min="1" required>
+                <input type="number" id="shares" placeholder="Shares" min="1" required oninput="updateCostCalculator()">
+                
+                <div id="costCalculator" class="cost-calculator" style="display: none;">
+                    <div class="calc-row">
+                        <span>Share Price:</span>
+                        <span id="calcPrice">$0.00</span>
+                    </div>
+                    <div class="calc-row">
+                        <span>Shares:</span>
+                        <span id="calcShares">0</span>
+                    </div>
+                    <div class="calc-row">
+                        <span>Trading Fee:</span>
+                        <span id="calcFee">$0.00</span>
+                    </div>
+                    <div class="calc-row calc-total">
+                        <span>Total Cost:</span>
+                        <span id="calcTotal">$0.00</span>
+                    </div>
+                </div>
+                
+                <div id="affordabilityInfo" class="affordability-info" style="display: none;"></div>
+                
                 <button type="submit" name="action" value="buy" class="buy-btn">BUY</button>
                 <button type="button" onclick="placeTrade(event, 'sell')" class="sell-btn">SELL</button>
                 <button type="button" onclick="placeTrade(event, 'short')" class="sell-btn" style="background-color: #330033; border-color: #ff00ff; color: #ff00ff;">SHORT</button>
@@ -182,6 +239,115 @@
     <script>
         let stocks = [];
         let paginator;
+        let currentAccountData = null;
+        let tradingFee = 0;
+        
+        // Load account data for affordability calculations
+        async function loadAccountData() {
+            try {
+                const response = await fetch('/api/account');
+                currentAccountData = await response.json();
+            } catch (error) {
+                console.error('Error loading account data:', error);
+            }
+        }
+        
+        // Calculate trading fee based on game year
+        async function calculateTradingFee() {
+            try {
+                const timeResponse = await fetch('/api/time');
+                const timeData = await timeResponse.json();
+                const gameDate = new Date(timeData.currentTime);
+                const year = gameDate.getFullYear();
+                
+                if (year >= 2019) {
+                    tradingFee = 0;
+                } else if (year >= 2013) {
+                    tradingFee = 0.99;
+                } else if (year >= 2000) {
+                    tradingFee = 2.99;
+                } else if (year >= 1990) {
+                    tradingFee = 4.99;
+                } else if (year >= 1975) {
+                    tradingFee = 7.99;
+                } else {
+                    tradingFee = 9.99;
+                }
+            } catch (error) {
+                console.error('Error calculating trading fee:', error);
+                tradingFee = 0;
+            }
+        }
+        
+        // Update cost calculator when user changes stock or shares
+        function updateCostCalculator() {
+            const symbol = document.getElementById('stockSymbol').value;
+            const shares = parseInt(document.getElementById('shares').value) || 0;
+            
+            if (!symbol || shares <= 0) {
+                document.getElementById('costCalculator').style.display = 'none';
+                document.getElementById('affordabilityInfo').style.display = 'none';
+                return;
+            }
+            
+            // Find the stock price
+            const stock = stocks.find(s => s.symbol === symbol);
+            if (!stock) {
+                document.getElementById('costCalculator').style.display = 'none';
+                document.getElementById('affordabilityInfo').style.display = 'none';
+                return;
+            }
+            
+            const price = stock.price;
+            const subtotal = price * shares;
+            const totalCost = subtotal + tradingFee;
+            
+            // Update calculator display
+            document.getElementById('calcPrice').textContent = `$${price.toFixed(2)}`;
+            document.getElementById('calcShares').textContent = shares.toLocaleString();
+            document.getElementById('calcFee').textContent = `$${tradingFee.toFixed(2)}`;
+            document.getElementById('calcTotal').textContent = `$${totalCost.toFixed(2)}`;
+            document.getElementById('costCalculator').style.display = 'block';
+            
+            // Check affordability
+            if (currentAccountData) {
+                const cash = currentAccountData.cash || 0;
+                const canAfford = cash >= totalCost;
+                const maxShares = Math.floor((cash - tradingFee) / price);
+                const sharesAvailable = stock.sharesAvailable || 0;
+                const actualMaxShares = Math.min(maxShares, sharesAvailable);
+                
+                const affordInfo = document.getElementById('affordabilityInfo');
+                affordInfo.style.display = 'block';
+                
+                if (canAfford && shares <= sharesAvailable) {
+                    affordInfo.className = 'affordability-info can-afford';
+                    affordInfo.innerHTML = `
+                        ✓ You can afford this purchase<br>
+                        Available Cash: $${cash.toFixed(2)}<br>
+                        Max Shares: ${actualMaxShares.toLocaleString()} shares (${sharesAvailable > maxShares ? 'limited by cash' : 'limited by availability'})<br>
+                        Total for max: $${(actualMaxShares * price + tradingFee).toFixed(2)}
+                    `;
+                } else if (!canAfford) {
+                    affordInfo.className = 'affordability-info cannot-afford';
+                    affordInfo.innerHTML = `
+                        ✗ Insufficient funds<br>
+                        Available Cash: $${cash.toFixed(2)}<br>
+                        Needed: $${totalCost.toFixed(2)}<br>
+                        Short by: $${(totalCost - cash).toFixed(2)}<br>
+                        Max you can buy: ${maxShares.toLocaleString()} shares
+                    `;
+                } else {
+                    affordInfo.className = 'affordability-info cannot-afford';
+                    affordInfo.innerHTML = `
+                        ✗ Not enough shares available<br>
+                        You requested: ${shares.toLocaleString()} shares<br>
+                        Available: ${sharesAvailable.toLocaleString()} shares<br>
+                        Reduce your order by: ${(shares - sharesAvailable).toLocaleString()} shares
+                    `;
+                }
+            }
+        }
         
         // Check for trade halts (called by interval)
         async function updateTradeHaltWarning() {
@@ -202,6 +368,7 @@
         function selectStock(symbol) {
             document.getElementById('stockSymbol').value = symbol;
             document.getElementById('shares').focus();
+            updateCostCalculator();
         }
         
         async function placeTrade(event, action) {
@@ -228,6 +395,9 @@
                     messageDiv.innerHTML = '';
                     messageDiv.appendChild(successDiv);
                     document.getElementById('shares').value = '';
+                    // Reload account data and recalculate
+                    loadAccountData();
+                    updateCostCalculator();
                 } else {
                     const errorDiv = document.createElement('div');
                     errorDiv.className = 'message error';
@@ -332,6 +502,9 @@
             ]
         });
         
+        // Initialize data
+        loadAccountData();
+        calculateTradingFee();
         updateStocks();
         updateEraTheme();
         updateTradeHaltWarning();
@@ -340,6 +513,8 @@
         setInterval(updateEraTheme, 10000);
         setInterval(updateTradeHaltWarning, 1000);
         setInterval(updateNavNotifications, 3000); // Update every 3 seconds
+        setInterval(loadAccountData, 5000); // Refresh account data
+        setInterval(calculateTradingFee, 60000); // Recalculate fee every minute
     </script>
 </body>
 </html>

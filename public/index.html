@@ -52,25 +52,27 @@
         .controls {
             background-color: #000;
             border: 2px solid #00ff00;
-            padding: 15px;
+            padding: 10px;
             margin-bottom: 20px;
             text-align: center;
         }
         .controls-status {
-            margin-bottom: 10px;
-            padding: 10px;
+            margin-bottom: 8px;
+            padding: 6px;
             background-color: #001100;
             border: 1px solid #00ff00;
             display: flex;
             justify-content: center;
-            gap: 20px;
+            gap: 15px;
             flex-wrap: wrap;
+            font-size: 0.85em;
         }
         .status-indicator {
             display: inline-block;
-            padding: 5px 15px;
+            padding: 3px 10px;
             border-radius: 3px;
             font-weight: bold;
+            font-size: 0.9em;
         }
         .paused-indicator {
             background-color: #440000;
@@ -91,11 +93,11 @@
             background-color: #003300;
             color: #00ff00;
             border: 2px solid #00ff00;
-            padding: 10px 20px;
-            margin: 5px;
+            padding: 8px 15px;
+            margin: 3px;
             cursor: pointer;
             font-family: 'Courier New', monospace;
-            font-size: 1em;
+            font-size: 0.9em;
         }
         button:hover {
             background-color: #00ff00;
@@ -171,8 +173,12 @@
         </div>
         <div class="portal-links">
             <a href="/trading" class="portal-link">
-                <h2>📈 Trading Platform</h2>
-                <p>Buy and sell stocks</p>
+                <h2>📈 Stocks</h2>
+                <p>Buy and sell individual stocks</p>
+            </a>
+            <a href="/indexfunds.html" class="portal-link">
+                <h2>📊 Index Funds</h2>
+                <p>Diversified fund investments</p>
             </a>
             <a href="/bank" class="portal-link">
                 <h2>🏦 Bank Account</h2>
@@ -182,8 +188,12 @@
                 <h2>💰 Loans</h2>
                 <p>Borrow money and manage credit</p>
             </a>
+            <a href="/taxes" class="portal-link">
+                <h2>📋 Tax Center</h2>
+                <p>View tax obligations and history</p>
+            </a>
             <a href="/graphs" class="portal-link">
-                <h2>📊 Market Graphs</h2>
+                <h2>📉 Market Graphs</h2>
                 <p>Charts and trends</p>
             </a>
             <a href="/news" class="portal-link" id="newsLink">
