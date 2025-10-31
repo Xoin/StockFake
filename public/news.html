@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>StockFake - News</title>
     <link rel="stylesheet" href="era-themes.css">
+    <script src="header.js"></script>
     <style>
         * {
             margin: 0;
@@ -54,6 +55,19 @@
         .news-item {
             border-bottom: 1px solid #003300;
             padding: 20px 0;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        .news-item:hover {
+            background-color: #001100;
+        }
+        .news-item.unread {
+            background-color: #002200;
+            border-left: 4px solid #00ff00;
+            padding-left: 16px;
+        }
+        .news-item.unread .news-headline {
+            font-weight: bold;
         }
         .news-item:last-child {
             border-bottom: none;
@@ -71,6 +85,7 @@
         .news-body {
             color: #00cc00;
             line-height: 1.5;
+            white-space: pre-wrap;
         }
         .no-news {
             text-align: center;
@@ -81,15 +96,8 @@
 </head>
 <body>
     <div class="container">
-        <h1>📰 HISTORICAL NEWS</h1>
-        <div class="nav">
-            <a href="/">← Back to Portal</a> |
-            <a href="/trading">Trading</a> |
-            <a href="/bank">Bank</a> |
-            <a href="/email">Email</a>
-        </div>
-        
-        <div class="time-display" id="timeDisplay">Loading...</div>
+        <!-- Shared header component - auto-loads via header.js -->
+        <div id="shared-header" data-title="📰 HISTORICAL NEWS"></div>
         
         <div class="pagination-controls-container"></div>
         <div class="news-container" id="newsContainer">
@@ -98,54 +106,28 @@
         <div class="pagination-controls-container"></div>
     </div>
     
-    <script>
-        // Helper function to escape HTML
-        function escapeHtml(text) {
-            const div = document.createElement('div');
-            div.textContent = text;
-            return div.innerHTML;
-        }
-        
-        async function updateNews() {
-            const response = await fetch('/api/news');
-            const news = await response.json();
-            
-            const container = document.getElementById('newsContainer');
-            
-            if (news.length === 0) {
-                container.innerHTML = '<div class="no-news">No news available yet. Major events will appear as time progresses.</div>';
-            } else {
-                container.innerHTML = news.map(item => `
-                    <div class="news-item">
-                        <div class="news-date">${new Date(item.date).toLocaleDateString()}</div>
-                        <div class="news-headline">${escapeHtml(item.headline)}</div>
-                        <div class="news-body">${escapeHtml(item.body)}</div>
-                    </div>
-                `).join('');
-            }
-        }
-        
-        async function updateTime() {
-            const response = await fetch('/api/time');
-            const data = await response.json();
-            const date = new Date(data.currentTime);
-            document.getElementById('timeDisplay').textContent = `Current Game Time: ${date.toLocaleString()}`;
-        }
-        
-        updateNews();
-        updateTime();
-        setInterval(updateNews, 5000);
-        setInterval(updateTime, 1000);
-    </script>
     <script src="common.js"></script>
     <script>
-        let newsPaginator;
+        let paginator;
         let allNews = [];
+        let readNewsIds = new Set(JSON.parse(localStorage.getItem('readNewsIds') || '[]'));
+        
+        // Mark news as read
+        function markNewsAsRead(newsId) {
+            readNewsIds.add(newsId);
+            localStorage.setItem('readNewsIds', JSON.stringify([...readNewsIds]));
+            renderNewsPage();
+        }
+        
+        // Pagination render function - used by pagination controls in common.js
+        function renderPage() {
+            renderNewsPage();
+        }
         
         async function renderNewsPage() {
-            if (!newsPaginator) return;
+            if (!paginator) return;
             
-            const pageNews = newsPaginator.getCurrentPageItems();
+            const pageNews = paginator.getCurrentPageItems();
             const container = document.getElementById('newsContainer');
             
             if (pageNews.length === 0 && allNews.length === 0) {
@@ -153,47 +135,74 @@
             } else if (pageNews.length === 0) {
                 container.innerHTML = '<div class="no-news">No items on this page.</div>';
             } else {
-                container.innerHTML = pageNews.map(item => `
-                    <div class="news-item">
-                        <div class="news-date">${new Date(item.date).toLocaleDateString()}</div>
-                        <div class="news-headline">${escapeHtml(item.headline)}</div>
-                        <div class="news-body">${escapeHtml(item.body)}</div>
-                    </div>
-                `).join('');
+                container.innerHTML = pageNews.map(item => {
+                    const isUnread = !readNewsIds.has(item.id);
+                    const unreadClass = isUnread ? 'unread' : '';
+                    return `
+                        <div class="news-item ${unreadClass}" onclick="markNewsAsRead(${item.id})">
+                            <div class="news-date">${new Date(item.date).toLocaleDateString()}</div>
+                            <div class="news-headline">${escapeHtml(item.headline)}</div>
+                            <div class="news-body">${escapeHtml(item.body)}</div>
+                        </div>
+                    `;
+                }).join('');
             }
             
             // Update pagination controls
             const paginationDivs = document.querySelectorAll('.pagination-controls-container');
             paginationDivs.forEach(div => {
-                div.innerHTML = newsPaginator.renderControls();
+                div.innerHTML = paginator.renderControls();
             });
         }
         
         async function updateNews() {
             const response = await fetch('/api/news');
-            allNews = await response.json();
+            const rawNews = await response.json();
             
-            // Update localStorage with current count (mark as viewed)
+            // Merge multiple dynamic news items from the same day
+            const newsById = new Map();
+            const dynamicNewsByDate = new Map();
+            
+            rawNews.forEach(item => {
+                // Check if it's dynamic news (id >= 10000)
+                if (item.id >= 10000) {
+                    const dateKey = new Date(item.date).toDateString();
+                    if (!dynamicNewsByDate.has(dateKey)) {
+                        dynamicNewsByDate.set(dateKey, []);
+                    }
+                    dynamicNewsByDate.get(dateKey).push(item);
+                } else {
+                    newsById.set(item.id, item);
+                }
+            });
+            
+            // Merge dynamic news items by date
+            dynamicNewsByDate.forEach((items, dateKey) => {
+                if (items.length > 1) {
+                    // Create merged news item with formatted list
+                    const mergedItem = {
+                        id: items[0].id, // Use first ID
+                        date: items[0].date,
+                        headline: 'Market Update: Multiple Stock Movements',
+                        body: items.map((item, idx) => `${idx + 1}. ${item.body}`).join('\n')
+                    };
+                    newsById.set(mergedItem.id, mergedItem);
+                } else {
+                    newsById.set(items[0].id, items[0]);
+                }
+            });
+            
+            allNews = Array.from(newsById.values()).sort((a, b) => new Date(b.date) - new Date(a.date));
+            
+            // Update localStorage with current count for badge
             localStorage.setItem('lastNewsCount', allNews.length);
             
-            newsPaginator = new Paginator(allNews, 10);
+            paginator = new Paginator(allNews, 10);
             renderNewsPage();
         }
         
-        async function updateEraTheme() {
-            const response = await fetch('/api/time');
-            const data = await response.json();
-            const gameDate = new Date(data.currentTime);
-            const year = gameDate.getFullYear();
-            applyEraTheme(year);
-        }
-        
         updateNews();
-        updateTime();
-        updateEraTheme();
         setInterval(updateNews, 5000);
-        setInterval(updateTime, 1000);
-        setInterval(updateEraTheme, 10000);
     </script>
 </body>
 </html>

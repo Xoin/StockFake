@@ -153,11 +153,7 @@ body.era-1990s {
 body.era-1990s .container {
     background-color: #ffffff;
     border: 2px solid #000000;
-}
-
-body.era-1990s * {
-    border-color: #000000 !important;
-    color: #000000;
+    padding: 20px;
 }
 
 body.era-1990s .positive {
@@ -169,13 +165,13 @@ body.era-1990s .negative {
 }
 
 body.era-1990s h1 {
-    color: #0000ff;
+    color: #0000ff !important;
     text-shadow: 2px 2px #808080;
     font-size: 2em;
 }
 
 body.era-1990s h2 {
-    color: #800080;
+    color: #800080 !important;
     font-size: 1.5em;
 }
 
@@ -190,7 +186,7 @@ body.era-1990s a:visited {
 
 body.era-1990s .page-btn {
     background-color: #c0c0c0;
-    color: #000000;
+    color: #000000 !important;
     border: 2px outset #808080 !important;
     font-family: Arial, sans-serif;
 }
@@ -204,14 +200,15 @@ body.era-1990s .page-btn:active {
 }
 
 body.era-1990s .page-btn.active {
-    background-color: #000080;
-    color: #ffffff;
+    background-color: #000080 !important;
+    color: #ffffff !important;
     border-style: inset !important;
 }
 
 body.era-1990s table {
     background-color: #ffffff;
     border-collapse: collapse;
+    color: #000000;
 }
 
 body.era-1990s th {
@@ -219,9 +216,75 @@ body.era-1990s th {
     color: #ffffff !important;
 }
 
+body.era-1990s td {
+    color: #000000 !important;
+}
+
 body.era-1990s .portal-link {
     background-color: #e0e0e0 !important;
     border: 2px outset #808080 !important;
+    color: #000000 !important;
+}
+
+body.era-1990s .time-display,
+body.era-1990s .controls,
+body.era-1990s .stocks-container,
+body.era-1990s .news-container,
+body.era-1990s .company-header,
+body.era-1990s .info-section {
+    border-color: #000000 !important;
+    color: #000000 !important;
+}
+
+body.era-1990s .nav a {
+    color: #0000ff !important;
+}
+
+body.era-1990s input,
+body.era-1990s select,
+body.era-1990s textarea {
+    background-color: #ffffff !important;
+    color: #000000 !important;
+    border: 2px inset #808080 !important;
+}
+
+body.era-1990s button {
+    background-color: #c0c0c0;
+    color: #000000 !important;
+    border: 2px outset #808080 !important;
+}
+
+body.era-1990s button:active {
+    border-style: inset !important;
+}
+
+body.era-1990s .nav-badge {
+    background-color: #ff0000 !important;
+    color: #ffffff !important;
+}
+
+body.era-1990s .news-date,
+body.era-1990s .news-headline,
+body.era-1990s .news-body {
+    color: #000000 !important;
+}
+
+body.era-1990s .stock-link {
+    color: #0000ff !important;
+}
+
+body.era-1990s .message {
+    color: #000000 !important;
+}
+
+body.era-1990s .error {
+    color: #ff0000 !important;
+    background-color: #ffe0e0 !important;
+}
+
+body.era-1990s .success {
+    color: #008000 !important;
+    background-color: #e0ffe0 !important;
 }
 
 /* 2000s: Web 2.0 (gradients, rounded corners, shadows) */
@@ -235,11 +298,7 @@ body.era-2000s .container {
     background-color: #ffffff;
     border-radius: 10px;
     box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
-}
-
-body.era-2000s * {
-    border-color: #cccccc !important;
-    color: #333333;
+    padding: 20px;
 }
 
 body.era-2000s .positive {
@@ -251,7 +310,7 @@ body.era-2000s .negative {
 }
 
 body.era-2000s h1 {
-    color: #2c5aa0;
+    color: #2c5aa0 !important;
     text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.2);
     background: linear-gradient(to bottom, #f0f0f0 0%, #d0d0d0 100%);
     padding: 15px;
@@ -259,7 +318,7 @@ body.era-2000s h1 {
 }
 
 body.era-2000s h2 {
-    color: #4a90e2;
+    color: #4a90e2 !important;
 }
 
 body.era-2000s a {
@@ -273,7 +332,7 @@ body.era-2000s a:hover {
 
 body.era-2000s .page-btn {
     background: linear-gradient(to bottom, #ffffff 0%, #e0e0e0 100%);
-    color: #333333;
+    color: #333333 !important;
     border: 1px solid #cccccc !important;
     border-radius: 5px;
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
@@ -328,11 +387,7 @@ body.era-2010s .container {
     background-color: #ffffff;
     border-radius: 4px;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
-}
-
-body.era-2010s * {
-    border-color: #e0e0e0 !important;
-    color: #2c3e50;
+    padding: 20px;
 }
 
 body.era-2010s .positive {
@@ -344,13 +399,13 @@ body.era-2010s .negative {
 }
 
 body.era-2010s h1 {
-    color: #34495e;
+    color: #34495e !important;
     font-weight: 300;
     font-size: 2.5em;
 }
 
 body.era-2010s h2 {
-    color: #3498db;
+    color: #3498db !important;
     font-weight: 400;
 }
 
@@ -366,7 +421,7 @@ body.era-2010s a:hover {
 
 body.era-2010s .page-btn {
     background-color: #ffffff;
-    color: #3498db;
+    color: #3498db !important;
     border: 1px solid #3498db !important;
     border-radius: 3px;
     transition: all 0.3s;
@@ -417,23 +472,18 @@ body.era-2010s .portal-link:hover {
     transform: translateY(-3px);
 }
 
-/* 2020s: Modern responsive (CSS Grid, custom properties) */
+/* 2020s: Modern flat design (clean, minimal, accessible) */
 body.era-2020s {
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', sans-serif;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background-color: #f5f7fa;
     color: #1a202c;
 }
 
 body.era-2020s .container {
-    background-color: rgba(255, 255, 255, 0.95);
-    border-radius: 12px;
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
-    backdrop-filter: blur(10px);
-}
-
-body.era-2020s * {
-    border-color: #e2e8f0 !important;
-    color: #1a202c;
+    background-color: #ffffff;
+    border-radius: 8px;
+    border: 1px solid #e2e8f0;
+    padding: 20px;
 }
 
 body.era-2020s .positive {
@@ -445,59 +495,54 @@ body.era-2020s .negative {
 }
 
 body.era-2020s h1 {
-    color: #1a202c;
+    color: #667eea !important;
     font-weight: 700;
     font-size: 2.5em;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
 }
 
 body.era-2020s h2 {
-    color: #667eea;
+    color: #4c51bf !important;
     font-weight: 600;
 }
 
 body.era-2020s a {
     color: #667eea !important;
     text-decoration: none;
-    transition: all 0.3s;
+    transition: color 0.2s;
 }
 
 body.era-2020s a:hover {
-    color: #764ba2 !important;
+    color: #4c51bf !important;
 }
 
 body.era-2020s .page-btn {
     background-color: #ffffff;
-    color: #667eea;
+    color: #667eea !important;
     border: 2px solid #667eea !important;
-    border-radius: 8px;
-    transition: all 0.3s;
+    border-radius: 6px;
+    transition: all 0.2s;
     font-weight: 500;
 }
 
 body.era-2020s .page-btn:hover:not(:disabled) {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    color: #ffffff;
-    transform: scale(1.05);
+    background-color: #667eea;
+    color: #ffffff !important;
 }
 
 body.era-2020s .page-btn.active {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    color: #ffffff;
+    background-color: #667eea;
+    color: #ffffff !important;
     font-weight: 600;
 }
 
 body.era-2020s table {
-    border-radius: 8px;
+    border-radius: 6px;
     overflow: hidden;
-    border: none !important;
+    border: 1px solid #e2e8f0 !important;
 }
 
 body.era-2020s th {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+    background-color: #667eea !important;
     color: #ffffff !important;
     font-weight: 600;
     text-transform: uppercase;
@@ -507,42 +552,21 @@ body.era-2020s th {
 
 body.era-2020s tr {
     border-bottom: 1px solid #e2e8f0 !important;
-    transition: all 0.3s;
 }
 
 body.era-2020s tr:hover {
     background-color: #f7fafc;
-    transform: scale(1.01);
 }
 
 body.era-2020s .portal-link {
-    background: rgba(255, 255, 255, 0.9) !important;
-    border: 2px solid transparent !important;
-    border-radius: 12px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-    transition: all 0.3s;
-    position: relative;
-    overflow: hidden;
-}
-
-body.era-2020s .portal-link::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    opacity: 0;
-    transition: opacity 0.3s;
-}
-
-body.era-2020s .portal-link:hover::before {
-    opacity: 0.1;
+    background-color: #ffffff !important;
+    border: 2px solid #e2e8f0 !important;
+    border-radius: 8px;
+    transition: all 0.2s;
+    color: #1a202c !important;
 }
 
 body.era-2020s .portal-link:hover {
-    box-shadow: 0 8px 24px rgba(102, 126, 234, 0.3) !important;
-    transform: translateY(-5px);
     border-color: #667eea !important;
+    background-color: #f7fafc !important;
 }

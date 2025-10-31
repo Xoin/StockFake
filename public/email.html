@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>StockFake - Email</title>
     <link rel="stylesheet" href="era-themes.css">
+    <script src="header.js"></script>
     <style>
         * {
             margin: 0;
@@ -45,11 +46,20 @@
             padding: 20px;
         }
         .email-item {
+            background-color: #001100;
             border: 1px solid #003300;
             padding: 15px;
             margin-bottom: 15px;
             cursor: pointer;
             transition: background-color 0.3s;
+        }
+        .email-item.unread {
+            background-color: #002200;
+            border-left: 4px solid #00ff00;
+            padding-left: 11px;
+        }
+        .email-item.unread .email-subject {
+            font-weight: bold;
         }
         .email-item:hover {
             background-color: #003300;
@@ -125,54 +135,22 @@
         <div class="pagination-controls-container"></div>
     </div>
     
-    <script>
-        // Helper function to escape HTML
-        function escapeHtml(text) {
-            const div = document.createElement('div');
-            div.textContent = text;
-            return div.innerHTML;
-        }
-        
-        async function updateEmails() {
-            const response = await fetch('/api/emails');
-            const emails = await response.json();
-            
-            const container = document.getElementById('emailContainer');
-            
-            if (emails.length === 0) {
-                container.innerHTML = '<div class="no-emails">No emails yet.</div>';
-            } else {
-                container.innerHTML = emails.map((email, index) => `
-                    <div class="email-item ${email.spam ? 'spam' : ''}" onclick="toggleEmail(${index})">
-                        <div class="email-header">
-                            <div class="email-from">From: ${escapeHtml(email.from)}${email.spam ? '<span class="spam-badge">SPAM</span>' : ''}</div>
-                            <div class="email-date">${new Date(email.date).toLocaleString()}</div>
-                        </div>
-                        <div class="email-subject">${escapeHtml(email.subject)}</div>
-                        <div class="email-body" id="email-body-${index}">${escapeHtml(email.body)}</div>
-                    </div>
-                `).join('');
-            }
-        }
-        
-        function toggleEmail(index) {
-            const emailItem = document.getElementById(`email-body-${index}`).parentElement;
-            emailItem.classList.toggle('expanded');
-        }
-        
-        updateEmails();
-        setInterval(updateEmails, 5000);
-    </script>
     <script src="common.js"></script>
     <script>
-        let emailPaginator;
+        let paginator;
         let allEmails = [];
-        let currentExpandedEmail = null;
+        let readEmailIds = new Set(JSON.parse(localStorage.getItem('readEmailIds') || '[]'));
+        let expandedEmails = new Set();
+        
+        // Pagination render function
+        function renderPage() {
+            renderEmailPage();
+        }
         
         async function renderEmailPage() {
-            if (!emailPaginator) return;
+            if (!paginator) return;
             
-            const pageEmails = emailPaginator.getCurrentPageItems();
+            const pageEmails = paginator.getCurrentPageItems();
             const container = document.getElementById('emailContainer');
             
             if (pageEmails.length === 0 && allEmails.length === 0) {
@@ -180,17 +158,20 @@
             } else if (pageEmails.length === 0) {
                 container.innerHTML = '<div class="no-emails">No items on this page.</div>';
             } else {
-                const startIndex = (emailPaginator.currentPage - 1) * emailPaginator.itemsPerPage;
+                const startIndex = (paginator.currentPage - 1) * paginator.itemsPerPage;
                 container.innerHTML = pageEmails.map((email, relativeIndex) => {
                     const index = startIndex + relativeIndex;
+                    const isExpanded = expandedEmails.has(index);
+                    const isUnread = email.id && !readEmailIds.has(email.id);
+                    const unreadClass = isUnread ? 'unread' : '';
                     return `
-                        <div class="email-item ${email.spam ? 'spam' : ''}" onclick="toggleEmail(${index})">
+                        <div class="email-item ${email.spam ? 'spam' : ''} ${unreadClass} ${isExpanded ? 'expanded' : ''}" onclick="toggleEmail(${index}, ${email.id || 0})">
                             <div class="email-header">
                                 <div class="email-from">From: ${escapeHtml(email.from)}${email.spam ? '<span class="spam-badge">SPAM</span>' : ''}</div>
                                 <div class="email-date">${new Date(email.date).toLocaleString()}</div>
                             </div>
                             <div class="email-subject">${escapeHtml(email.subject)}</div>
-                            <div class="email-body" id="email-body-${index}">${escapeHtml(email.body)}</div>
+                            <div class="email-body">${escapeHtml(email.body)}</div>
                         </div>
                     `;
                 }).join('');
@@ -199,38 +180,51 @@
             // Update pagination controls
             const paginationDivs = document.querySelectorAll('.pagination-controls-container');
             paginationDivs.forEach(div => {
-                div.innerHTML = emailPaginator.renderControls();
+                div.innerHTML = paginator.renderControls();
             });
         }
         
-        function toggleEmail(index) {
-            const emailItem = document.getElementById(`email-body-${index}`).parentElement;
-            emailItem.classList.toggle('expanded');
+        function toggleEmail(index, emailId) {
+            if (expandedEmails.has(index)) {
+                expandedEmails.delete(index);
+            } else {
+                expandedEmails.add(index);
+                // Mark as read when expanded
+                if (emailId) {
+                    readEmailIds.add(emailId);
+                    localStorage.setItem('readEmailIds', JSON.stringify([...readEmailIds]));
+                }
+            }
+            renderEmailPage();
         }
         
         async function updateEmails() {
             const response = await fetch('/api/emails');
-            allEmails = await response.json();
+            const newEmails = await response.json();
             
-            // Update localStorage with current count (mark as viewed)
+            // Add IDs if missing (use index as fallback)
+            newEmails.forEach((email, idx) => {
+                if (!email.id) {
+                    email.id = `email-${idx}-${new Date(email.date).getTime()}`;
+                }
+            });
+            
+            // Only re-render if the email list has changed
+            const emailsChanged = JSON.stringify(newEmails) !== JSON.stringify(allEmails);
+            allEmails = newEmails;
+            
+            // Update localStorage with current count
             localStorage.setItem('lastEmailCount', allEmails.length);
             
-            emailPaginator = new Paginator(allEmails, 15);
-            renderEmailPage();
-        }
-        
-        async function updateEraTheme() {
-            const response = await fetch('/api/time');
-            const data = await response.json();
-            const gameDate = new Date(data.currentTime);
-            const year = gameDate.getFullYear();
-            applyEraTheme(year);
+            if (!paginator || emailsChanged) {
+                paginator = new Paginator(allEmails, 15);
+                renderEmailPage();
+            }
+            // If emails haven't changed, don't re-render to preserve expanded state
         }
         
         updateEmails();
-        updateEraTheme();
         setInterval(updateEmails, 5000);
-        setInterval(updateEraTheme, 10000);
     </script>
 </body>
 </html>

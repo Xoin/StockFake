@@ -169,6 +169,85 @@
             padding: 50px;
             font-size: 1.5em;
         }
+        .stock-chart-container {
+            position: relative;
+            height: 400px;
+            background-color: #001100;
+            border: 1px solid #003300;
+            margin: 15px 0;
+        }
+        .chart-canvas {
+            width: 100%;
+            height: 100%;
+        }
+        .price-history-table {
+            margin-top: 15px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .price-history-table table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        .price-history-table th {
+            background-color: #003300;
+            padding: 10px;
+            text-align: left;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+        .price-history-table td {
+            padding: 8px;
+            border-bottom: 1px solid #001100;
+        }
+        .price-history-table tr:hover {
+            background-color: #001100;
+        }
+        .timeframe-buttons {
+            margin-bottom: 15px;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        .timeframe-btn {
+            background-color: #003300;
+            color: #00ff00;
+            border: 1px solid #00ff00;
+            padding: 8px 15px;
+            cursor: pointer;
+            font-family: 'Courier New', monospace;
+        }
+        .timeframe-btn:hover {
+            background-color: #00ff00;
+            color: #000;
+        }
+        .timeframe-btn.active {
+            background-color: #00ff00;
+            color: #000;
+            font-weight: bold;
+        }
+        .stock-metrics {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin: 15px 0;
+        }
+        .metric-card {
+            background-color: #001100;
+            border: 1px solid #003300;
+            padding: 15px;
+            text-align: center;
+        }
+        .metric-label {
+            color: #00aa00;
+            font-size: 0.85em;
+            margin-bottom: 5px;
+        }
+        .metric-value {
+            font-size: 1.3em;
+            font-weight: bold;
+        }
         .error {
             background-color: #440000;
             border: 2px solid #ff0000;
@@ -282,6 +361,52 @@
                 </div>
                 
                 <div class="section">
+                    <h3>📈 Stock Performance</h3>
+                    <div id="stockMetrics" class="stock-metrics">
+                        <div class="metric-card">
+                            <div class="metric-label">Current Price</div>
+                            <div class="metric-value" id="currentPrice">Loading...</div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="metric-label">Today's Change</div>
+                            <div class="metric-value" id="priceChange">Loading...</div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="metric-label">Available Shares</div>
+                            <div class="metric-value" id="availableShares">Loading...</div>
+                        </div>
+                    </div>
+                    
+                    <div class="timeframe-buttons">
+                        <button class="timeframe-btn active" onclick="loadStockHistory(7, this)">7 Days</button>
+                        <button class="timeframe-btn" onclick="loadStockHistory(30, this)">30 Days</button>
+                        <button class="timeframe-btn" onclick="loadStockHistory(90, this)">90 Days</button>
+                        <button class="timeframe-btn" onclick="loadStockHistory(365, this)">1 Year</button>
+                        <button class="timeframe-btn" onclick="loadStockHistory(1825, this)">5 Years</button>
+                    </div>
+                    
+                    <div class="stock-chart-container">
+                        <canvas id="stockChart" class="chart-canvas"></canvas>
+                    </div>
+                    
+                    <div class="price-history-table">
+                        <h4 style="margin-bottom: 10px;">Recent Price History</h4>
+                        <table id="priceHistoryTable">
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Price</th>
+                                    <th>Change</th>
+                                </tr>
+                            </thead>
+                            <tbody id="priceHistoryBody">
+                                <tr><td colspan="3" style="text-align: center;">Loading...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                
+                <div class="section">
                     <h3>💼 Products & Services</h3>
                     <div class="products-grid">
                         ${company.products.map(product => `
@@ -341,6 +466,175 @@
         
         // Load company info on page load
         loadCompanyInfo();
+        
+        // Stock chart and history functions
+        let stockHistory = [];
+        let currentTimeframe = 7;
+        
+        async function loadStockHistory(days, button) {
+            currentTimeframe = days;
+            
+            // Update button states
+            document.querySelectorAll('.timeframe-btn').forEach(btn => btn.classList.remove('active'));
+            if (button) button.classList.add('active');
+            
+            try {
+                const response = await fetch(`/api/stocks/${encodeURIComponent(symbol)}/history?days=${days}`);
+                stockHistory = await response.json();
+                
+                drawStockChart();
+                updatePriceHistory();
+            } catch (error) {
+                console.error('Error loading stock history:', error);
+            }
+        }
+        
+        async function loadStockInfo() {
+            try {
+                const response = await fetch(`/api/stocks/${encodeURIComponent(symbol)}`);
+                const stock = await response.json();
+                
+                document.getElementById('currentPrice').textContent = `$${stock.price.toFixed(2)}`;
+                
+                const changeEl = document.getElementById('priceChange');
+                const change = stock.change || 0;
+                changeEl.textContent = `${change >= 0 ? '+' : ''}${change.toFixed(2)}%`;
+                changeEl.style.color = change >= 0 ? '#00ff00' : '#ff0000';
+                
+                const sharesAvailable = stock.sharesAvailable || 0;
+                const sharesDisplay = sharesAvailable > 1000000 
+                    ? `${(sharesAvailable / 1000000).toFixed(1)}M`
+                    : sharesAvailable.toLocaleString();
+                document.getElementById('availableShares').textContent = sharesDisplay;
+            } catch (error) {
+                console.error('Error loading stock info:', error);
+            }
+        }
+        
+        function drawStockChart() {
+            const canvas = document.getElementById('stockChart');
+            const ctx = canvas.getContext('2d');
+            
+            // Set canvas size only if it changed
+            const newWidth = canvas.offsetWidth;
+            const newHeight = canvas.offsetHeight;
+            if (canvas.width !== newWidth || canvas.height !== newHeight) {
+                canvas.width = newWidth;
+                canvas.height = newHeight;
+            }
+            
+            if (stockHistory.length === 0) {
+                ctx.fillStyle = '#00aa00';
+                ctx.font = '16px Courier New';
+                ctx.textAlign = 'center';
+                ctx.fillText('No historical data available', canvas.width / 2, canvas.height / 2);
+                return;
+            }
+            
+            // Calculate bounds
+            const prices = stockHistory.map(d => d.price);
+            const maxPrice = Math.max(...prices);
+            const minPrice = Math.min(...prices);
+            const priceRange = maxPrice - minPrice || 1;
+            
+            const padding = 40;
+            const chartWidth = canvas.width - 2 * padding;
+            const chartHeight = canvas.height - 2 * padding;
+            
+            // Clear canvas
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // Draw grid
+            ctx.strokeStyle = '#003300';
+            ctx.lineWidth = 1;
+            for (let i = 0; i <= 5; i++) {
+                const y = padding + (chartHeight / 5) * i;
+                ctx.beginPath();
+                ctx.moveTo(padding, y);
+                ctx.lineTo(canvas.width - padding, y);
+                ctx.stroke();
+                
+                // Y-axis labels
+                const price = maxPrice - (priceRange / 5) * i;
+                ctx.fillStyle = '#00aa00';
+                ctx.font = '12px Courier New';
+                ctx.textAlign = 'right';
+                ctx.fillText(`$${price.toFixed(2)}`, padding - 5, y + 4);
+            }
+            
+            // Draw price line
+            ctx.strokeStyle = '#00ff00';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            
+            stockHistory.forEach((point, index) => {
+                const x = padding + (chartWidth / (stockHistory.length - 1)) * index;
+                const y = padding + chartHeight - ((point.price - minPrice) / priceRange) * chartHeight;
+                
+                if (index === 0) {
+                    ctx.moveTo(x, y);
+                } else {
+                    ctx.lineTo(x, y);
+                }
+            });
+            
+            ctx.stroke();
+            
+            // Draw points
+            stockHistory.forEach((point, index) => {
+                const x = padding + (chartWidth / (stockHistory.length - 1)) * index;
+                const y = padding + chartHeight - ((point.price - minPrice) / priceRange) * chartHeight;
+                
+                ctx.fillStyle = '#00ff00';
+                ctx.beginPath();
+                ctx.arc(x, y, 3, 0, 2 * Math.PI);
+                ctx.fill();
+            });
+            
+            // Draw axes
+            ctx.strokeStyle = '#00ff00';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(padding, padding);
+            ctx.lineTo(padding, canvas.height - padding);
+            ctx.lineTo(canvas.width - padding, canvas.height - padding);
+            ctx.stroke();
+        }
+        
+        function updatePriceHistory() {
+            const tbody = document.getElementById('priceHistoryBody');
+            
+            if (stockHistory.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="3" style="text-align: center;">No price history available</td></tr>';
+                return;
+            }
+            
+            // Show last 10 days
+            const recentHistory = stockHistory.slice(-10).reverse();
+            
+            tbody.innerHTML = recentHistory.map((point, index) => {
+                const date = new Date(point.date);
+                const prevPoint = index < recentHistory.length - 1 ? recentHistory[index + 1] : point;
+                const change = ((point.price - prevPoint.price) / prevPoint.price) * 100;
+                const changeStr = index < recentHistory.length - 1 
+                    ? `${change >= 0 ? '+' : ''}${change.toFixed(2)}%`
+                    : '-';
+                const changeClass = change >= 0 ? 'positive' : 'negative';
+                
+                return `
+                    <tr>
+                        <td>${date.toLocaleDateString()}</td>
+                        <td>$${point.price.toFixed(2)}</td>
+                        <td class="${changeClass}">${changeStr}</td>
+                    </tr>
+                `;
+            }).join('');
+        }
+        
+        // Initialize stock data
+        loadStockInfo();
+        loadStockHistory(7);
+        setInterval(loadStockInfo, 5000);
     </script>
     <script src="common.js"></script>
     <script>

@@ -19,7 +19,7 @@ app.use(express.static('public'));
 
 // Game state
 let gameTime = new Date('1970-01-01T09:30:00'); // Start at market open
-let isPaused = false;
+let isPaused = true; // Start paused so player can review the game
 let timeMultiplier = 3600; // 1 real second = 1 game hour by default
 
 // Stock market hours (NYSE)
@@ -981,14 +981,19 @@ app.post('/api/trade', (req, res) => {
     const futurePositionValue = futureShares * stockPrice.price;
     const currentPortfolioValue = calculatePortfolioValue();
     const futurePortfolioValue = currentPortfolioValue + totalCost;
-    const futureConcentration = futurePositionValue / futurePortfolioValue;
     
-    if (futureConcentration > userAccount.riskControls.maxPositionSize) {
-      return res.status(400).json({ 
-        error: `Position would exceed maximum concentration limit of ${(userAccount.riskControls.maxPositionSize * 100).toFixed(0)}%. Current concentration would be ${(futureConcentration * 100).toFixed(1)}%`,
-        maxPositionSize: userAccount.riskControls.maxPositionSize,
-        futureConcentration: futureConcentration
-      });
+    // Only apply concentration limits if portfolio has existing value
+    // For first purchase, skip this check
+    if (futurePortfolioValue > 0 && currentPortfolioValue > 0) {
+      const futureConcentration = futurePositionValue / futurePortfolioValue;
+      
+      if (futureConcentration > userAccount.riskControls.maxPositionSize) {
+        return res.status(400).json({ 
+          error: `Position would exceed maximum concentration limit of ${(userAccount.riskControls.maxPositionSize * 100).toFixed(0)}%. Current concentration would be ${(futureConcentration * 100).toFixed(1)}%`,
+          maxPositionSize: userAccount.riskControls.maxPositionSize,
+          futureConcentration: futureConcentration
+        });
+      }
     }
     
     // Handle margin trading

@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>StockFake - Trading Platform</title>
     <link rel="stylesheet" href="era-themes.css">
+    <script src="header.js"></script>
     <style>
         * {
             margin: 0;
@@ -82,6 +83,41 @@
             border: 2px solid #00ff00;
             padding: 20px;
         }
+        .cost-calculator {
+            margin: 15px 0;
+            padding: 10px;
+            background-color: #001100;
+            border: 1px solid #00ff00;
+            border-radius: 4px;
+        }
+        .cost-calculator .calc-row {
+            display: flex;
+            justify-content: space-between;
+            margin: 5px 0;
+            padding: 5px 0;
+        }
+        .cost-calculator .calc-total {
+            border-top: 2px solid #00ff00;
+            margin-top: 10px;
+            padding-top: 10px;
+            font-weight: bold;
+            font-size: 1.1em;
+        }
+        .affordability-info {
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 4px;
+        }
+        .can-afford {
+            background-color: #004400;
+            border: 1px solid #00ff00;
+            color: #00ff00;
+        }
+        .cannot-afford {
+            background-color: #440000;
+            border: 1px solid #ff0000;
+            color: #ff0000;
+        }
         input, select {
             background-color: #000;
             color: #00ff00;
@@ -128,17 +164,117 @@
             border-color: #00ff00;
             color: #00ff00;
         }
+        .concentration-panel {
+            background-color: #000;
+            border: 2px solid #00aa00;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+        .concentration-panel h3 {
+            margin-bottom: 12px;
+            color: #00ff00;
+        }
+        .concentration-info {
+            display: flex;
+            gap: 30px;
+            flex-wrap: wrap;
+            margin-bottom: 15px;
+            padding: 10px;
+            background-color: #001100;
+            border: 1px solid #003300;
+        }
+        .concentration-item {
+            display: flex;
+            gap: 10px;
+        }
+        .conc-label {
+            color: #00aa00;
+        }
+        .conc-value {
+            color: #00ff00;
+            font-weight: bold;
+        }
+        .current-concentrations {
+            margin-top: 10px;
+        }
+        .concentration-stock {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px;
+            margin: 5px 0;
+            background-color: #001100;
+            border-left: 3px solid #00aa00;
+        }
+        .concentration-stock.warning {
+            border-left-color: #ffaa00;
+            background-color: #221100;
+        }
+        .concentration-stock.limit {
+            border-left-color: #ff0000;
+            background-color: #220000;
+        }
+        .concentration-bar {
+            flex: 1;
+            max-width: 300px;
+            height: 20px;
+            background-color: #002200;
+            border: 1px solid #003300;
+            margin: 0 15px;
+            position: relative;
+        }
+        .concentration-fill {
+            height: 100%;
+            background-color: #00ff00;
+            transition: width 0.3s;
+        }
+        .concentration-fill.warning {
+            background-color: #ffaa00;
+        }
+        .concentration-fill.limit {
+            background-color: #ff0000;
+        }
+        .concentration-percentage {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: #000;
+            font-weight: bold;
+            font-size: 0.85em;
+            text-shadow: 0 0 2px #fff;
+        }
     </style>
 </head>
 <body>
     <div class="container">
-        <!-- Header will be loaded here -->
-        <div id="page-header"></div>
+        <!-- Shared header component -->
+        <div id="shared-header" data-title="📈 TRADING PLATFORM"></div>
         
         <div id="haltWarning" class="halt-warning" style="display: none;"></div>
         
+        <!-- Portfolio Concentration Display -->
+        <div class="concentration-panel" id="concentrationPanel" style="display: none;">
+            <h3>📊 Portfolio Concentration Limits</h3>
+            <div class="concentration-info">
+                <div class="concentration-item">
+                    <span class="conc-label">Maximum Per Stock:</span>
+                    <span class="conc-value" id="maxConcentration">30%</span>
+                </div>
+                <div class="concentration-item">
+                    <span class="conc-label">Current Portfolio Value:</span>
+                    <span class="conc-value" id="currentPortfolioValue">$0.00</span>
+                </div>
+            </div>
+            <div id="currentConcentrations" class="current-concentrations"></div>
+        </div>
+        
         <div class="stocks-container">
             <h2>Available Stocks</h2>
+            <div style="margin-bottom: 15px;">
+                <input type="text" id="stockSearch" placeholder="Search stocks by symbol or name..." 
+                    style="width: 100%; max-width: 400px; padding: 10px; font-size: 1em;"
+                    oninput="filterStocks()">
+            </div>
             <div class="pagination-controls-container"></div>
             <table>
                 <thead>
@@ -162,10 +298,32 @@
             <h2>Place Trade</h2>
             <div id="message"></div>
             <form onsubmit="placeTrade(event)">
-                <select id="stockSymbol" required>
+                <select id="stockSymbol" required onchange="updateCostCalculator()">
                     <option value="">Select Stock</option>
                 </select>
-                <input type="number" id="shares" placeholder="Shares" min="1" required>
+                <input type="number" id="shares" placeholder="Shares" min="1" required oninput="updateCostCalculator()">
+                
+                <div id="costCalculator" class="cost-calculator" style="display: none;">
+                    <div class="calc-row">
+                        <span>Share Price:</span>
+                        <span id="calcPrice">$0.00</span>
+                    </div>
+                    <div class="calc-row">
+                        <span>Shares:</span>
+                        <span id="calcShares">0</span>
+                    </div>
+                    <div class="calc-row">
+                        <span>Trading Fee:</span>
+                        <span id="calcFee">$0.00</span>
+                    </div>
+                    <div class="calc-row calc-total">
+                        <span>Total Cost:</span>
+                        <span id="calcTotal">$0.00</span>
+                    </div>
+                </div>
+                
+                <div id="affordabilityInfo" class="affordability-info" style="display: none;"></div>
+                
                 <button type="submit" name="action" value="buy" class="buy-btn">BUY</button>
                 <button type="button" onclick="placeTrade(event, 'sell')" class="sell-btn">SELL</button>
                 <button type="button" onclick="placeTrade(event, 'short')" class="sell-btn" style="background-color: #330033; border-color: #ff00ff; color: #ff00ff;">SHORT</button>
@@ -182,6 +340,218 @@
     <script>
         let stocks = [];
         let paginator;
+        let currentAccountData = null;
+        let tradingFee = 0;
+        
+        // Load account data for affordability calculations
+        async function loadAccountData() {
+            try {
+                const response = await fetch('/api/account');
+                if (!response.ok) {
+                    throw new Error('Failed to load account data');
+                }
+                currentAccountData = await response.json();
+                updateConcentrationDisplay();
+            } catch (error) {
+                console.error('Error loading account data:', error);
+                // Display warning to user
+                const affordInfo = document.getElementById('affordabilityInfo');
+                if (affordInfo) {
+                    affordInfo.style.display = 'block';
+                    affordInfo.className = 'affordability-info cannot-afford';
+                    affordInfo.innerHTML = '⚠ Unable to load account data. Please refresh the page.';
+                }
+            }
+        }
+        
+        // Update concentration display panel
+        function updateConcentrationDisplay() {
+            if (!currentAccountData) return;
+            
+            const panel = document.getElementById('concentrationPanel');
+            const concentrationsDiv = document.getElementById('currentConcentrations');
+            const portfolioMetrics = currentAccountData.portfolioMetrics || {};
+            const positionConcentrations = portfolioMetrics.positionConcentrations || {};
+            const maxConcentration = (currentAccountData.riskControls?.maxPositionSize || 0.30) * 100;
+            const warningThreshold = (currentAccountData.riskControls?.concentrationWarningThreshold || 0.20) * 100;
+            
+            // Update header info
+            document.getElementById('maxConcentration').textContent = `${maxConcentration.toFixed(0)}%`;
+            document.getElementById('currentPortfolioValue').textContent = 
+                `$${(portfolioMetrics.portfolioValue || 0).toFixed(2)}`;
+            
+            // Display current concentrations
+            const concentrationEntries = Object.entries(positionConcentrations);
+            
+            if (concentrationEntries.length > 0) {
+                panel.style.display = 'block';
+                
+                concentrationsDiv.innerHTML = `
+                    <div style="margin-bottom: 8px; color: #00aa00; font-weight: bold;">Current Holdings:</div>
+                    ${concentrationEntries.map(([symbol, data]) => {
+                        const percent = data.currentPercent || 0;
+                        let statusClass = '';
+                        let statusText = 'OK';
+                        
+                        if (data.limit) {
+                            statusClass = 'limit';
+                            statusText = 'AT LIMIT';
+                        } else if (data.warning) {
+                            statusClass = 'warning';
+                            statusText = 'WARNING';
+                        }
+                        
+                        return `
+                            <div class="concentration-stock ${statusClass}">
+                                <span style="min-width: 80px; font-weight: bold;">${symbol}</span>
+                                <div class="concentration-bar">
+                                    <div class="concentration-fill ${statusClass}" style="width: ${Math.min(percent, 100)}%">
+                                        <span class="concentration-percentage">${percent.toFixed(1)}%</span>
+                                    </div>
+                                </div>
+                                <span style="min-width: 80px; text-align: right;">${statusText}</span>
+                            </div>
+                        `;
+                    }).join('')}
+                    <div style="margin-top: 12px; padding: 8px; background-color: #001100; border: 1px solid #003300; font-size: 0.9em;">
+                        <div style="color: #00aa00;">💡 Concentration Rules:</div>
+                        <div style="color: #00cc00; margin-top: 4px;">• Maximum ${maxConcentration.toFixed(0)}% of portfolio in any single stock</div>
+                        <div style="color: #ffaa00; margin-top: 4px;">• Warning at ${warningThreshold.toFixed(0)}% concentration</div>
+                        <div style="color: #00cc00; margin-top: 4px;">• Helps diversify risk across multiple investments</div>
+                    </div>
+                `;
+            } else if (portfolioMetrics.portfolioValue > 0) {
+                panel.style.display = 'block';
+                concentrationsDiv.innerHTML = `
+                    <div style="padding: 12px; background-color: #001100; border: 1px solid #003300; color: #00aa00;">
+                        No stock positions yet. You can invest up to ${maxConcentration.toFixed(0)}% of your portfolio in any single stock.
+                    </div>
+                `;
+            } else {
+                panel.style.display = 'none';
+            }
+        }
+        
+        // Calculate trading fee based on game year
+        async function calculateTradingFee() {
+            try {
+                const timeResponse = await fetch('/api/time');
+                const timeData = await timeResponse.json();
+                const gameDate = new Date(timeData.currentTime);
+                const year = gameDate.getFullYear();
+                
+                if (year >= 2019) {
+                    tradingFee = 0;
+                } else if (year >= 2013) {
+                    tradingFee = 0.99;
+                } else if (year >= 2000) {
+                    tradingFee = 2.99;
+                } else if (year >= 1990) {
+                    tradingFee = 4.99;
+                } else if (year >= 1975) {
+                    tradingFee = 7.99;
+                } else {
+                    tradingFee = 9.99;
+                }
+            } catch (error) {
+                console.error('Error calculating trading fee:', error);
+                tradingFee = 0;
+            }
+        }
+        
+        // Update cost calculator when user changes stock or shares
+        function updateCostCalculator() {
+            const symbol = document.getElementById('stockSymbol').value;
+            const shares = parseInt(document.getElementById('shares').value) || 0;
+            
+            if (!symbol || shares <= 0) {
+                document.getElementById('costCalculator').style.display = 'none';
+                document.getElementById('affordabilityInfo').style.display = 'none';
+                return;
+            }
+            
+            // Find the stock price
+            const stock = stocks.find(s => s.symbol === symbol);
+            if (!stock) {
+                document.getElementById('costCalculator').style.display = 'none';
+                document.getElementById('affordabilityInfo').style.display = 'none';
+                return;
+            }
+            
+            const price = stock.price;
+            const subtotal = price * shares;
+            const totalCost = subtotal + tradingFee;
+            
+            // Update calculator display
+            document.getElementById('calcPrice').textContent = `$${price.toFixed(2)}`;
+            document.getElementById('calcShares').textContent = shares.toLocaleString();
+            document.getElementById('calcFee').textContent = `$${tradingFee.toFixed(2)}`;
+            document.getElementById('calcTotal').textContent = `$${totalCost.toFixed(2)}`;
+            document.getElementById('costCalculator').style.display = 'block';
+            
+            // Check affordability and concentration
+            if (currentAccountData) {
+                const cash = currentAccountData.cash || 0;
+                const canAfford = cash >= totalCost;
+                const maxShares = Math.floor((cash - tradingFee) / price);
+                const sharesAvailable = stock.sharesAvailable || 0;
+                const actualMaxShares = Math.min(maxShares, sharesAvailable);
+                
+                // Calculate concentration impact
+                const portfolioValue = currentAccountData.portfolioMetrics?.portfolioValue || 0;
+                const currentHolding = (currentAccountData.portfolio || {})[symbol] || 0;
+                const futureHolding = currentHolding + shares;
+                const futureValue = futureHolding * price;
+                const futurePortfolioValue = portfolioValue + totalCost;
+                const futureConcentration = futurePortfolioValue > 0 ? (futureValue / futurePortfolioValue) * 100 : 0;
+                const maxConcentration = ((currentAccountData.riskControls?.maxPositionSize || 0.30) * 100);
+                const warningConcentration = ((currentAccountData.riskControls?.concentrationWarningThreshold || 0.20) * 100);
+                
+                const affordInfo = document.getElementById('affordabilityInfo');
+                affordInfo.style.display = 'block';
+                
+                let messages = [];
+                let isError = false;
+                
+                // Check concentration limit
+                if (futureConcentration > maxConcentration && futurePortfolioValue > 0) {
+                    messages.push(`✗ Exceeds concentration limit: ${futureConcentration.toFixed(1)}% > ${maxConcentration.toFixed(0)}%`);
+                    messages.push(`Maximum allowed: ${maxConcentration.toFixed(0)}% of portfolio in single stock`);
+                    isError = true;
+                } else if (futureConcentration > warningConcentration && futurePortfolioValue > 0) {
+                    messages.push(`⚠ High concentration: ${futureConcentration.toFixed(1)}% of portfolio`);
+                    messages.push(`Warning threshold: ${warningConcentration.toFixed(0)}%`);
+                }
+                
+                // Check affordability
+                if (canAfford && shares <= sharesAvailable) {
+                    if (!isError) {
+                        messages.unshift(`✓ You can afford this purchase`);
+                    }
+                    messages.push(`Available Cash: $${cash.toFixed(2)}`);
+                    messages.push(`Max Shares: ${actualMaxShares.toLocaleString()} shares`);
+                    if (futurePortfolioValue > 0) {
+                        messages.push(`Concentration after purchase: ${futureConcentration.toFixed(1)}%`);
+                    }
+                } else if (!canAfford) {
+                    messages.unshift(`✗ Insufficient funds`);
+                    messages.push(`Available Cash: $${cash.toFixed(2)}`);
+                    messages.push(`Needed: $${totalCost.toFixed(2)}`);
+                    messages.push(`Short by: $${(totalCost - cash).toFixed(2)}`);
+                    messages.push(`Max you can buy: ${maxShares.toLocaleString()} shares`);
+                    isError = true;
+                } else {
+                    messages.unshift(`✗ Not enough shares available`);
+                    messages.push(`You requested: ${shares.toLocaleString()} shares`);
+                    messages.push(`Available: ${sharesAvailable.toLocaleString()} shares`);
+                    messages.push(`Reduce your order by: ${(shares - sharesAvailable).toLocaleString()} shares`);
+                    isError = true;
+                }
+                
+                affordInfo.className = isError ? 'affordability-info cannot-afford' : 'affordability-info can-afford';
+                affordInfo.innerHTML = messages.join('<br>');
+            }
+        }
         
         // Check for trade halts (called by interval)
         async function updateTradeHaltWarning() {
@@ -202,6 +572,7 @@
         function selectStock(symbol) {
             document.getElementById('stockSymbol').value = symbol;
             document.getElementById('shares').focus();
+            updateCostCalculator();
         }
         
         async function placeTrade(event, action) {
@@ -228,6 +599,9 @@
                     messageDiv.innerHTML = '';
                     messageDiv.appendChild(successDiv);
                     document.getElementById('shares').value = '';
+                    // Reload account data and recalculate
+                    loadAccountData();
+                    updateCostCalculator();
                 } else {
                     const errorDiv = document.createElement('div');
                     errorDiv.className = 'message error';
@@ -297,13 +671,27 @@
                 stockSelect.value = currentSelection;
             }
             
+            // Apply search filter if active
+            filterStocks();
+        }
+        
+        // Filter stocks based on search input
+        function filterStocks() {
+            const searchTerm = document.getElementById('stockSearch')?.value.toLowerCase() || '';
+            const filteredStocks = searchTerm 
+                ? stocks.filter(s => 
+                    s.symbol.toLowerCase().includes(searchTerm) || 
+                    s.name.toLowerCase().includes(searchTerm)
+                  )
+                : stocks;
+            
             // Preserve current page if paginator exists
             const currentPage = paginator ? paginator.currentPage : 1;
             
-            // Initialize paginator with new data
-            paginator = new Paginator(stocks, 20);
+            // Initialize paginator with filtered data
+            paginator = new Paginator(filteredStocks, 20);
             
-            // Restore the page number if it's still valid
+            // Try to restore the page number if it's still valid
             if (currentPage <= paginator.totalPages) {
                 paginator.currentPage = currentPage;
             }
@@ -311,35 +699,17 @@
             renderPage();
         }
         
-        // Apply era theme based on game time
-        async function updateEraTheme() {
-            const response = await fetch('/api/time');
-            const data = await response.json();
-            const gameDate = new Date(data.currentTime);
-            const year = gameDate.getFullYear();
-            applyEraTheme(year);
-        }
-        
-        // Initialize page with header
-        loadHeader('page-header', {
-            title: '📈 TRADING PLATFORM',
-            navigationLinks: [
-                { href: '/', text: '← Back to Portal' },
-                { href: '/bank', text: 'Bank' },
-                { href: '/loans', text: 'Loans' },
-                { href: '/news', text: 'News' },
-                { href: '/email', text: 'Email' }
-            ]
-        });
-        
+        // Initialize data
+        loadAccountData();
+        calculateTradingFee();
         updateStocks();
-        updateEraTheme();
         updateTradeHaltWarning();
         updateNavNotifications(); // Initial update
         setInterval(updateStocks, 2000);
-        setInterval(updateEraTheme, 10000);
         setInterval(updateTradeHaltWarning, 1000);
         setInterval(updateNavNotifications, 3000); // Update every 3 seconds
+        setInterval(loadAccountData, 5000); // Refresh account data
+        setInterval(calculateTradingFee, 60000); // Recalculate fee every minute
     </script>
 </body>
 </html>
