@@ -373,8 +373,17 @@
                 stockSelect.value = currentSelection;
             }
             
-            // Initialize paginator
+            // Preserve current page if paginator exists
+            const currentPage = paginator ? paginator.currentPage : 1;
+            
+            // Initialize paginator with new data
             paginator = new Paginator(stocks, 20);
+            
+            // Restore the page number if it's still valid
+            if (currentPage <= paginator.totalPages) {
+                paginator.currentPage = currentPage;
+            }
+            
             renderPage();
         }
         
@@ -389,8 +398,10 @@
         
         updateStocks();
         updateEraTheme();
+        updateNavNotifications(); // Initial update
         setInterval(updateStocks, 2000);
         setInterval(updateEraTheme, 10000);
+        setInterval(updateNavNotifications, 3000); // Update every 3 seconds
     </script>
 </body>
 </html>

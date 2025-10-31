@@ -116,6 +116,7 @@
             color: #00ff00;
             display: block;
             transition: all 0.3s;
+            position: relative;
         }
         .portal-link:hover {
             background-color: #003300;
@@ -127,6 +128,27 @@
         }
         .portal-link p {
             color: #00aa00;
+        }
+        .notification-badge {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background-color: #ff0000;
+            color: #fff;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 0.9em;
+            box-shadow: 0 0 10px #ff0000;
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.8; transform: scale(1.1); }
         }
     </style>
 </head>
@@ -164,13 +186,15 @@
                 <h2>📊 Market Graphs</h2>
                 <p>Charts and trends</p>
             </a>
-            <a href="/news" class="portal-link">
+            <a href="/news" class="portal-link" id="newsLink">
                 <h2>📰 News</h2>
                 <p>Historical events and market news</p>
+                <span id="newsBadge" class="notification-badge" style="display: none;">0</span>
             </a>
-            <a href="/email" class="portal-link">
+            <a href="/email" class="portal-link" id="emailLink">
                 <h2>📧 Email</h2>
                 <p>Messages and notifications</p>
+                <span id="emailBadge" class="notification-badge" style="display: none;">0</span>
             </a>
         </div>
     </div>
@@ -229,8 +253,52 @@
             updateTime();
         }
         
+        // Update notification badges
+        async function updateNotifications() {
+            try {
+                // Get current counts
+                const newsResponse = await fetch('/api/news');
+                const newsData = await newsResponse.json();
+                const newsCount = newsData.length;
+                
+                const emailResponse = await fetch('/api/emails');
+                const emailData = await emailResponse.json();
+                const emailCount = emailData.length;
+                
+                // Get last viewed counts from localStorage
+                const lastNewsCount = parseInt(localStorage.getItem('lastNewsCount') || '0');
+                const lastEmailCount = parseInt(localStorage.getItem('lastEmailCount') || '0');
+                
+                // Calculate new items
+                const newNewsCount = Math.max(0, newsCount - lastNewsCount);
+                const newEmailCount = Math.max(0, emailCount - lastEmailCount);
+                
+                // Update badges
+                const newsBadge = document.getElementById('newsBadge');
+                const emailBadge = document.getElementById('emailBadge');
+                
+                if (newNewsCount > 0) {
+                    newsBadge.textContent = newNewsCount > 99 ? '99+' : newNewsCount;
+                    newsBadge.style.display = 'flex';
+                } else {
+                    newsBadge.style.display = 'none';
+                }
+                
+                if (newEmailCount > 0) {
+                    emailBadge.textContent = newEmailCount > 99 ? '99+' : newEmailCount;
+                    emailBadge.style.display = 'flex';
+                } else {
+                    emailBadge.style.display = 'none';
+                }
+            } catch (error) {
+                console.error('Error updating notifications:', error);
+            }
+        }
+        
         updateTime();
+        updateNotifications();
         setInterval(updateTime, 1000);
+        setInterval(updateNotifications, 3000); // Check every 3 seconds
     </script>
     <script src="common.js"></script>
     <script>

@@ -124,3 +124,52 @@ function escapeHtml(text) {
     div.textContent = text;
     return div.innerHTML;
 }
+
+// Notification badge update function
+async function updateNavNotifications() {
+    try {
+        // Get current counts
+        const newsResponse = await fetch('/api/news');
+        const newsData = await newsResponse.json();
+        const newsCount = newsData.length;
+        
+        const emailResponse = await fetch('/api/emails');
+        const emailData = await emailResponse.json();
+        const emailCount = emailData.length;
+        
+        // Get last viewed counts from localStorage
+        const lastNewsCount = parseInt(localStorage.getItem('lastNewsCount') || '0');
+        const lastEmailCount = parseInt(localStorage.getItem('lastEmailCount') || '0');
+        
+        // Calculate new items
+        const newNewsCount = Math.max(0, newsCount - lastNewsCount);
+        const newEmailCount = Math.max(0, emailCount - lastEmailCount);
+        
+        // Update nav links with badges
+        const navLinks = document.querySelectorAll('.nav a');
+        navLinks.forEach(link => {
+            // Remove existing badges
+            const existingBadge = link.querySelector('.nav-badge');
+            if (existingBadge) {
+                existingBadge.remove();
+            }
+            
+            // Add badge if there are new items
+            if (link.href.includes('/news') && newNewsCount > 0) {
+                const badge = document.createElement('span');
+                badge.className = 'nav-badge';
+                badge.textContent = newNewsCount > 99 ? '99+' : newNewsCount;
+                badge.style.cssText = 'background-color: #ff0000; color: #fff; padding: 2px 6px; border-radius: 10px; font-size: 0.7em; margin-left: 5px; font-weight: bold;';
+                link.appendChild(badge);
+            } else if (link.href.includes('/email') && newEmailCount > 0) {
+                const badge = document.createElement('span');
+                badge.className = 'nav-badge';
+                badge.textContent = newEmailCount > 99 ? '99+' : newEmailCount;
+                badge.style.cssText = 'background-color: #ff0000; color: #fff; padding: 2px 6px; border-radius: 10px; font-size: 0.7em; margin-left: 5px; font-weight: bold;';
+                link.appendChild(badge);
+            }
+        });
+    } catch (error) {
+        console.error('Error updating nav notifications:', error);
+    }
+}

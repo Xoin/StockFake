@@ -173,6 +173,9 @@
             const response = await fetch('/api/news');
             allNews = await response.json();
             
+            // Update localStorage with current count (mark as viewed)
+            localStorage.setItem('lastNewsCount', allNews.length);
+            
             newsPaginator = new Paginator(allNews, 10);
             renderNewsPage();
         }
