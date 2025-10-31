@@ -19,7 +19,7 @@ class TemplateRenderer {
   loadTemplate(templateName) {
     const templatePath = path.join(this.templatesDir, `${templateName}.html`);
     
-    // Check cache in development mode we might want to disable caching
+    // Check cache. In development mode, we might want to disable caching.
     if (this.cache[templatePath]) {
       return this.cache[templatePath];
     }

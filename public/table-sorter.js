@@ -1,5 +1,5 @@
 /**
- * Table Sorting Utility
+ * Table Sorter Utility
  * Provides sortable table functionality with visual indicators
  */
 
@@ -227,6 +227,9 @@ class TableSorter {
  * Helper function to quickly add sorting to a table
  * @param {string} tableId - ID of the table element
  * @param {object} options - Sorting options
+ * @param {number[]} options.sortableColumns - Array of column indices to make sortable (empty = all columns)
+ * @param {object} options.defaultSort - Default sort state { column: number, direction: 'asc'|'desc' }
+ * @param {function} options.onSort - Callback function called after sorting (columnIndex, direction)
  * @returns {TableSorter} TableSorter instance
  */
 function makeSortable(tableId, options = {}) {
