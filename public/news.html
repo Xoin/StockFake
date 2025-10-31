@@ -184,7 +184,7 @@
             const movements = items.map(item => {
                 // Try to extract company name, symbol, and change percentage
                 const symbolMatch = item.match(/\(([A-Z]+)\)/);
-                const changeMatch = item.match(/(gained|gained|advanced|declined|lost|moved|up|down)\s+([\d.]+)%/i);
+                const changeMatch = item.match(/(gained|advanced|declined|lost|moved|up|down)\s+([\d.]+)%/i);
                 const upMatch = item.match(/(surges|surged|jump|jumped|rally|rallied|gains|gained|advanced)/i);
                 const downMatch = item.match(/(plunges|plunged|drop|dropped|decline|declined|losses|lost|tumbled)/i);
                 
@@ -196,7 +196,7 @@
                     const percentMatch = item.match(/([\d.]+)%/);
                     if (percentMatch) change = parseFloat(percentMatch[1]);
                 }
-                if (downMatch) {
+                if (downMatch && change === 0) {
                     const percentMatch = item.match(/([\d.]+)%/);
                     if (percentMatch) change = -parseFloat(percentMatch[1]);
                 }
@@ -232,7 +232,7 @@
             movements.forEach(m => {
                 const changeClass = m.change >= 0 ? 'positive-change' : 'negative-change';
                 const changeSymbol = m.change >= 0 ? '▲' : '▼';
-                const changeText = m.change !== 0 ? `${changeSymbol} ${Math.abs(m.change).toFixed(1)}%` : 'N/A';
+                const changeText = m.change !== 0 ? `${escapeHtml(changeSymbol)} ${Math.abs(m.change).toFixed(1)}%` : 'N/A';
                 
                 tableHtml += `
                     <tr>
