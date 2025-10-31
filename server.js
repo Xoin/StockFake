@@ -1141,7 +1141,7 @@ app.post('/api/trade', (req, res) => {
     }
     
     // Apply sale and deduct tax and fee
-    const grossSaleAmount = totalCost;
+    const grossSaleAmount = stockPrice.price * shares;  // Fixed: use actual sale proceeds
     const netSaleProceeds = grossSaleAmount - taxAmount - tradingFee;
     userAccount.cash += netSaleProceeds;
     userAccount.portfolio[symbol] -= shares;
@@ -1757,14 +1757,29 @@ app.post('/api/indexfunds/trade', (req, res) => {
       remainingShares -= sharesToSell;
     }
     
+    // Track which purchases were used in the sale for expense ratio calculation
+    const purchasesUsedInSale = [];
+    let remainingForExpense = shares;
+    
+    for (const purchase of holding.purchaseHistory) {
+      if (remainingForExpense <= 0) break;
+      
+      const sharesFromThisPurchase = Math.min(remainingForExpense, purchase.shares);
+      purchasesUsedInSale.push({
+        shares: sharesFromThisPurchase,
+        pricePerShare: purchase.pricePerShare,
+        date: purchase.date
+      });
+      remainingForExpense -= sharesFromThisPurchase;
+    }
+    
     // Update holding purchase history
     holding.purchaseHistory = purchases;
     
-    // Calculate expense ratio fee based on actual holding periods (FIFO)
+    // Calculate expense ratio fee based on actual holding periods for shares sold
     let totalExpenseFee = 0;
-    const soldPurchases = purchases.filter(p => p.shares === 0); // These were fully consumed in the sale
     
-    soldPurchases.forEach(purchase => {
+    purchasesUsedInSale.forEach(purchase => {
       const daysHeld = (gameTime - new Date(purchase.date)) / (1000 * 60 * 60 * 24);
       const dailyFeeRate = fund.expenseRatio / 365;
       const purchaseValue = purchase.shares * purchase.pricePerShare;
@@ -1779,12 +1794,11 @@ app.post('/api/indexfunds/trade', (req, res) => {
         amount: totalExpenseFee,
         description: `Expense ratio fee (${(fund.expenseRatio * 100).toFixed(2)}%) for ${fund.name}`
       });
-      taxAmount += totalExpenseFee; // Deduct from proceeds
     }
     
-    // Apply sale and deduct tax and fee
-    const grossSaleAmount = fundPrice * shares;  // Fixed: use actual sale proceeds
-    const netSaleProceeds = grossSaleAmount - taxAmount - tradingFee;
+    // Apply sale and deduct tax, fee, and expense ratio
+    const grossSaleAmount = fundPrice * shares;
+    const netSaleProceeds = grossSaleAmount - taxAmount - tradingFee - totalExpenseFee;
     userAccount.cash += netSaleProceeds;
     holding.shares -= shares;
     
