@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>StockFake - News</title>
+    <link rel="stylesheet" href="era-themes.css">
     <style>
         * {
             margin: 0;
@@ -90,9 +91,11 @@
         
         <div class="time-display" id="timeDisplay">Loading...</div>
         
+        <div id="paginationControls"></div>
         <div class="news-container" id="newsContainer">
             <div class="no-news">Loading news...</div>
         </div>
+        <div id="paginationControls"></div>
     </div>
     
     <script>
@@ -133,6 +136,61 @@
         updateTime();
         setInterval(updateNews, 5000);
         setInterval(updateTime, 1000);
+    </script>
+    <script src="common.js"></script>
+    <script>
+        let newsPaginator;
+        let allNews = [];
+        
+        async function renderNewsPage() {
+            if (!newsPaginator) return;
+            
+            const pageNews = newsPaginator.getCurrentPageItems();
+            const container = document.getElementById('newsContainer');
+            
+            if (pageNews.length === 0 && allNews.length === 0) {
+                container.innerHTML = '<div class="no-news">No news available yet. Major events will appear as time progresses.</div>';
+            } else if (pageNews.length === 0) {
+                container.innerHTML = '<div class="no-news">No items on this page.</div>';
+            } else {
+                container.innerHTML = pageNews.map(item => `
+                    <div class="news-item">
+                        <div class="news-date">${new Date(item.date).toLocaleDateString()}</div>
+                        <div class="news-headline">${escapeHtml(item.headline)}</div>
+                        <div class="news-body">${escapeHtml(item.body)}</div>
+                    </div>
+                `).join('');
+            }
+            
+            // Update pagination controls
+            const paginationDivs = document.querySelectorAll('#paginationControls');
+            paginationDivs.forEach(div => {
+                div.innerHTML = newsPaginator.renderControls();
+            });
+        }
+        
+        async function updateNews() {
+            const response = await fetch('/api/news');
+            allNews = await response.json();
+            
+            newsPaginator = new Paginator(allNews, 10);
+            renderNewsPage();
+        }
+        
+        async function updateEraTheme() {
+            const response = await fetch('/api/time');
+            const data = await response.json();
+            const gameDate = new Date(data.currentTime);
+            const year = gameDate.getFullYear();
+            applyEraTheme(year);
+        }
+        
+        updateNews();
+        updateTime();
+        updateEraTheme();
+        setInterval(updateNews, 5000);
+        setInterval(updateTime, 1000);
+        setInterval(updateEraTheme, 10000);
     </script>
 </body>
 </html>

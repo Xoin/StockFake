@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>StockFake - Trading Platform</title>
+    <link rel="stylesheet" href="era-themes.css">
     <style>
         * {
             margin: 0;
@@ -135,6 +136,7 @@
         
         <div class="stocks-container">
             <h2>Available Stocks</h2>
+            <div id="paginationControls"></div>
             <table>
                 <thead>
                     <tr>
@@ -149,6 +151,7 @@
                     <tr><td colspan="5">Loading...</td></tr>
                 </tbody>
             </table>
+            <div id="paginationControls"></div>
         </div>
         
         <div class="trade-form">
@@ -173,37 +176,7 @@
     
     <script>
         let stocks = [];
-        
-        // Helper function to escape HTML
-        function escapeHtml(text) {
-            const div = document.createElement('div');
-            div.textContent = text;
-            return div.innerHTML;
-        }
-        
-        async function updateStocks() {
-            const response = await fetch('/api/stocks');
-            stocks = await response.json();
-            
-            const stockSelect = document.getElementById('stockSymbol');
-            stockSelect.innerHTML = '<option value="">Select Stock</option>' + 
-                stocks.map(s => `<option value="${escapeHtml(s.symbol)}">${escapeHtml(s.symbol)} - ${escapeHtml(s.name)}</option>`).join('');
-            
-            const tbody = document.getElementById('stocksList');
-            tbody.innerHTML = stocks.map(stock => `
-                <tr>
-                    <td>${escapeHtml(stock.symbol)}</td>
-                    <td>${escapeHtml(stock.name)}</td>
-                    <td>$${stock.price.toFixed(2)}</td>
-                    <td class="${stock.change >= 0 ? 'positive' : 'negative'}">
-                        ${stock.change >= 0 ? '+' : ''}${stock.change.toFixed(2)}%
-                    </td>
-                    <td>
-                        <button onclick="selectStock('${escapeHtml(stock.symbol)}')" class="buy-btn">Trade</button>
-                    </td>
-                </tr>
-            `).join('');
-        }
+        let paginator;
         
         async function updateTime() {
             const response = await fetch('/api/time');
@@ -256,10 +229,63 @@
             }
         }
         
-        updateStocks();
         updateTime();
-        setInterval(updateStocks, 2000);
         setInterval(updateTime, 1000);
+    </script>
+    <script src="common.js"></script>
+    <script>
+        async function renderPage() {
+            if (!paginator) return;
+            
+            const pageStocks = paginator.getCurrentPageItems();
+            const tbody = document.getElementById('stocksList');
+            tbody.innerHTML = pageStocks.map(stock => `
+                <tr>
+                    <td>${escapeHtml(stock.symbol)}</td>
+                    <td>${escapeHtml(stock.name)}</td>
+                    <td>$${stock.price.toFixed(2)}</td>
+                    <td class="${stock.change >= 0 ? 'positive' : 'negative'}">
+                        ${stock.change >= 0 ? '+' : ''}${stock.change.toFixed(2)}%
+                    </td>
+                    <td>
+                        <button onclick="selectStock('${escapeHtml(stock.symbol)}')" class="buy-btn">Trade</button>
+                    </td>
+                </tr>
+            `).join('');
+            
+            // Add pagination controls
+            const paginationDivs = document.querySelectorAll('#paginationControls');
+            paginationDivs.forEach(div => {
+                div.innerHTML = paginator.renderControls();
+            });
+        }
+        
+        async function updateStocks() {
+            const response = await fetch('/api/stocks');
+            stocks = await response.json();
+            
+            const stockSelect = document.getElementById('stockSymbol');
+            stockSelect.innerHTML = '<option value="">Select Stock</option>' + 
+                stocks.map(s => `<option value="${escapeHtml(s.symbol)}">${escapeHtml(s.symbol)} - ${escapeHtml(s.name)}</option>`).join('');
+            
+            // Initialize paginator
+            paginator = new Paginator(stocks, 20);
+            renderPage();
+        }
+        
+        // Apply era theme based on game time
+        async function updateEraTheme() {
+            const response = await fetch('/api/time');
+            const data = await response.json();
+            const gameDate = new Date(data.currentTime);
+            const year = gameDate.getFullYear();
+            applyEraTheme(year);
+        }
+        
+        updateStocks();
+        updateEraTheme();
+        setInterval(updateStocks, 2000);
+        setInterval(updateEraTheme, 10000);
     </script>
 </body>
 </html>

@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>StockFake - Email</title>
+    <link rel="stylesheet" href="era-themes.css">
     <style>
         * {
             margin: 0;
@@ -117,9 +118,11 @@
             <a href="/news">News</a>
         </div>
         
+        <div id="paginationControls"></div>
         <div class="email-container" id="emailContainer">
             <div class="no-emails">Loading emails...</div>
         </div>
+        <div id="paginationControls"></div>
     </div>
     
     <script>
@@ -159,6 +162,72 @@
         
         updateEmails();
         setInterval(updateEmails, 5000);
+    </script>
+    <script src="common.js"></script>
+    <script>
+        let emailPaginator;
+        let allEmails = [];
+        let currentExpandedEmail = null;
+        
+        async function renderEmailPage() {
+            if (!emailPaginator) return;
+            
+            const pageEmails = emailPaginator.getCurrentPageItems();
+            const container = document.getElementById('emailContainer');
+            
+            if (pageEmails.length === 0 && allEmails.length === 0) {
+                container.innerHTML = '<div class="no-emails">No emails yet.</div>';
+            } else if (pageEmails.length === 0) {
+                container.innerHTML = '<div class="no-emails">No items on this page.</div>';
+            } else {
+                const startIndex = (emailPaginator.currentPage - 1) * emailPaginator.itemsPerPage;
+                container.innerHTML = pageEmails.map((email, relativeIndex) => {
+                    const index = startIndex + relativeIndex;
+                    return `
+                        <div class="email-item ${email.spam ? 'spam' : ''}" onclick="toggleEmail(${index})">
+                            <div class="email-header">
+                                <div class="email-from">From: ${escapeHtml(email.from)}${email.spam ? '<span class="spam-badge">SPAM</span>' : ''}</div>
+                                <div class="email-date">${new Date(email.date).toLocaleString()}</div>
+                            </div>
+                            <div class="email-subject">${escapeHtml(email.subject)}</div>
+                            <div class="email-body" id="email-body-${index}">${escapeHtml(email.body)}</div>
+                        </div>
+                    `;
+                }).join('');
+            }
+            
+            // Update pagination controls
+            const paginationDivs = document.querySelectorAll('#paginationControls');
+            paginationDivs.forEach(div => {
+                div.innerHTML = emailPaginator.renderControls();
+            });
+        }
+        
+        function toggleEmail(index) {
+            const emailItem = document.getElementById(`email-body-${index}`).parentElement;
+            emailItem.classList.toggle('expanded');
+        }
+        
+        async function updateEmails() {
+            const response = await fetch('/api/emails');
+            allEmails = await response.json();
+            
+            emailPaginator = new Paginator(allEmails, 15);
+            renderEmailPage();
+        }
+        
+        async function updateEraTheme() {
+            const response = await fetch('/api/time');
+            const data = await response.json();
+            const gameDate = new Date(data.currentTime);
+            const year = gameDate.getFullYear();
+            applyEraTheme(year);
+        }
+        
+        updateEmails();
+        updateEraTheme();
+        setInterval(updateEmails, 5000);
+        setInterval(updateEraTheme, 10000);
     </script>
 </body>
 </html>
