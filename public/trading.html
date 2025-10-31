@@ -223,10 +223,18 @@
                 const messageDiv = document.getElementById('message');
                 
                 if (response.ok) {
-                    messageDiv.innerHTML = `<div class="message success">Trade successful! ${tradeAction.toUpperCase()} ${shares} shares of ${symbol}</div>`;
+                    const successDiv = document.createElement('div');
+                    successDiv.className = 'message success';
+                    successDiv.textContent = `Trade successful! ${tradeAction.toUpperCase()} ${shares} shares of ${symbol}`;
+                    messageDiv.innerHTML = '';
+                    messageDiv.appendChild(successDiv);
                     document.getElementById('shares').value = '';
                 } else {
-                    messageDiv.innerHTML = `<div class="message error">Error: ${data.error}</div>`;
+                    const errorDiv = document.createElement('div');
+                    errorDiv.className = 'message error';
+                    errorDiv.textContent = `Error: ${data.error}`;
+                    messageDiv.innerHTML = '';
+                    messageDiv.appendChild(errorDiv);
                 }
                 
                 setTimeout(() => messageDiv.innerHTML = '', 5000);
