@@ -84,6 +84,7 @@
         .news-body {
             color: #00cc00;
             line-height: 1.5;
+            white-space: pre-wrap;
         }
         .no-news {
             text-align: center;
@@ -184,12 +185,12 @@
             // Merge dynamic news items by date
             dynamicNewsByDate.forEach((items, dateKey) => {
                 if (items.length > 1) {
-                    // Create merged news item
+                    // Create merged news item with formatted list
                     const mergedItem = {
                         id: items[0].id, // Use first ID
                         date: items[0].date,
                         headline: 'Market Update: Multiple Stock Movements',
-                        body: items.map(item => item.body).join(' | ')
+                        body: items.map((item, idx) => `${idx + 1}. ${item.body}`).join('\n')
                     };
                     newsById.set(mergedItem.id, mergedItem);
                 } else {

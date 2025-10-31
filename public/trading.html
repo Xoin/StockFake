@@ -175,6 +175,11 @@
         
         <div class="stocks-container">
             <h2>Available Stocks</h2>
+            <div style="margin-bottom: 15px;">
+                <input type="text" id="stockSearch" placeholder="Search stocks by symbol or name..." 
+                    style="width: 100%; max-width: 400px; padding: 10px; font-size: 1em;"
+                    oninput="filterStocks()">
+            </div>
             <div class="pagination-controls-container"></div>
             <table>
                 <thead>
@@ -478,13 +483,27 @@
                 stockSelect.value = currentSelection;
             }
             
+            // Apply search filter if active
+            filterStocks();
+        }
+        
+        // Filter stocks based on search input
+        function filterStocks() {
+            const searchTerm = document.getElementById('stockSearch')?.value.toLowerCase() || '';
+            const filteredStocks = searchTerm 
+                ? stocks.filter(s => 
+                    s.symbol.toLowerCase().includes(searchTerm) || 
+                    s.name.toLowerCase().includes(searchTerm)
+                  )
+                : stocks;
+            
             // Preserve current page if paginator exists
             const currentPage = paginator ? paginator.currentPage : 1;
             
-            // Initialize paginator with new data
-            paginator = new Paginator(stocks, 20);
+            // Initialize paginator with filtered data
+            paginator = new Paginator(filteredStocks, 20);
             
-            // Restore the page number if it's still valid
+            // Try to restore the page number if it's still valid
             if (currentPage <= paginator.totalPages) {
                 paginator.currentPage = currentPage;
             }

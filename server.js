@@ -19,7 +19,7 @@ app.use(express.static('public'));
 
 // Game state
 let gameTime = new Date('1970-01-01T09:30:00'); // Start at market open
-let isPaused = false;
+let isPaused = true; // Start paused so player can review the game
 let timeMultiplier = 3600; // 1 real second = 1 game hour by default
 
 // Stock market hours (NYSE)

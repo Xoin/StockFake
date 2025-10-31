@@ -197,6 +197,11 @@
         
         <div class="funds-container">
             <h2>Available Index Funds</h2>
+            <div style="margin-bottom: 15px;">
+                <input type="text" id="fundSearch" placeholder="Search funds by symbol or name..." 
+                    style="width: 100%; max-width: 400px; padding: 10px; font-size: 1em;"
+                    oninput="filterFunds()">
+            </div>
             <table id="fundsTable">
                 <thead>
                     <tr>
@@ -265,35 +270,56 @@
         let currentAccountData = null;
         let currentPrice = 0;
         let tradingFee = 0;
+        let allFunds = [];
         
         async function loadFunds() {
             try {
                 const response = await fetch('/api/indexfunds');
-                const funds = await response.json();
+                allFunds = await response.json();
                 
-                const tbody = document.getElementById('fundsBody');
-                if (funds.length === 0) {
-                    tbody.innerHTML = '<tr><td colspan="6" style="text-align: center;">No index funds available yet. They will become available as time progresses.</td></tr>';
-                } else {
-                    tbody.innerHTML = funds.map(fund => `
-                        <tr>
-                            <td><strong>${escapeHtml(fund.symbol)}</strong></td>
-                            <td>${escapeHtml(fund.name)}</td>
-                            <td>$${fund.price.toFixed(2)}</td>
-                            <td class="${fund.change >= 0 ? 'positive' : 'negative'}">
-                                ${fund.change >= 0 ? '+' : ''}${fund.change.toFixed(2)}%
-                            </td>
-                            <td>${fund.expenseRatio.toFixed(2)}%</td>
-                            <td>
-                                <button class="buy-btn" onclick="openTrade('${escapeHtml(fund.symbol)}', 'buy')">Buy</button>
-                                <button class="sell-btn" onclick="openTrade('${escapeHtml(fund.symbol)}', 'sell')">Sell</button>
-                            </td>
-                        </tr>
-                    `).join('');
-                }
+                filterFunds();
             } catch (error) {
                 console.error('Error loading funds:', error);
-                document.getElementById('fundsBody').innerHTML = '<tr><td colspan="6" style="text-align: center; color: #ff0000;">Error loading index funds</td></tr>';
+                const tbody = document.getElementById('fundsBody');
+                if (tbody) {
+                    tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: #ff0000;">Error loading index funds. Please check console for details.</td></tr>';
+                }
+            }
+        }
+        
+        // Filter funds based on search input
+        function filterFunds() {
+            const searchTerm = document.getElementById('fundSearch')?.value.toLowerCase() || '';
+            const filteredFunds = searchTerm 
+                ? allFunds.filter(f => 
+                    f.symbol.toLowerCase().includes(searchTerm) || 
+                    f.name.toLowerCase().includes(searchTerm)
+                  )
+                : allFunds;
+            
+            const tbody = document.getElementById('fundsBody');
+            if (!tbody) return;
+            
+            if (filteredFunds.length === 0 && allFunds.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" style="text-align: center;">No index funds available yet. They will become available as time progresses.</td></tr>';
+            } else if (filteredFunds.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" style="text-align: center;">No funds match your search.</td></tr>';
+            } else {
+                tbody.innerHTML = filteredFunds.map(fund => `
+                    <tr>
+                        <td><strong>${escapeHtml(fund.symbol)}</strong></td>
+                        <td>${escapeHtml(fund.name)}</td>
+                        <td>$${fund.price.toFixed(2)}</td>
+                        <td class="${fund.change >= 0 ? 'positive' : 'negative'}">
+                            ${fund.change >= 0 ? '+' : ''}${fund.change.toFixed(2)}%
+                        </td>
+                        <td>${fund.expenseRatio.toFixed(2)}%</td>
+                        <td>
+                            <button class="buy-btn" onclick="openTrade('${escapeHtml(fund.symbol)}', 'buy')">Buy</button>
+                            <button class="sell-btn" onclick="openTrade('${escapeHtml(fund.symbol)}', 'sell')">Sell</button>
+                        </td>
+                    </tr>
+                `).join('');
             }
         }
         
