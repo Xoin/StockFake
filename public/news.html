@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>StockFake - News</title>
     <link rel="stylesheet" href="era-themes.css">
+    <script src="header.js"></script>
     <style>
         * {
             margin: 0;
@@ -95,15 +96,8 @@
 </head>
 <body>
     <div class="container">
-        <h1>📰 HISTORICAL NEWS</h1>
-        <div class="nav">
-            <a href="/">← Back to Portal</a> |
-            <a href="/trading">Trading</a> |
-            <a href="/bank">Bank</a> |
-            <a href="/email">Email</a>
-        </div>
-        
-        <div class="time-display" id="timeDisplay">Loading...</div>
+        <!-- Shared header component - auto-loads via header.js -->
+        <div id="shared-header" data-title="📰 HISTORICAL NEWS"></div>
         
         <div class="pagination-controls-container"></div>
         <div class="news-container" id="newsContainer">
@@ -207,27 +201,8 @@
             renderNewsPage();
         }
         
-        async function updateTime() {
-            const response = await fetch('/api/time');
-            const data = await response.json();
-            const date = new Date(data.currentTime);
-            document.getElementById('timeDisplay').textContent = `Current Game Time: ${date.toLocaleString()}`;
-        }
-        
-        async function updateEraTheme() {
-            const response = await fetch('/api/time');
-            const data = await response.json();
-            const gameDate = new Date(data.currentTime);
-            const year = gameDate.getFullYear();
-            applyEraTheme(year);
-        }
-        
         updateNews();
-        updateTime();
-        updateEraTheme();
         setInterval(updateNews, 5000);
-        setInterval(updateTime, 1000);
-        setInterval(updateEraTheme, 10000);
     </script>
 </body>
 </html>

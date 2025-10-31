@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>StockFake - Trading Platform</title>
     <link rel="stylesheet" href="era-themes.css">
+    <script src="header.js"></script>
     <style>
         * {
             margin: 0;
@@ -167,9 +168,8 @@
 </head>
 <body>
     <div class="container">
-        <h1>📈 TRADING PLATFORM</h1>
-        <!-- Header will be loaded here -->
-        <div id="page-header"></div>
+        <!-- Shared header component -->
+        <div id="shared-header" data-title="📈 TRADING PLATFORM"></div>
         
         <div id="haltWarning" class="halt-warning" style="display: none;"></div>
         
@@ -511,36 +511,13 @@
             renderPage();
         }
         
-        // Apply era theme based on game time
-        async function updateEraTheme() {
-            const response = await fetch('/api/time');
-            const data = await response.json();
-            const gameDate = new Date(data.currentTime);
-            const year = gameDate.getFullYear();
-            applyEraTheme(year);
-        }
-        
-        // Initialize page with header
-        loadHeader('page-header', {
-            title: '📈 TRADING PLATFORM',
-            navigationLinks: [
-                { href: '/', text: '← Back to Portal' },
-                { href: '/bank', text: 'Bank' },
-                { href: '/loans', text: 'Loans' },
-                { href: '/news', text: 'News' },
-                { href: '/email', text: 'Email' }
-            ]
-        });
-        
         // Initialize data
         loadAccountData();
         calculateTradingFee();
         updateStocks();
-        updateEraTheme();
         updateTradeHaltWarning();
         updateNavNotifications(); // Initial update
         setInterval(updateStocks, 2000);
-        setInterval(updateEraTheme, 10000);
         setInterval(updateTradeHaltWarning, 1000);
         setInterval(updateNavNotifications, 3000); // Update every 3 seconds
         setInterval(loadAccountData, 5000); // Refresh account data

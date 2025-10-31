@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>StockFake - Index Funds</title>
     <link rel="stylesheet" href="era-themes.css">
+    <script src="header.js"></script>
     <style>
         * {
             margin: 0;
@@ -184,16 +185,8 @@
 </head>
 <body>
     <div class="container">
-        <h1>📊 INDEX FUNDS</h1>
-        <div class="nav">
-            <a href="/">← Back to Portal</a> |
-            <a href="/trading">Stocks</a> |
-            <a href="/bank">Bank</a> |
-            <a href="/loans">Loans</a> |
-            <a href="/news">News</a>
-        </div>
-        
-        <div class="time-display" id="timeDisplay">Loading...</div>
+        <!-- Shared header component -->
+        <div id="shared-header" data-title="📊 INDEX FUNDS"></div>
         
         <div class="funds-container">
             <h2>Available Index Funds</h2>
@@ -488,31 +481,10 @@
             selectedFund = null;
         }
         
-        async function updateTime() {
-            const response = await fetch('/api/time');
-            const data = await response.json();
-            const date = new Date(data.currentTime);
-            const status = data.isMarketOpen ? '🟢 MARKET OPEN' : '🔴 MARKET CLOSED';
-            document.getElementById('timeDisplay').textContent = `${date.toLocaleString()} - ${status}`;
-        }
-        
-        async function updateEraTheme() {
-            const response = await fetch('/api/time');
-            const data = await response.json();
-            const gameDate = new Date(data.currentTime);
-            const year = gameDate.getFullYear();
-            applyEraTheme(year);
-        }
-        
         // Initialize
         loadFunds();
         loadAccountData();
-        updateTime();
-        updateEraTheme();
-        
         setInterval(loadFunds, 10000);
-        setInterval(updateTime, 1000);
-        setInterval(updateEraTheme, 10000);
     </script>
 </body>
 </html>

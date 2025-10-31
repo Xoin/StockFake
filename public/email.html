@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>StockFake - Email</title>
     <link rel="stylesheet" href="era-themes.css">
+    <script src="header.js"></script>
     <style>
         * {
             margin: 0;
@@ -222,18 +223,8 @@
             // If emails haven't changed, don't re-render to preserve expanded state
         }
         
-        async function updateEraTheme() {
-            const response = await fetch('/api/time');
-            const data = await response.json();
-            const gameDate = new Date(data.currentTime);
-            const year = gameDate.getFullYear();
-            applyEraTheme(year);
-        }
-        
         updateEmails();
-        updateEraTheme();
         setInterval(updateEmails, 5000);
-        setInterval(updateEraTheme, 10000);
     </script>
 </body>
 </html>
