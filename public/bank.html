@@ -92,6 +92,12 @@
             <div class="balance">
                 Cash Balance: $<span id="cashBalance">0.00</span>
             </div>
+            <div class="balance" style="font-size: 1em; margin: 10px 0;">
+                Purchasing Power (1970 dollars): $<span id="realValue">0.00</span>
+            </div>
+            <div style="text-align: center; color: #00aa00; margin: 10px 0;">
+                Inflation Rate: <span id="inflationRate">0</span>% | Cumulative: <span id="cumulativeInflation">1.0</span>x
+            </div>
         </div>
         
         <div class="portfolio">
@@ -103,10 +109,11 @@
                         <th>Shares</th>
                         <th>Current Price</th>
                         <th>Total Value</th>
+                        <th>Influence</th>
                     </tr>
                 </thead>
                 <tbody id="portfolioList">
-                    <tr><td colspan="4">Loading...</td></tr>
+                    <tr><td colspan="5">Loading...</td></tr>
                 </tbody>
             </table>
             <div class="total-value">
@@ -115,6 +122,24 @@
             <div class="total-value">
                 Total Account Value: $<span id="totalValue">0.00</span>
             </div>
+        </div>
+        
+        <div class="portfolio" id="shortPositionsSection" style="display: none;">
+            <h2>Short Positions</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Symbol</th>
+                        <th>Shares</th>
+                        <th>Borrow Price</th>
+                        <th>Current Price</th>
+                        <th>P&L</th>
+                    </tr>
+                </thead>
+                <tbody id="shortPositionsList">
+                    <tr><td colspan="5">No short positions</td></tr>
+                </tbody>
+            </table>
         </div>
         
         <div class="portfolio">
@@ -127,12 +152,13 @@
                         <th>Symbol</th>
                         <th>Shares</th>
                         <th>Price</th>
+                        <th>Fee</th>
                         <th>Tax</th>
                         <th>Total</th>
                     </tr>
                 </thead>
                 <tbody id="transactionsList">
-                    <tr><td colspan="7">No transactions</td></tr>
+                    <tr><td colspan="8">No transactions</td></tr>
                 </tbody>
             </table>
         </div>
@@ -151,6 +177,23 @@
                 </thead>
                 <tbody id="dividendsList">
                     <tr><td colspan="5">No dividends yet</td></tr>
+                </tbody>
+            </table>
+        </div>
+        
+        <div class="portfolio">
+            <h2>Fees & Costs</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Type</th>
+                        <th>Amount</th>
+                        <th>Description</th>
+                    </tr>
+                </thead>
+                <tbody id="feesList">
+                    <tr><td colspan="4">No fees charged</td></tr>
                 </tbody>
             </table>
         </div>
@@ -174,11 +217,18 @@
             
             document.getElementById('cashBalance').textContent = account.cash.toFixed(2);
             
+            // Update inflation data
+            if (account.inflationData) {
+                document.getElementById('realValue').textContent = account.inflationData.realValue.toFixed(2);
+                document.getElementById('inflationRate').textContent = account.inflationData.currentRate.toFixed(1);
+                document.getElementById('cumulativeInflation').textContent = account.inflationData.cumulativeInflation.toFixed(2);
+            }
+            
             const portfolioList = document.getElementById('portfolioList');
             let portfolioValue = 0;
             
             if (Object.keys(account.portfolio).length === 0) {
-                portfolioList.innerHTML = '<tr><td colspan="4">No stocks owned</td></tr>';
+                portfolioList.innerHTML = '<tr><td colspan="5">No stocks owned</td></tr>';
             } else {
                 portfolioList.innerHTML = Object.entries(account.portfolio)
                     .filter(([_, shares]) => shares > 0)
@@ -187,6 +237,7 @@
                         const currentPrice = stock ? stock.price : 0;
                         const value = shares * currentPrice;
                         portfolioValue += value;
+                        const influence = account.shareholderInfluence[symbol] || 0;
                         
                         return `
                             <tr>
@@ -194,6 +245,7 @@
                                 <td>${shares}</td>
                                 <td>$${currentPrice.toFixed(2)}</td>
                                 <td>$${value.toFixed(2)}</td>
+                                <td>${influence} votes</td>
                             </tr>
                         `;
                     }).join('');
@@ -202,10 +254,37 @@
             document.getElementById('portfolioValue').textContent = portfolioValue.toFixed(2);
             document.getElementById('totalValue').textContent = (account.cash + portfolioValue).toFixed(2);
             
+            // Update short positions
+            const shortPositionsSection = document.getElementById('shortPositionsSection');
+            const shortPositionsList = document.getElementById('shortPositionsList');
+            if (account.shortPositions && Object.keys(account.shortPositions).length > 0) {
+                shortPositionsSection.style.display = 'block';
+                shortPositionsList.innerHTML = Object.entries(account.shortPositions)
+                    .filter(([_, position]) => position.shares > 0)
+                    .map(([symbol, position]) => {
+                        const stock = stocks.find(s => s.symbol === symbol);
+                        const currentPrice = stock ? stock.price : 0;
+                        const pnl = (position.borrowPrice - currentPrice) * position.shares;
+                        const pnlClass = pnl >= 0 ? 'positive' : 'negative';
+                        
+                        return `
+                            <tr>
+                                <td>${symbol}</td>
+                                <td>${position.shares}</td>
+                                <td>$${position.borrowPrice.toFixed(2)}</td>
+                                <td>$${currentPrice.toFixed(2)}</td>
+                                <td class="${pnlClass}">$${pnl.toFixed(2)}</td>
+                            </tr>
+                        `;
+                    }).join('');
+            } else {
+                shortPositionsSection.style.display = 'none';
+            }
+            
             // Update transactions list
             const transactionsList = document.getElementById('transactionsList');
             if (!account.transactions || account.transactions.length === 0) {
-                transactionsList.innerHTML = '<tr><td colspan="7">No transactions</td></tr>';
+                transactionsList.innerHTML = '<tr><td colspan="8">No transactions</td></tr>';
             } else {
                 transactionsList.innerHTML = account.transactions.slice().reverse().map(tx => `
                     <tr>
@@ -214,6 +293,7 @@
                         <td>${escapeHtml(tx.symbol)}</td>
                         <td>${tx.shares}</td>
                         <td>$${tx.pricePerShare.toFixed(2)}</td>
+                        <td>${tx.tradingFee ? '$' + tx.tradingFee.toFixed(2) : '-'}</td>
                         <td>${tx.tax ? '$' + tx.tax.toFixed(2) : '-'}</td>
                         <td>$${(tx.netProceeds || tx.total).toFixed(2)}</td>
                     </tr>
@@ -232,6 +312,21 @@
                         <td>$${div.grossAmount.toFixed(2)}</td>
                         <td>$${div.tax.toFixed(2)}</td>
                         <td>$${div.netAmount.toFixed(2)}</td>
+                    </tr>
+                `).join('');
+            }
+            
+            // Update fees list
+            const feesList = document.getElementById('feesList');
+            if (!account.fees || account.fees.length === 0) {
+                feesList.innerHTML = '<tr><td colspan="4">No fees charged</td></tr>';
+            } else {
+                feesList.innerHTML = account.fees.slice().reverse().map(fee => `
+                    <tr>
+                        <td>${new Date(fee.date).toLocaleDateString()}</td>
+                        <td>${escapeHtml(fee.type)}</td>
+                        <td>$${fee.amount.toFixed(2)}</td>
+                        <td>${escapeHtml(fee.description)}</td>
                     </tr>
                 `).join('');
             }
