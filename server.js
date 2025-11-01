@@ -108,7 +108,7 @@ function processPendingOrders() {
         if (!fund) {
           errorMessage = 'Index fund not found';
         } else {
-          const fundPrice = indexFunds.calculateIndexPrice(fund, gameTime, timeMultiplier);
+          const fundPrice = indexFunds.calculateIndexPrice(fund, gameTime, timeMultiplier, isPaused);
           if (!fundPrice) {
             errorMessage = 'Unable to calculate fund price';
           } else {
@@ -2695,14 +2695,14 @@ app.post('/api/margin/calculate', (req, res) => {
 
 // Get all available index funds
 app.get('/api/indexfunds', (req, res) => {
-  const availableFunds = indexFunds.getAvailableIndexFunds(gameTime, timeMultiplier);
+  const availableFunds = indexFunds.getAvailableIndexFunds(gameTime, timeMultiplier, isPaused);
   res.json(availableFunds);
 });
 
 // Get specific index fund details
 app.get('/api/indexfunds/:symbol', (req, res) => {
   const { symbol } = req.params;
-  const fundDetails = indexFunds.getIndexFundDetails(symbol, gameTime, timeMultiplier);
+  const fundDetails = indexFunds.getIndexFundDetails(symbol, gameTime, timeMultiplier, isPaused);
   
   if (!fundDetails) {
     return res.status(404).json({ error: 'Index fund not found or not available yet' });
@@ -2717,7 +2717,7 @@ app.get('/api/indexfunds/:symbol/history', (req, res) => {
   const { days } = req.query;
   
   const daysToFetch = parseInt(days) || 30;
-  const history = indexFunds.getIndexFundHistory(symbol, gameTime, daysToFetch, timeMultiplier);
+  const history = indexFunds.getIndexFundHistory(symbol, gameTime, daysToFetch, timeMultiplier, false);
   
   res.json(history);
 });
@@ -2777,7 +2777,7 @@ app.post('/api/indexfunds/trade', (req, res) => {
     return res.status(400).json({ error: 'This index fund is not available yet' });
   }
   
-  const fundPrice = indexFunds.calculateIndexPrice(fund, gameTime, timeMultiplier);
+  const fundPrice = indexFunds.calculateIndexPrice(fund, gameTime, timeMultiplier, isPaused);
   if (!fundPrice) {
     return res.status(404).json({ error: 'Unable to calculate fund price' });
   }
