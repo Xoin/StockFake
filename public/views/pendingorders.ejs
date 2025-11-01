@@ -1,0 +1,246 @@
+<%- include('partials/header', { 
+    title: 'Pending Orders',
+    pageTitle: '📋 PENDING ORDERS',
+    pageStyles: `
+        .orders-container {
+            background-color: #000;
+            border: 2px solid #00ff00;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        .orders-info {
+            background-color: #001100;
+            border: 1px solid #003300;
+            padding: 15px;
+            margin-bottom: 20px;
+            color: #00aa00;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th, td {
+            padding: 10px;
+            text-align: left;
+            border-bottom: 1px solid #003300;
+        }
+        th {
+            background-color: #003300;
+        }
+        tr:hover {
+            background-color: #002200;
+        }
+        .status-pending {
+            color: #ffaa00;
+        }
+        .status-executed {
+            color: #00ff00;
+        }
+        .status-failed {
+            color: #ff0000;
+        }
+        .status-cancelled {
+            color: #888888;
+        }
+        .action-buy {
+            color: #00ff00;
+        }
+        .action-sell {
+            color: #ff8800;
+        }
+        .cancel-btn {
+            background-color: #330000;
+            border: 1px solid #ff0000;
+            color: #ff0000;
+            padding: 5px 10px;
+            cursor: pointer;
+            font-family: 'Courier New', monospace;
+            font-size: 0.85em;
+        }
+        .cancel-btn:hover {
+            background-color: #ff0000;
+            color: #000;
+        }
+        .cancel-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        .no-orders {
+            text-align: center;
+            padding: 30px;
+            color: #00aa00;
+        }
+    `
+}) %>
+
+        <div class="orders-info">
+            <h3>ℹ️ About Pending Orders</h3>
+            <p>Pending orders are trades that are waiting to be executed when the market opens. Orders placed when the market is closed will be automatically executed at the next market open.</p>
+            <p>• Pending orders can be cancelled before execution<br>
+            • Orders are executed at the opening price when market opens<br>
+            • You can view execution history for completed orders</p>
+        </div>
+
+        <div class="orders-container">
+            <h2>Active Pending Orders</h2>
+            <table id="pendingOrdersTable">
+                <thead>
+                    <tr>
+                        <th>Order ID</th>
+                        <th>Symbol</th>
+                        <th>Type</th>
+                        <th>Action</th>
+                        <th>Shares</th>
+                        <th>Status</th>
+                        <th>Created</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="pendingOrdersList">
+                    <tr><td colspan="8" class="no-orders">Loading...</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="orders-container">
+            <h2>Order History</h2>
+            <table id="historyOrdersTable">
+                <thead>
+                    <tr>
+                        <th>Order ID</th>
+                        <th>Symbol</th>
+                        <th>Type</th>
+                        <th>Action</th>
+                        <th>Shares</th>
+                        <th>Status</th>
+                        <th>Execution Price</th>
+                        <th>Created</th>
+                        <th>Executed</th>
+                    </tr>
+                </thead>
+                <tbody id="historyOrdersList">
+                    <tr><td colspan="9" class="no-orders">No order history</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+<%- include('partials/footer', {
+    pageScripts: `
+    <script>
+        let ordersSorter;
+        let historySorter;
+
+        async function loadOrders() {
+            try {
+                const response = await fetch('/api/pendingorders');
+                const orders = await response.json();
+                
+                const pending = orders.filter(o => o.status === 'pending');
+                const history = orders.filter(o => o.status !== 'pending');
+                
+                renderPendingOrders(pending);
+                renderOrderHistory(history);
+            } catch (error) {
+                console.error('Error loading orders:', error);
+            }
+        }
+        
+        function renderPendingOrders(orders) {
+            const tbody = document.getElementById('pendingOrdersList');
+            
+            if (orders.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="8" class="no-orders">No pending orders</td></tr>';
+                return;
+            }
+            
+            tbody.innerHTML = orders.map(order => \`
+                <tr>
+                    <td>#\${order.id}</td>
+                    <td><strong>\${escapeHtml(order.symbol)}</strong></td>
+                    <td>\${escapeHtml(order.orderType)}</td>
+                    <td class="action-\${order.action}">\${escapeHtml(order.action.toUpperCase())}</td>
+                    <td>\${order.shares}</td>
+                    <td class="status-\${order.status}">\${escapeHtml(order.status.toUpperCase())}</td>
+                    <td>\${new Date(order.createdAt).toLocaleString()}</td>
+                    <td>
+                        <button class="cancel-btn" onclick="cancelOrder(\${order.id})">Cancel</button>
+                    </td>
+                </tr>
+            \`).join('');
+            
+            if (!ordersSorter) {
+                ordersSorter = makeSortable('pendingOrdersTable');
+            } else {
+                ordersSorter.refresh();
+            }
+        }
+        
+        function renderOrderHistory(orders) {
+            const tbody = document.getElementById('historyOrdersList');
+            
+            if (orders.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="9" class="no-orders">No order history</td></tr>';
+                return;
+            }
+            
+            tbody.innerHTML = orders.map(order => \`
+                <tr>
+                    <td>#\${order.id}</td>
+                    <td><strong>\${escapeHtml(order.symbol)}</strong></td>
+                    <td>\${escapeHtml(order.orderType)}</td>
+                    <td class="action-\${order.action}">\${escapeHtml(order.action.toUpperCase())}</td>
+                    <td>\${order.shares}</td>
+                    <td class="status-\${order.status}">\${escapeHtml(order.status.toUpperCase())}</td>
+                    <td>\${order.executionPrice ? '$' + order.executionPrice.toFixed(2) : 'N/A'}</td>
+                    <td>\${new Date(order.createdAt).toLocaleString()}</td>
+                    <td>\${order.executedAt ? new Date(order.executedAt).toLocaleString() : 'N/A'}</td>
+                </tr>
+            \`).join('');
+            
+            if (!historySorter) {
+                historySorter = makeSortable('historyOrdersTable');
+            } else {
+                historySorter.refresh();
+            }
+        }
+        
+        async function cancelOrder(orderId) {
+            if (!confirm(\`Cancel pending order #\${orderId}?\`)) {
+                return;
+            }
+            
+            try {
+                const response = await fetch(\`/api/pendingorders/\${orderId}/cancel\`, {
+                    method: 'POST'
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok) {
+                    alert(\`✓ Order #\${orderId} cancelled successfully\`);
+                    loadOrders(); // Refresh the list
+                } else {
+                    alert(\`✗ Error: \${result.error || 'Failed to cancel order'}\`);
+                }
+            } catch (error) {
+                alert(\`✗ Error: \${error.message}\`);
+            }
+        }
+        
+        loadOrders();
+        setInterval(loadOrders, 3000); // Refresh every 3 seconds
+    </script>
+    <script>
+        async function updateEraTheme() {
+            const response = await fetch('/api/time');
+            const data = await response.json();
+            const gameDate = new Date(data.currentTime);
+            const year = gameDate.getFullYear();
+            applyEraTheme(year);
+        }
+        
+        updateEraTheme();
+        setInterval(updateEraTheme, 10000);
+    </script>
+    `
+}) %>

@@ -30,7 +30,7 @@ app.use(express.json());
 // Whitelist of known pages to prevent open redirects
 const validPages = new Set([
   '/index', '/bank', '/trading', '/news', '/email', '/graphs', 
-  '/loans', '/taxes', '/cheat', '/indexfunds', '/indexfund', '/company'
+  '/loans', '/taxes', '/cheat', '/indexfunds', '/indexfund', '/company', '/pendingorders'
 ]);
 
 app.use((req, res, next) => {
@@ -268,6 +268,10 @@ app.get('/indexfunds', (req, res) => {
 
 app.get('/cheat', (req, res) => {
   res.render('cheat');
+});
+
+app.get('/pendingorders', (req, res) => {
+  res.render('pendingorders');
 });
 
 app.get('/', (req, res) => {
@@ -2955,7 +2959,49 @@ app.get('/api/pendingorders/status/:status', (req, res) => {
   }
 });
 
-// Cancel a pending order
+// Cancel a pending order (POST endpoint)
+app.post('/api/pendingorders/:id/cancel', (req, res) => {
+  try {
+    const { id } = req.params;
+    const orderId = parseInt(id);
+    
+    if (isNaN(orderId)) {
+      return res.status(400).json({ error: 'Invalid order ID' });
+    }
+    
+    // Get the order to check if it's pending
+    const order = dbModule.getPendingOrder.get(orderId);
+    
+    if (!order) {
+      return res.status(404).json({ error: 'Order not found' });
+    }
+    
+    if (order.status !== 'pending') {
+      return res.status(400).json({ 
+        error: `Cannot cancel order with status '${order.status}'. Only pending orders can be cancelled.` 
+      });
+    }
+    
+    // Mark the order as cancelled
+    dbModule.updatePendingOrderStatus.run(
+      'cancelled',
+      gameTime.toISOString(),
+      null,
+      'Cancelled by user',
+      orderId
+    );
+    
+    res.json({ 
+      success: true,
+      message: 'Order cancelled successfully',
+      orderId: orderId
+    });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to cancel order: ' + error.message });
+  }
+});
+
+// Cancel a pending order (DELETE endpoint)
 app.delete('/api/pendingorders/:id', (req, res) => {
   try {
     const { id } = req.params;

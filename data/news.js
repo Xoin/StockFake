@@ -735,12 +735,12 @@ let sortedDateCache = []; // Cache of sorted dates for performance
 let dynamicNewsEvents = [];
 let nextDynamicNewsId = 10000; // Start dynamic IDs high to avoid conflicts
 
-// Thresholds for news generation
-const SIGNIFICANT_MOVE_THRESHOLD = 5.0; // 5.0% single-day move (increased from 2.5% to reduce noise)
-const MAJOR_MOVE_THRESHOLD = 8; // 8% single-day move (increased from 5%)
+// Thresholds for news generation - Made less frequent for important events only
+const SIGNIFICANT_MOVE_THRESHOLD = 8.0; // 8% single-day move (increased to reduce frequency)
+const MAJOR_MOVE_THRESHOLD = 12; // 12% single-day move (increased for truly major events)
 const VOLATILITY_WINDOW = 5; // Track 5 periods for volatility
-const VOLATILITY_THRESHOLD = 2.5; // Average volatility threshold (increased from 1.8%)
-const NEWS_COOLDOWN_MS = 24 * 60 * 60 * 1000; // 1 day cooldown per stock
+const VOLATILITY_THRESHOLD = 4.0; // Average volatility threshold (increased significantly)
+const NEWS_COOLDOWN_MS = 7 * 24 * 60 * 60 * 1000; // 7 day cooldown per stock (increased from 1 day)
 
 // Cleanup thresholds to prevent memory leaks
 const MAX_PRICE_HISTORY_DAYS = 90; // Keep only last 90 days of price history
