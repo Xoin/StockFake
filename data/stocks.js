@@ -23,6 +23,34 @@ for (const [symbol, stockInfo] of Object.entries(historicalStockData.data)) {
   stockSectors[symbol] = stockInfo.sector;
 }
 
+// Price cache for when market is closed
+let priceCache = {};
+let lastMarketState = null;
+let lastCacheTime = null;
+
+// Stock market hours (NYSE) - same as server.js
+const MARKET_OPEN_HOUR = 9;
+const MARKET_OPEN_MINUTE = 30;
+const MARKET_CLOSE_HOUR = 16;
+const MARKET_CLOSE_MINUTE = 0;
+
+// Check if market is open
+function isMarketOpen(date) {
+  const day = date.getDay();
+  const hours = date.getHours();
+  const minutes = date.getMinutes();
+  
+  // Weekend check
+  if (day === 0 || day === 6) return false;
+  
+  // Time check
+  const currentMinutes = hours * 60 + minutes;
+  const openMinutes = MARKET_OPEN_HOUR * 60 + MARKET_OPEN_MINUTE;
+  const closeMinutes = MARKET_CLOSE_HOUR * 60 + MARKET_CLOSE_MINUTE;
+  
+  return currentMinutes >= openMinutes && currentMinutes < closeMinutes;
+}
+
 // Deterministic pseudo-random function based on time and symbol
 // This ensures the same time always produces the same price
 function seededRandom(symbol, time) {
@@ -48,6 +76,27 @@ function getStockPrice(symbol, currentTime) {
   const stockData = historicalData[symbol];
   if (!stockData) return null;
   
+  const marketOpen = isMarketOpen(currentTime);
+  const currentMarketState = marketOpen;
+  
+  // Check if market state has changed
+  if (lastMarketState !== null && lastMarketState !== currentMarketState) {
+    if (!currentMarketState) {
+      // Market just closed - cache current time for reference
+      lastCacheTime = currentTime;
+    } else {
+      // Market just opened - clear cache
+      priceCache = {};
+      lastCacheTime = null;
+    }
+  }
+  lastMarketState = currentMarketState;
+  
+  // If market is closed and we have a cached price, return it
+  if (!marketOpen && priceCache[symbol]) {
+    return priceCache[symbol];
+  }
+  
   // Find the two data points to interpolate between
   let before = stockData[0];
   let after = stockData[stockData.length - 1];
@@ -67,13 +116,20 @@ function getStockPrice(symbol, currentTime) {
   
   // If after the last data point, use last price
   if (currentTime >= stockData[stockData.length - 1].date) {
-    return {
+    const result = {
       symbol,
       price: stockData[stockData.length - 1].price,
       change: 0,
       name: getStockName(symbol),
       sector: getStockSector(symbol)
     };
+    
+    // Cache if market is closed
+    if (!marketOpen) {
+      priceCache[symbol] = result;
+    }
+    
+    return result;
   }
   
   // Linear interpolation
@@ -91,13 +147,20 @@ function getStockPrice(symbol, currentTime) {
   // Calculate change from previous base price
   const change = ((price - before.price) / before.price) * 100;
   
-  return {
+  const result = {
     symbol,
     price: parseFloat(price.toFixed(2)),
     change: parseFloat(change.toFixed(2)),
     name: getStockName(symbol),
     sector: getStockSector(symbol)
   };
+  
+  // Cache if market is closed
+  if (!marketOpen) {
+    priceCache[symbol] = result;
+  }
+  
+  return result;
 }
 
 function getStockName(symbol) {
