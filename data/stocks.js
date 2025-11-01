@@ -166,9 +166,24 @@ function getStockPrice(symbol, currentTime, timeMultiplier, isPaused, bypassCach
     return null;
   }
   
-  // If after the last data point, use last price
+  // If after the last data point, use last price with continued growth
   if (currentTime >= stockData[stockData.length - 1].date) {
-    const basePrice = stockData[stockData.length - 1].price;
+    let basePrice = stockData[stockData.length - 1].price;
+    const lastDataDate = stockData[stockData.length - 1].date;
+    
+    // Calculate time since last data point
+    const daysSinceLastData = (currentTime.getTime() - lastDataDate.getTime()) / (1000 * 60 * 60 * 24);
+    
+    // Apply continued growth: average 7% annual growth (historical market average)
+    // Compound daily: (1 + annual_rate)^(days/365.25)
+    const annualGrowthRate = 0.07; // 7% per year
+    const growthFactor = Math.pow(1 + annualGrowthRate, daysSinceLastData / 365.25);
+    basePrice = basePrice * growthFactor;
+    
+    // Add daily volatility (±2%)
+    const randomValue = seededRandom(symbol, Math.floor(currentTime.getTime() / (1000 * 60 * 60 * 24)));
+    const volatility = (randomValue - 0.5) * 0.04; // ±2%
+    basePrice = basePrice * (1 + volatility);
     
     // Apply crash simulation impact if module is loaded
     let finalPrice = basePrice;
