@@ -500,7 +500,7 @@ let stocks = [];
             const panel = document.getElementById('sectorBalancePanel');
             const balancesDiv = document.getElementById('sectorBalances');
             const portfolioMetrics = currentAccountData.portfolioMetrics || {};
-            const holdings = currentAccountData.holdings || {};
+            const portfolio = currentAccountData.portfolio || {};
             
             if (portfolioMetrics.portfolioValue <= 0) {
                 panel.style.display = 'none';
@@ -511,11 +511,11 @@ let stocks = [];
             const sectorBalances = {};
             let totalValue = 0;
             
-            Object.entries(holdings).forEach(([symbol, holding]) => {
-                if (holding.quantity > 0) {
+            Object.entries(portfolio).forEach(([symbol, shares]) => {
+                if (shares > 0) {
                     const stock = stocks.find(s => s.symbol === symbol);
                     if (stock && stock.sector) {
-                        const value = holding.quantity * stock.price;
+                        const value = shares * stock.price;
                         sectorBalances[stock.sector] = (sectorBalances[stock.sector] || 0) + value;
                         totalValue += value;
                     }
