@@ -92,7 +92,7 @@ function processPendingOrders() {
       let errorMessage = null;
       
       if (order.order_type === 'stock') {
-        const stockPrice = stocks.getStockPrice(order.symbol, gameTime, timeMultiplier);
+        const stockPrice = stocks.getStockPrice(order.symbol, gameTime, timeMultiplier, isPaused);
         if (!stockPrice) {
           errorMessage = 'Stock not found or not available';
         } else {
@@ -279,7 +279,7 @@ app.get('/', (req, res) => {
 });
 
 app.get('/api/stocks', (req, res) => {
-  const stockData = stocks.getStockData(gameTime, timeMultiplier);
+  const stockData = stocks.getStockData(gameTime, timeMultiplier, isPaused);
   
   // Add share availability info to each stock
   const stocksWithAvailability = stockData.map(stock => {
@@ -296,7 +296,7 @@ app.get('/api/stocks', (req, res) => {
 
 app.get('/api/stocks/:symbol', (req, res) => {
   const { symbol } = req.params;
-  const stockPrice = stocks.getStockPrice(symbol, gameTime, timeMultiplier);
+  const stockPrice = stocks.getStockPrice(symbol, gameTime, timeMultiplier, isPaused);
   
   if (!stockPrice) {
     return res.status(404).json({ error: 'Stock not found' });
@@ -352,7 +352,7 @@ app.get('/api/stocks/:symbol/history', (req, res) => {
   // Get historical prices for the specified number of days
   for (let i = daysToFetch; i >= 0; i -= sampleInterval) {
     const date = new Date(gameTime.getTime() - (i * 24 * 60 * 60 * 1000));
-    const price = stocks.getStockPrice(symbol, date, timeMultiplier);
+    const price = stocks.getStockPrice(symbol, date, timeMultiplier, false); // Always use real prices for history
     if (price) {
       history.push({
         date: date.toISOString(),
@@ -363,7 +363,7 @@ app.get('/api/stocks/:symbol/history', (req, res) => {
   
   // Always include the most recent data point
   if (history.length === 0 || history[history.length - 1].date !== gameTime.toISOString()) {
-    const price = stocks.getStockPrice(symbol, gameTime, timeMultiplier);
+    const price = stocks.getStockPrice(symbol, gameTime, timeMultiplier, false); // Always use real prices for history
     if (price) {
       history.push({
         date: gameTime.toISOString(),
@@ -374,7 +374,7 @@ app.get('/api/stocks/:symbol/history', (req, res) => {
   
   // If insufficient data, use hourly intervals for recent data
   addHourlySamplingIfNeeded(history, daysToFetch, (date) => {
-    const price = stocks.getStockPrice(symbol, date, timeMultiplier);
+    const price = stocks.getStockPrice(symbol, date, timeMultiplier, false); // Always use real prices for history
     return price ? { date: date.toISOString(), price: price.price } : null;
   });
   
@@ -400,7 +400,7 @@ app.get('/api/market/index', (req, res) => {
   // Calculate simple market index based on average of all stocks
   for (let i = daysToFetch; i >= 0; i -= sampleInterval) {
     const date = new Date(gameTime.getTime() - (i * 24 * 60 * 60 * 1000));
-    const allStocks = stocks.getStockData(date, timeMultiplier);
+    const allStocks = stocks.getStockData(date, timeMultiplier, false); // Always use real prices for history
     
     if (allStocks.length > 0) {
       const avgPrice = allStocks.reduce((sum, s) => sum + s.price, 0) / allStocks.length;
@@ -414,7 +414,7 @@ app.get('/api/market/index', (req, res) => {
   
   // Always include the most recent data point
   if (history.length === 0 || history[history.length - 1].date !== gameTime.toISOString()) {
-    const allStocks = stocks.getStockData(gameTime, timeMultiplier);
+    const allStocks = stocks.getStockData(gameTime, timeMultiplier, false); // Always use real prices for history
     if (allStocks.length > 0) {
       const avgPrice = allStocks.reduce((sum, s) => sum + s.price, 0) / allStocks.length;
       history.push({
@@ -427,7 +427,7 @@ app.get('/api/market/index', (req, res) => {
   
   // If insufficient data, use hourly intervals for recent data
   addHourlySamplingIfNeeded(history, daysToFetch, (date) => {
-    const allStocks = stocks.getStockData(date, timeMultiplier);
+    const allStocks = stocks.getStockData(date, timeMultiplier, false); // Always use real prices for history
     if (allStocks.length > 0) {
       const avgPrice = allStocks.reduce((sum, s) => sum + s.price, 0) / allStocks.length;
       return {
@@ -904,7 +904,7 @@ function calculatePortfolioValue() {
   // Add individual stock positions
   for (const [symbol, shares] of Object.entries(userAccount.portfolio)) {
     if (shares > 0) {
-      const stockPrice = stocks.getStockPrice(symbol, gameTime, timeMultiplier);
+      const stockPrice = stocks.getStockPrice(symbol, gameTime, timeMultiplier, isPaused);
       if (stockPrice) {
         totalValue += stockPrice.price * shares;
       }
@@ -986,7 +986,7 @@ function checkPositionConcentration(symbol) {
   const portfolioValue = calculatePortfolioValue();
   if (portfolioValue === 0) return { concentration: 0, warning: false, limit: false };
   
-  const stockPrice = stocks.getStockPrice(symbol, gameTime, timeMultiplier);
+  const stockPrice = stocks.getStockPrice(symbol, gameTime, timeMultiplier, isPaused);
   if (!stockPrice) return { concentration: 0, warning: false, limit: false };
   
   const shares = userAccount.portfolio[symbol] || 0;
@@ -1094,7 +1094,7 @@ function forceLiquidation() {
   const positions = Object.entries(userAccount.portfolio)
     .filter(([symbol, shares]) => shares > 0)
     .map(([symbol, shares]) => {
-      const stockPrice = stocks.getStockPrice(symbol, gameTime, timeMultiplier);
+      const stockPrice = stocks.getStockPrice(symbol, gameTime, timeMultiplier, isPaused);
       return {
         symbol,
         shares,
@@ -1314,7 +1314,7 @@ function sellStocksToRecoverBalance(targetAmount) {
   for (const [symbol, shares] of sortedPositions) {
     if (amountRaised >= amountToRaise) break;
     
-    const stockPrice = stocks.getStockPrice(symbol, gameTime, timeMultiplier);
+    const stockPrice = stocks.getStockPrice(symbol, gameTime, timeMultiplier, isPaused);
     if (!stockPrice) continue;
     
     const saleValue = shares * stockPrice.price;
@@ -1999,7 +1999,7 @@ app.post('/api/trade', (req, res) => {
     }
   }
   
-  const stockPrice = stocks.getStockPrice(symbol, gameTime, timeMultiplier);
+  const stockPrice = stocks.getStockPrice(symbol, gameTime, timeMultiplier, isPaused);
   if (!stockPrice) {
     return res.status(404).json({ error: 'Stock not found' });
   }
@@ -2648,7 +2648,7 @@ app.post('/api/margin/pay', (req, res) => {
 app.post('/api/margin/calculate', (req, res) => {
   const { symbol, shares } = req.body;
   
-  const stockPrice = stocks.getStockPrice(symbol, gameTime, timeMultiplier);
+  const stockPrice = stocks.getStockPrice(symbol, gameTime, timeMultiplier, isPaused);
   if (!stockPrice) {
     return res.status(404).json({ error: 'Stock not found' });
   }
@@ -3470,7 +3470,7 @@ app.post('/api/debug/addstock', (req, res) => {
   }
   
   // Check if stock exists
-  const stockPrice = stocks.getStockPrice(symbol, gameTime, timeMultiplier);
+  const stockPrice = stocks.getStockPrice(symbol, gameTime, timeMultiplier, isPaused);
   if (!stockPrice) {
     return res.status(404).json({ error: 'Stock not found or not available at current time' });
   }
