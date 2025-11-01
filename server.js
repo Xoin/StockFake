@@ -390,6 +390,21 @@ function addHourlySamplingIfNeeded(history, daysToFetch, dataFetcher) {
 
 // Constants for historical data fetching
 const BYPASS_CACHE_FOR_HISTORICAL = true; // Always bypass cache for historical chart data
+const TOP_MOVERS_COUNT = 5; // Number of top gainers/losers to show
+const MAX_INDEX_FUNDS_DISPLAY = 10; // Maximum index funds to display in charts
+
+// Helper function to determine sampling interval based on time period
+function getSamplingInterval(daysToFetch) {
+  let sampleInterval = 1; // days
+  if (daysToFetch > 365) {
+    sampleInterval = 7; // Weekly for > 1 year
+  } else if (daysToFetch > 180) {
+    sampleInterval = 3; // Every 3 days for > 6 months
+  } else if (daysToFetch > 90) {
+    sampleInterval = 2; // Every 2 days for > 3 months
+  }
+  return sampleInterval;
+}
 
 // Stock history API for charts
 app.get('/api/stocks/:symbol/history', (req, res) => {
@@ -449,14 +464,7 @@ app.get('/api/market/index', (req, res) => {
   const history = [];
   
   // Determine sampling interval based on time period
-  let sampleInterval = 1; // days
-  if (daysToFetch > 365) {
-    sampleInterval = 7; // Weekly for > 1 year
-  } else if (daysToFetch > 180) {
-    sampleInterval = 3; // Every 3 days for > 6 months
-  } else if (daysToFetch > 90) {
-    sampleInterval = 2; // Every 2 days for > 3 months
-  }
+  const sampleInterval = getSamplingInterval(daysToFetch);
   
   // Calculate simple market index based on average of all stocks
   for (let i = daysToFetch; i >= 0; i -= sampleInterval) {
@@ -519,14 +527,7 @@ app.get('/api/market/sectors', (req, res) => {
   });
   
   // Determine sampling interval
-  let sampleInterval = 1;
-  if (daysToFetch > 365) {
-    sampleInterval = 7;
-  } else if (daysToFetch > 180) {
-    sampleInterval = 3;
-  } else if (daysToFetch > 90) {
-    sampleInterval = 2;
-  }
+  const sampleInterval = getSamplingInterval(daysToFetch);
   
   // Calculate average price for each sector at each time point
   for (let i = daysToFetch; i >= 0; i -= sampleInterval) {
@@ -570,14 +571,7 @@ app.get('/api/market/health', (req, res) => {
   const history = [];
   
   // Determine sampling interval
-  let sampleInterval = 1;
-  if (daysToFetch > 365) {
-    sampleInterval = 7;
-  } else if (daysToFetch > 180) {
-    sampleInterval = 3;
-  } else if (daysToFetch > 90) {
-    sampleInterval = 2;
-  }
+  const sampleInterval = getSamplingInterval(daysToFetch);
   
   // Calculate market health metrics over time
   for (let i = daysToFetch; i >= 0; i -= sampleInterval) {
@@ -682,8 +676,8 @@ app.get('/api/market/stats', (req, res) => {
   }).filter(Boolean);
   
   changes.sort((a, b) => b.change - a.change);
-  const topGainers = changes.slice(0, 5);
-  const topLosers = changes.slice(-5).reverse();
+  const topGainers = changes.slice(0, TOP_MOVERS_COUNT);
+  const topLosers = changes.slice(-TOP_MOVERS_COUNT).reverse();
   
   res.json({
     totalStocks: allStocks.length,

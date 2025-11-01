@@ -173,11 +173,11 @@
 
 <!-- Tab Navigation -->
 <div class="tab-buttons">
-    <button class="tab-button active" onclick="switchTab('overview')">Market Overview</button>
-    <button class="tab-button" onclick="switchTab('sectors')">Sector Performance</button>
-    <button class="tab-button" onclick="switchTab('health')">Market Health</button>
-    <button class="tab-button" onclick="switchTab('indexfunds')">Index Funds</button>
-    <button class="tab-button" onclick="switchTab('stocks')">Individual Stocks</button>
+    <button class="tab-button active" onclick="switchTab('overview', event)">Market Overview</button>
+    <button class="tab-button" onclick="switchTab('sectors', event)">Sector Performance</button>
+    <button class="tab-button" onclick="switchTab('health', event)">Market Health</button>
+    <button class="tab-button" onclick="switchTab('indexfunds', event)">Index Funds</button>
+    <button class="tab-button" onclick="switchTab('stocks', event)">Individual Stocks</button>
 </div>
 
 <!-- Overview Tab -->
@@ -261,6 +261,9 @@ let charts = {
     stock: null
 };
 
+// Constants
+const MAX_INDEX_FUNDS_DISPLAY = 10;
+
 // Current state
 let currentTab = 'overview';
 let selectedSectors = [];
@@ -286,14 +289,16 @@ function showInsufficientDataMessage(ctx, primaryMessage, secondaryMessage) {
 }
 
 // Tab switching
-function switchTab(tabName) {
+function switchTab(tabName, event) {
     currentTab = tabName;
     
     // Update button states
     document.querySelectorAll('.tab-button').forEach(btn => {
         btn.classList.remove('active');
     });
-    event.target.classList.add('active');
+    if (event && event.target) {
+        event.target.classList.add('active');
+    }
     
     // Update content visibility
     document.querySelectorAll('.tab-content').forEach(content => {
@@ -817,7 +822,7 @@ async function updateIndexFundChart() {
         
         // Fetch history for each fund
         const datasets = [];
-        for (let i = 0; i < Math.min(funds.length, 10); i++) {
+        for (let i = 0; i < Math.min(funds.length, MAX_INDEX_FUNDS_DISPLAY); i++) {
             const fund = funds[i];
             try {
                 const histResponse = await fetch(\`/api/indexfunds/\${fund.symbol}/history?days=\${days}\`);
