@@ -781,6 +781,9 @@ function checkAndPayDividends() {
 // Call this periodically
 setInterval(checkAndPayDividends, 5000);
 
+// Rebalancing check interval (30 seconds)
+const REBALANCING_CHECK_INTERVAL_MS = 30000;
+
 // Check and process index fund rebalancing
 function checkIndexFundRebalancing() {
   if (!isPaused) {
@@ -800,8 +803,8 @@ function checkIndexFundRebalancing() {
   }
 }
 
-// Call this periodically (every 30 seconds to avoid too frequent checks)
-setInterval(checkIndexFundRebalancing, 30000);
+// Call this periodically
+setInterval(checkIndexFundRebalancing, REBALANCING_CHECK_INTERVAL_MS);
 
 // Calculate trading fee based on year (fees decreased over time)
 function getTradingFee(tradeValue, currentTime) {
@@ -3037,22 +3040,6 @@ app.post('/api/indexfunds/trade', (req, res) => {
       }
       
       remainingShares -= sharesToSell;
-    }
-    
-    // Track which purchases were used in the sale for expense ratio calculation
-    const purchasesUsedInSale = [];
-    let remainingForExpense = shares;
-    
-    for (const purchase of holding.purchaseHistory) {
-      if (remainingForExpense <= 0) break;
-      
-      const sharesFromThisPurchase = Math.min(remainingForExpense, purchase.shares);
-      purchasesUsedInSale.push({
-        shares: sharesFromThisPurchase,
-        pricePerShare: purchase.pricePerShare,
-        date: purchase.date
-      });
-      remainingForExpense -= sharesFromThisPurchase;
     }
     
     // Update holding purchase history

@@ -4,6 +4,15 @@
 const dbModule = require('../database');
 const stocks = require('../data/stocks');
 
+// Constants for share estimation
+const LARGE_CAP_TECH_SHARES = 15000000000;  // 15 billion shares
+const LARGE_CAP_NON_TECH_SHARES = 10000000000;  // 10 billion shares
+const MID_CAP_SHARES = 5000000000;  // 5 billion shares
+const SMALL_CAP_SHARES = 2000000000;  // 2 billion shares
+
+// Threshold for meaningful weight changes
+const WEIGHT_CHANGE_THRESHOLD = 0.0001;
+
 // Rebalancing strategy types
 const REBALANCING_STRATEGIES = {
   PERIODIC: 'periodic',           // Rebalance on a fixed schedule
@@ -85,13 +94,13 @@ function getEstimatedSharesOutstanding(symbol) {
   const midCap = ['BA', 'CAT', 'GE', 'MMM', 'HON', 'UPS', 'LMT', 'DE'];
   
   if (largeCap.includes(symbol)) {
-    return 15000000000; // 15 billion shares
+    return LARGE_CAP_TECH_SHARES;
   } else if (largeCap2.includes(symbol)) {
-    return 10000000000; // 10 billion shares
+    return LARGE_CAP_NON_TECH_SHARES;
   } else if (midCap.includes(symbol)) {
-    return 5000000000;  // 5 billion shares
+    return MID_CAP_SHARES;
   } else {
-    return 2000000000;  // 2 billion shares (small/mid cap)
+    return SMALL_CAP_SHARES;
   }
 }
 
@@ -380,7 +389,7 @@ function analyzeConstituentChanges(previousWeights, newWeights) {
     const previous = previousWeights.find(w => w.constituent_symbol === constituent.symbol);
     if (previous) {
       const weightChange = constituent.weight - previous.weight;
-      if (Math.abs(weightChange) > 0.0001) { // Threshold for meaningful change
+      if (Math.abs(weightChange) > WEIGHT_CHANGE_THRESHOLD) {
         changes.adjusted.push({
           symbol: constituent.symbol,
           previousWeight: previous.weight,
