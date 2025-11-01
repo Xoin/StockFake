@@ -106,7 +106,7 @@ try {
     const priceChange = ((impactedPrice - basePrice) / basePrice) * 100;
     
     const inRange = priceChange >= point.expectedMin && priceChange <= point.expectedMax;
-    const status = inRange ? '✓' : '⚠';
+    const status = inRange ? '✓' : '✗';  // Consistent status symbols
     
     console.log(`    ${status} ${point.name}: $${impactedPrice.toFixed(2)} (${priceChange.toFixed(1)}%) [Expected: ${point.expectedMin}% to ${point.expectedMax}%]`);
     

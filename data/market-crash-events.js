@@ -132,7 +132,7 @@ const historicalCrashes = [
         'Industrials': -0.54,
         'Consumer': -0.48,
         'Energy': -0.60,
-        'Healthcare': -0.35
+        'Healthcare': -0.28   // Healthcare more defensive but still impacted
       }
     },
     cascadingEffects: [

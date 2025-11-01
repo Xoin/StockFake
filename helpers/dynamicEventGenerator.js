@@ -209,15 +209,18 @@ function generateDynamicCrash(eventDate, eventType, seed) {
   }
   
   // Adjust volatility decay based on duration
+  // For multi-year events, use very slow decay to maintain elevated volatility
+  // Math: 0.9995 daily decay means ~18% annual reduction (0.9995^365 ≈ 0.82)
+  //       Takes ~5-7 years to return to baseline volatility
   let volatilityDecay;
   if (durationDays > 1095) {
-    // Multi-year events: very slow decay
+    // Multi-year events: very slow decay (0.05%-0.02% daily, ~18-7% annual)
     volatilityDecay = 0.9995 + (random1 * 0.0003);  // 0.9995 to 0.9998
   } else if (durationDays > 365) {
-    // Year+ events: slow decay
+    // Year+ events: slow decay (~1% daily, ~97% annual retention)
     volatilityDecay = 0.997 + (random1 * 0.002);  // 0.997 to 0.999
   } else {
-    // Shorter events: moderate decay
+    // Shorter events: moderate decay (2-8% daily reduction)
     volatilityDecay = 0.92 + (random1 * 0.06);  // 0.92 to 0.98
   }
   
