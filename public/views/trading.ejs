@@ -637,6 +637,23 @@ async function renderPage() {
             // Apply asset filter if it exists
             if (assetFilter) {
                 filteredStocks = stocks.filter(s => assetFilter.matchesFilter(s));
+                
+                // Calculate counts for display
+                const counts = {
+                    types: {},
+                    sectors: {}
+                };
+                
+                stocks.forEach(stock => {
+                    if (stock.type) {
+                        counts.types[stock.type] = (counts.types[stock.type] || 0) + 1;
+                    }
+                    if (stock.sector) {
+                        counts.sectors[stock.sector] = (counts.sectors[stock.sector] || 0) + 1;
+                    }
+                });
+                
+                assetFilter.updateCounts(counts);
             }
             
             // Preserve current page if paginator exists

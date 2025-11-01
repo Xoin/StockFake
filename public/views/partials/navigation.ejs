@@ -27,7 +27,10 @@
                 
                 const timeEl = document.getElementById('gameTime');
                 if (timeEl) {
-                    timeEl.textContent = date.toLocaleString();
+                    const dayOfWeek = date.toLocaleDateString('en-US', { weekday: 'long' });
+                    const dateString = date.toLocaleDateString();
+                    const timeString = date.toLocaleTimeString();
+                    timeEl.textContent = `${dayOfWeek}, ${dateString}, ${timeString}`;
                 }
                 
                 const statusEl = document.getElementById('marketStatus');

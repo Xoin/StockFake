@@ -281,6 +281,23 @@ let selectedFund = null;
             // Apply asset filter if it exists - map category to sector for filtering
             if (assetFilter) {
                 filteredFunds = allFunds.filter(f => assetFilter.matchesFilter({...f, sector: f.category}));
+                
+                // Calculate counts for display
+                const counts = {
+                    types: {},
+                    sectors: {}
+                };
+                
+                allFunds.forEach(fund => {
+                    if (fund.type) {
+                        counts.types[fund.type] = (counts.types[fund.type] || 0) + 1;
+                    }
+                    if (fund.category) {
+                        counts.sectors[fund.category] = (counts.sectors[fund.category] || 0) + 1;
+                    }
+                });
+                
+                assetFilter.updateCounts(counts);
             }
             
             const tbody = document.getElementById('fundsBody');
