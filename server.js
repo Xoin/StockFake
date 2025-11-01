@@ -46,10 +46,51 @@ app.use((req, res, next) => {
 
 app.use(express.static('public'));
 
-// Game state
-let gameTime = new Date('1970-01-01T09:30:00'); // Start at market open
-let isPaused = true; // Start paused so player can review the game
-let timeMultiplier = 3600; // 1 real second = 1 game hour by default
+// Load game state from database
+const savedGameState = dbModule.getGameState.get();
+let gameTime = savedGameState ? new Date(savedGameState.game_time) : new Date('1970-01-01T09:30:00');
+let isPaused = savedGameState ? Boolean(savedGameState.is_paused) : true;
+let timeMultiplier = savedGameState ? savedGameState.time_multiplier : 3600;
+
+// Log loaded state
+console.log(`Loaded game state from database:`);
+console.log(`  Game time: ${gameTime.toISOString()}`);
+console.log(`  Is paused: ${isPaused}`);
+console.log(`  Time multiplier: ${timeMultiplier}`);
+
+// Save game state to database periodically (every 5 seconds)
+function saveGameState() {
+  try {
+    const savedState = dbModule.getGameState.get();
+    dbModule.updateGameState.run(
+      gameTime.toISOString(),
+      isPaused ? 1 : 0,
+      timeMultiplier,
+      savedState.last_dividend_quarter,
+      savedState.last_monthly_fee_check,
+      savedState.last_inflation_check,
+      savedState.cumulative_inflation
+    );
+  } catch (error) {
+    console.error('Error saving game state:', error);
+  }
+}
+
+// Save state every 5 seconds
+setInterval(saveGameState, 5000);
+
+// Save state on process exit
+process.on('SIGINT', () => {
+  console.log('\nSaving game state before exit...');
+  saveGameState();
+  process.exit(0);
+});
+
+process.on('SIGTERM', () => {
+  console.log('\nSaving game state before termination...');
+  saveGameState();
+  process.exit(0);
+});
 
 // Stock market hours (NYSE)
 const MARKET_OPEN_HOUR = 9;
@@ -212,6 +253,7 @@ app.get('/api/time', (req, res) => {
 
 app.post('/api/time/pause', (req, res) => {
   isPaused = !isPaused;
+  saveGameState(); // Save state when pause changes
   res.json({ isPaused });
 });
 
@@ -221,6 +263,7 @@ app.post('/api/time/speed', (req, res) => {
   // Allow up to 2592000 (30 days) for monthly speed
   if (multiplier && typeof multiplier === 'number' && multiplier > 0 && multiplier <= 2592000) {
     timeMultiplier = multiplier;
+    saveGameState(); // Save state when speed changes
   }
   res.json({ timeMultiplier });
 });
@@ -3405,6 +3448,7 @@ app.post('/api/debug/settime', (req, res) => {
     gameTime = new Date(time);
     // Update market state tracker to prevent false transitions
     wasMarketOpen = isMarketOpen(gameTime);
+    saveGameState(); // Save state after time change
     res.json({ success: true, newTime: gameTime });
   } catch (error) {
     res.status(400).json({ error: 'Invalid time format' });
@@ -3434,6 +3478,7 @@ app.post('/api/debug/skiptime', (req, res) => {
   gameTime = new Date(gameTime.getTime() + (amount * multipliers[unit]));
   // Update market state tracker to prevent false transitions
   wasMarketOpen = isMarketOpen(gameTime);
+  saveGameState(); // Save state after time skip
   res.json({ success: true, newTime: gameTime });
 });
 
