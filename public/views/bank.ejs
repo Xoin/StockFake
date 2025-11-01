@@ -613,11 +613,25 @@
         }
         
         async function quickSell(symbol, maxShares, isStock) {
-            const shares = prompt(\`How many shares of \${symbol} would you like to sell? (You own \${maxShares.toFixed(2)})\`, maxShares.toFixed(2));
-            if (!shares || parseFloat(shares) <= 0) return;
+            // For stocks, only accept integers. For index funds, allow fractional shares
+            const defaultValue = isStock ? Math.floor(maxShares) : maxShares.toFixed(2);
+            const ownedDisplay = isStock ? Math.floor(maxShares) : maxShares.toFixed(2);
+            const shares = prompt(\`How many shares of \${symbol} would you like to sell? (You own \${ownedDisplay})\`, defaultValue);
+            if (!shares) return;
             
-            if (parseFloat(shares) > maxShares) {
-                alert(\`You only own \${maxShares.toFixed(2)} shares of \${symbol}\`);
+            const sharesNum = isStock ? parseInt(shares) : parseFloat(shares);
+            if (isNaN(sharesNum) || sharesNum <= 0) {
+                alert('Please enter a valid number of shares');
+                return;
+            }
+            
+            if (isStock && sharesNum !== parseFloat(shares)) {
+                alert('Stocks can only be sold in whole numbers (integers)');
+                return;
+            }
+            
+            if (sharesNum > maxShares) {
+                alert(\`You only own \${ownedDisplay} shares of \${symbol}\`);
                 return;
             }
             
@@ -629,7 +643,7 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         symbol: symbol,
-                        shares: parseFloat(shares),
+                        shares: sharesNum,
                         action: 'sell'
                     })
                 });
@@ -637,7 +651,7 @@
                 const result = await response.json();
                 
                 if (response.ok) {
-                    alert(\`✓ Successfully sold \${shares} shares of \${symbol}!\`);
+                    alert(\`✓ Successfully sold \${sharesNum} shares of \${symbol}!\`);
                     updateAccount(); // Refresh the display
                 } else {
                     alert(\`✗ Error: \${result.error || 'Trade failed'}\`);

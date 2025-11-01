@@ -402,12 +402,18 @@ const MAX_INDEX_FUNDS_DISPLAY = 10; // Maximum index funds to display in charts
 // Helper function to determine sampling interval based on time period
 function getSamplingInterval(daysToFetch) {
   let sampleInterval = 1; // days
-  if (daysToFetch > 365) {
-    sampleInterval = 7; // Weekly for > 1 year
-  } else if (daysToFetch > 180) {
-    sampleInterval = 3; // Every 3 days for > 6 months
-  } else if (daysToFetch > 90) {
-    sampleInterval = 2; // Every 2 days for > 3 months
+  if (daysToFetch > 7300) { // > 20 years
+    sampleInterval = 365; // Yearly
+  } else if (daysToFetch > 1825) { // > 5 years
+    sampleInterval = 90; // Quarterly
+  } else if (daysToFetch > 730) { // > 2 years
+    sampleInterval = 30; // Monthly
+  } else if (daysToFetch > 365) { // > 1 year
+    sampleInterval = 7; // Weekly
+  } else if (daysToFetch > 180) { // > 6 months
+    sampleInterval = 3; // Every 3 days
+  } else if (daysToFetch > 90) { // > 3 months
+    sampleInterval = 2; // Every 2 days
   }
   return sampleInterval;
 }
@@ -585,8 +591,10 @@ app.get('/api/market/health', (req, res) => {
     const stocksAtDate = stocks.getStockData(date, timeMultiplier, false, BYPASS_CACHE_FOR_HISTORICAL);
     
     if (stocksAtDate.length > 0) {
-      // Calculate advancing vs declining (compare to previous day)
-      const prevDate = new Date(date.getTime() - (24 * 60 * 60 * 1000));
+      // Calculate advancing vs declining (compare to 5 days prior to avoid daily noise)
+      // This provides a more stable trend indicator
+      const lookbackDays = 5;
+      const prevDate = new Date(date.getTime() - (lookbackDays * 24 * 60 * 60 * 1000));
       const prevStocks = stocks.getStockData(prevDate, timeMultiplier, false, BYPASS_CACHE_FOR_HISTORICAL);
       
       let advancing = 0;
@@ -596,8 +604,10 @@ app.get('/api/market/health', (req, res) => {
       stocksAtDate.forEach(stock => {
         const prevStock = prevStocks.find(s => s.symbol === stock.symbol);
         if (prevStock) {
-          if (stock.price > prevStock.price) advancing++;
-          else if (stock.price < prevStock.price) declining++;
+          // Use a threshold to avoid counting tiny fluctuations
+          const priceChange = ((stock.price - prevStock.price) / prevStock.price) * 100;
+          if (priceChange > 0.5) advancing++;
+          else if (priceChange < -0.5) declining++;
           else unchanged++;
         }
       });
@@ -1382,48 +1392,89 @@ function processLoans() {
     if (currentDate > dueDate) {
       const daysOverdue = (currentDate - dueDate) / (1000 * 60 * 60 * 24);
       
-      // After 30 days, mark as missed payment
-      if (daysOverdue > 30 && !loan.markedAsMissed) {
-        loan.missedPayments += 1;
-        loan.markedAsMissed = true;
+      // Calculate how many 30-day periods have passed since due date
+      // This allows for multiple missed payments to accumulate
+      const missedPaymentPeriods = Math.floor(daysOverdue / 30);
+      
+      // Only process if we have more missed periods than recorded
+      if (missedPaymentPeriods > loan.missedPayments) {
+        const newMissedPayments = missedPaymentPeriods - loan.missedPayments;
         
-        // Apply late payment penalty
-        const penalty = loan.balance * company.latePaymentPenalty;
-        loan.balance += penalty;
-        
-        // Decrease credit score
-        userAccount.creditScore = Math.max(300, userAccount.creditScore + company.creditScoreImpact.late);
-        
-        // Record fee
-        userAccount.fees.push({
-          date: new Date(gameTime),
-          type: 'loan-late-payment',
-          amount: penalty,
-          description: `Late payment penalty for loan #${loan.id} from ${company.name}`
-        });
-        
-        userAccount.loanHistory.push({
-          date: new Date(gameTime),
-          type: 'missed-payment',
-          loanId: loan.id,
-          companyId: loan.companyId,
-          penalty: penalty,
-          creditScoreChange: company.creditScoreImpact.late
-        });
-        
-        // After 3 missed payments, loan goes to default
-        if (loan.missedPayments >= 3) {
-          loan.status = 'default';
-          userAccount.creditScore = Math.max(300, userAccount.creditScore + company.creditScoreImpact.default);
+        for (let i = 0; i < newMissedPayments; i++) {
+          loan.missedPayments += 1;
+          
+          // Apply late payment penalty for each missed payment
+          const penalty = loan.balance * company.latePaymentPenalty;
+          loan.balance += penalty;
+          
+          // Decrease credit score
+          userAccount.creditScore = Math.max(300, userAccount.creditScore + company.creditScoreImpact.late);
+          
+          // Record fee
+          userAccount.fees.push({
+            date: new Date(gameTime),
+            type: 'loan-late-payment',
+            amount: penalty,
+            description: `Late payment penalty #${loan.missedPayments} for loan #${loan.id} from ${company.name}`
+          });
           
           userAccount.loanHistory.push({
             date: new Date(gameTime),
-            type: 'default',
+            type: 'missed-payment',
             loanId: loan.id,
             companyId: loan.companyId,
-            remainingBalance: loan.balance,
-            creditScoreChange: company.creditScoreImpact.default
+            penalty: penalty,
+            missedPaymentNumber: loan.missedPayments,
+            creditScoreChange: company.creditScoreImpact.late
           });
+          
+          // After 3 missed payments, loan goes to default
+          if (loan.missedPayments >= 3) {
+            loan.status = 'default';
+            userAccount.creditScore = Math.max(300, userAccount.creditScore + company.creditScoreImpact.default);
+            
+            userAccount.loanHistory.push({
+              date: new Date(gameTime),
+              type: 'default',
+              loanId: loan.id,
+              companyId: loan.companyId,
+              remainingBalance: loan.balance,
+              creditScoreChange: company.creditScoreImpact.default
+            });
+            
+            // Force collection: deduct from cash (can go negative)
+            if (userAccount.cash > 0) {
+              const amountCollected = Math.min(userAccount.cash, loan.balance);
+              userAccount.cash -= amountCollected;
+              loan.balance -= amountCollected;
+              
+              userAccount.transactions.push({
+                date: new Date(gameTime),
+                type: 'loan-collection',
+                amount: -amountCollected,
+                description: `Forced collection on defaulted loan #${loan.id} from ${company.name}`
+              });
+            }
+            
+            // If still have balance owed and cash is now negative or insufficient, 
+            // add to debt that will incur daily penalties
+            if (loan.balance > 0) {
+              // Negative cash balance will be handled by processNegativeBalance()
+              // which charges 10% APR penalty on negative balances
+              userAccount.cash -= loan.balance;
+              loan.balance = 0;
+              
+              userAccount.transactions.push({
+                date: new Date(gameTime),
+                type: 'loan-default-debt',
+                amount: 0,
+                description: `Defaulted loan balance added to account debt. Total deficit: $${Math.abs(userAccount.cash).toLocaleString()}`
+              });
+            }
+            
+            // Break out of the loop once defaulted
+            break;
+          }
         }
       }
     }
@@ -1492,7 +1543,6 @@ function processNegativeBalance() {
         lastInterestAccrual: new Date(gameTime),
         missedPayments: 0,
         status: 'active',
-        markedAsMissed: false,
         termDays: lender.termDays,
         automatic: true // Mark as automatic
       };
@@ -2766,7 +2816,6 @@ app.post('/api/loans/take', (req, res) => {
     lastInterestAccrual: new Date(gameTime),
     missedPayments: 0,
     status: 'active',
-    markedAsMissed: false,
     termDays: company.termDays
   };
   
@@ -2838,11 +2887,6 @@ app.post('/api/loans/pay', (req, res) => {
   const previousBalance = loan.balance;
   loan.balance = Math.max(0, loan.balance - amount);
   loan.lastPaymentDate = new Date(gameTime);
-  
-  // If this was an overdue payment, reset missed payment flag
-  if (loan.markedAsMissed) {
-    loan.markedAsMissed = false;
-  }
   
   // Check if loan is paid off
   const isPaidOff = loan.balance <= 0;
@@ -3962,9 +4006,21 @@ const dynamicEventGenerator = require('./helpers/dynamicEventGenerator');
 marketCrashSim.initializeMarketState();
 
 // Update crash events periodically
+// Periodically update crash events and generate dynamic events
 setInterval(() => {
   if (!isPaused) {
     marketCrashSim.updateCrashEvents(gameTime);
+    
+    // Check for and generate dynamic events
+    const newEvents = dynamicEventGenerator.generateDynamicEvents(gameTime);
+    
+    // Auto-trigger the generated events
+    for (const event of newEvents) {
+      const result = marketCrashSim.triggerCrashEvent(event, gameTime);
+      if (result.success) {
+        console.log(`Auto-triggered dynamic crash event: ${event.name} (${event.type})`);
+      }
+    }
   }
 }, 10000);  // Update every 10 seconds
 
@@ -4311,6 +4367,37 @@ app.post('/api/debug/clearholdings', (req, res) => {
   userAccount.shareholderInfluence = {};
   
   res.json({ success: true });
+});
+
+// Set margin debt (debug)
+app.post('/api/debug/setmargindebt', (req, res) => {
+  const { amount } = req.body;
+  
+  if (typeof amount !== 'number' || amount < 0) {
+    return res.status(400).json({ error: 'Invalid amount' });
+  }
+  
+  userAccount.marginAccount.marginBalance = amount;
+  res.json({ success: true, marginBalance: amount });
+});
+
+// Clear transactions (debug)
+app.post('/api/debug/cleartransactions', (req, res) => {
+  userAccount.transactions = [];
+  res.json({ success: true, message: 'All transactions cleared' });
+});
+
+// Clear loans (debug)
+app.post('/api/debug/clearloans', (req, res) => {
+  userAccount.loans = [];
+  userAccount.loanHistory = [];
+  res.json({ success: true, message: 'All loans cleared' });
+});
+
+// Clear taxes (debug)
+app.post('/api/debug/cleartaxes', (req, res) => {
+  userAccount.taxes = [];
+  res.json({ success: true, message: 'Tax history cleared' });
 });
 
 // Reset game to initial state
