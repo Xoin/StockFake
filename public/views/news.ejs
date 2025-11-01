@@ -258,7 +258,7 @@ let paginator;
                         id: items[0].id, // Use first ID
                         date: items[0].date,
                         headline: 'Market Update: Multiple Stock Movements',
-                        body: items.map((item, idx) => \`\${idx + 1}. \${item.body}\`).join('\n')
+                        body: items.map((item, idx) => \\\`\\\${idx + 1}. \\\${item.body}\\\`).join('\\n')
                     };
                     newsById.set(mergedItem.id, mergedItem);
                 } else {
