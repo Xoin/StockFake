@@ -18,6 +18,7 @@ const loanCompanies = require('./data/loan-companies');
 const tradeHalts = require('./data/trade-halts');
 const shareAvailability = require('./data/share-availability');
 const indexFunds = require('./data/index-funds');
+const historicalEvents = require('./data/historical-events');
 
 // Load helper modules
 const indexFundRebalancing = require('./helpers/indexFundRebalancing');
@@ -330,6 +331,10 @@ app.get('/pendingorders', (req, res) => {
 
 app.get('/status', (req, res) => {
   res.render('status');
+});
+
+app.get('/events', (req, res) => {
+  res.render('events');
 });
 
 app.get('/', (req, res) => {
@@ -3917,6 +3922,78 @@ app.get('/api/emails', (req, res) => {
   });
   
   res.json(emails.filter(email => email.date <= gameTime).sort((a, b) => b.date - a.date));
+});
+
+// Historical Events API endpoint
+app.get('/api/historical-events', (req, res) => {
+  const { category, severity } = req.query;
+  
+  // Get historical events up to current game time
+  let events = historicalEvents.getEventsUpToDate(gameTime);
+  
+  // Get dynamic/crash events that have occurred
+  const crashEventHistory = marketCrashSim.getEventHistory(1000); // Get all events
+  
+  // Convert crash events to the same format as historical events
+  const dynamicEvents = crashEventHistory
+    .filter(event => new Date(event.activatedAt) <= gameTime)
+    .map(event => ({
+      id: event.id,
+      date: event.activatedAt,
+      title: event.name,
+      category: 'Market Event',
+      severity: event.severity,
+      description: event.description || `Dynamic market event: ${event.name}`,
+      impact: event.impact ? `Market impact: ${JSON.stringify(event.impact)}` : 'Market volatility and uncertainty',
+      isDynamic: true
+    }));
+  
+  // Merge historical and dynamic events
+  events = [...events, ...dynamicEvents];
+  
+  // Apply filters if provided
+  if (category) {
+    events = events.filter(e => e.category === category);
+  }
+  
+  if (severity) {
+    events = events.filter(e => e.severity === severity);
+  }
+  
+  // Sort by date, most recent first
+  events.sort((a, b) => new Date(b.date) - new Date(a.date));
+  
+  res.json({
+    events: events,
+    totalCount: events.length,
+    currentGameDate: gameTime,
+    categories: historicalEvents.getCategories().concat(['Market Event']),
+    hasMore: false
+  });
+});
+
+// Get events by category
+app.get('/api/historical-events/category/:category', (req, res) => {
+  const { category } = req.params;
+  const events = historicalEvents.getEventsByCategory(category, gameTime);
+  
+  res.json({
+    category: category,
+    events: events,
+    count: events.length
+  });
+});
+
+// Get events by severity  
+app.get('/api/historical-events/severity/:severity', (req, res) => {
+  const { severity } = req.params;
+  const events = historicalEvents.getEventsBySeverity(severity, gameTime);
+  
+  res.json({
+    severity: severity,
+    events: events,
+    count: events.length
+  });
 });
 
 // Market Crash Simulation API endpoints

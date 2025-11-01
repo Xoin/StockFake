@@ -1,0 +1,351 @@
+<%- include('partials/header', { 
+    title: 'Historical Events',
+    pageTitle: '📜 HISTORICAL MARKET EVENTS',
+    pageStyles: `
+        .info-box {
+            background-color: #001100;
+            border: 2px solid #00ff00;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        .info-box p {
+            color: #00ff00;
+            margin: 10px 0;
+            line-height: 1.6;
+        }
+        .info-box strong {
+            color: #00ff00;
+        }
+        .filter-controls {
+            background-color: #000;
+            border: 2px solid #00ff00;
+            padding: 15px;
+            margin-bottom: 20px;
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        .filter-controls label {
+            color: #00ff00;
+        }
+        .filter-controls select {
+            background-color: #001100;
+            border: 1px solid #00ff00;
+            color: #00ff00;
+            padding: 8px;
+            font-family: 'Courier New', monospace;
+        }
+        .filter-controls button {
+            background-color: #003300;
+            border: 2px solid #00ff00;
+            color: #00ff00;
+            padding: 8px 16px;
+            cursor: pointer;
+            font-family: 'Courier New', monospace;
+        }
+        .filter-controls button:hover {
+            background-color: #004400;
+        }
+        .event-timeline {
+            position: relative;
+            padding-left: 30px;
+        }
+        .event-item {
+            background-color: #001100;
+            border-left: 4px solid #00ff00;
+            padding: 20px;
+            margin-bottom: 20px;
+            position: relative;
+        }
+        .event-item::before {
+            content: '●';
+            position: absolute;
+            left: -11px;
+            top: 20px;
+            color: #00ff00;
+            font-size: 20px;
+            background-color: #000;
+        }
+        .event-item.severe {
+            border-left-color: #ff0000;
+        }
+        .event-item.severe::before {
+            color: #ff0000;
+        }
+        .event-item.major {
+            border-left-color: #ff8800;
+        }
+        .event-item.major::before {
+            color: #ff8800;
+        }
+        .event-item.moderate {
+            border-left-color: #ffff00;
+        }
+        .event-item.moderate::before {
+            color: #ffff00;
+        }
+        .event-item.positive {
+            border-left-color: #00ffff;
+        }
+        .event-item.positive::before {
+            color: #00ffff;
+        }
+        .event-date {
+            color: #00aa00;
+            font-size: 14px;
+            margin-bottom: 5px;
+        }
+        .event-title {
+            color: #00ff00;
+            font-size: 20px;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+        .event-category {
+            display: inline-block;
+            background-color: #003300;
+            border: 1px solid #00ff00;
+            color: #00ff00;
+            padding: 4px 12px;
+            font-size: 12px;
+            margin-bottom: 10px;
+            margin-right: 5px;
+        }
+        .event-badge {
+            display: inline-block;
+            background-color: #330033;
+            border: 1px solid #ff00ff;
+            color: #ff00ff;
+            padding: 4px 12px;
+            font-size: 12px;
+            margin-bottom: 10px;
+        }
+        .event-description {
+            color: #00ff00;
+            line-height: 1.6;
+            margin-bottom: 10px;
+        }
+        .event-impact {
+            color: #00aa00;
+            font-style: italic;
+            font-size: 14px;
+        }
+        .event-impact::before {
+            content: '⚡ Impact: ';
+            color: #ffff00;
+        }
+        .no-events {
+            background-color: #001100;
+            border: 2px solid #00ff00;
+            padding: 40px;
+            text-align: center;
+            color: #00ff00;
+        }
+        .no-events h3 {
+            color: #00ff00;
+            margin-bottom: 10px;
+        }
+        .stats-summary {
+            background-color: #001100;
+            border: 2px solid #00ff00;
+            padding: 20px;
+            margin-bottom: 20px;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+        }
+        .stat-item {
+            text-align: center;
+        }
+        .stat-item .label {
+            color: #00aa00;
+            font-size: 12px;
+            margin-bottom: 5px;
+        }
+        .stat-item .value {
+            color: #00ff00;
+            font-size: 24px;
+            font-weight: bold;
+        }
+    `
+}) %>
+
+<div class="info-box">
+    <p><strong>📜 About Historical Events</strong></p>
+    <p>This timeline shows major market events that have occurred in your game timeline. Events are only revealed AFTER they happen in the game, preventing you from using future knowledge to your advantage.</p>
+    <p>Use this information to understand market context and learn from historical patterns, but remember: past performance does not guarantee future results!</p>
+</div>
+
+<div class="stats-summary" id="statsSummary">
+    <div class="stat-item">
+        <div class="label">Total Events</div>
+        <div class="value" id="statTotal">-</div>
+    </div>
+    <div class="stat-item">
+        <div class="label">Most Recent</div>
+        <div class="value" id="statRecent" style="font-size: 14px;">-</div>
+    </div>
+    <div class="stat-item">
+        <div class="label">Crashes</div>
+        <div class="value" id="statCrashes">-</div>
+    </div>
+    <div class="stat-item">
+        <div class="label">Economic</div>
+        <div class="value" id="statEconomic">-</div>
+    </div>
+</div>
+
+<div class="filter-controls">
+    <label for="categoryFilter">Category:</label>
+    <select id="categoryFilter">
+        <option value="">All Categories</option>
+        <option value="Economic">Economic</option>
+        <option value="Market">Market</option>
+        <option value="Market Event">Market Event (Dynamic)</option>
+        <option value="Crash">Crash</option>
+        <option value="Regulatory">Regulatory</option>
+        <option value="Geopolitical">Geopolitical</option>
+        <option value="Financial">Financial</option>
+    </select>
+    
+    <label for="severityFilter">Severity:</label>
+    <select id="severityFilter">
+        <option value="">All Severities</option>
+        <option value="positive">Positive</option>
+        <option value="moderate">Moderate</option>
+        <option value="major">Major</option>
+        <option value="severe">Severe</option>
+    </select>
+    
+    <button onclick="applyFilters()">Apply Filters</button>
+    <button onclick="clearFilters()">Clear Filters</button>
+</div>
+
+<div id="eventsTimeline" class="event-timeline">
+    <!-- Events will be loaded here dynamically -->
+</div>
+
+<%- include('partials/footer', {
+    pageScripts: `
+    <script>
+let allEvents = [];
+let filteredEvents = [];
+
+// Load events
+async function loadEvents() {
+    try {
+        const response = await fetch('/api/historical-events');
+        const data = await response.json();
+        allEvents = data.events;
+        
+        updateStats();
+        applyFilters();
+    } catch (error) {
+        console.error('Failed to load historical events:', error);
+        document.getElementById('eventsTimeline').innerHTML = 
+            '<div class="no-events"><h3>Failed to load events</h3><p>Please try refreshing the page.</p></div>';
+    }
+}
+
+// Update statistics
+function updateStats() {
+    document.getElementById('statTotal').textContent = allEvents.length;
+    
+    if (allEvents.length > 0) {
+        const mostRecent = allEvents[0];
+        const date = new Date(mostRecent.date);
+        document.getElementById('statRecent').textContent = 
+            date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+    } else {
+        document.getElementById('statRecent').textContent = '-';
+    }
+    
+    const crashes = allEvents.filter(e => e.category === 'Crash').length;
+    const economic = allEvents.filter(e => e.category === 'Economic').length;
+    
+    document.getElementById('statCrashes').textContent = crashes;
+    document.getElementById('statEconomic').textContent = economic;
+}
+
+// Apply filters
+function applyFilters() {
+    const categoryFilter = document.getElementById('categoryFilter').value;
+    const severityFilter = document.getElementById('severityFilter').value;
+    
+    filteredEvents = allEvents.filter(event => {
+        const matchCategory = !categoryFilter || event.category === categoryFilter;
+        const matchSeverity = !severityFilter || event.severity === severityFilter;
+        return matchCategory && matchSeverity;
+    });
+    
+    renderEvents();
+}
+
+// Clear filters
+function clearFilters() {
+    document.getElementById('categoryFilter').value = '';
+    document.getElementById('severityFilter').value = '';
+    applyFilters();
+}
+
+// Render events
+function renderEvents() {
+    const timeline = document.getElementById('eventsTimeline');
+    
+    if (filteredEvents.length === 0) {
+        timeline.innerHTML = \`
+            <div class="no-events">
+                <h3>No Events Yet</h3>
+                <p>Historical events will appear here as they occur in the game timeline.</p>
+                <p>Keep playing to witness major market events unfold!</p>
+            </div>
+        \`;
+        return;
+    }
+    
+    timeline.innerHTML = filteredEvents.map(event => {
+        const date = new Date(event.date);
+        const dateStr = date.toLocaleDateString('en-US', { 
+            weekday: 'long',
+            year: 'numeric', 
+            month: 'long', 
+            day: 'numeric' 
+        });
+        
+        const dynamicBadge = event.isDynamic ? 
+            '<span class="event-badge">🎲 DYNAMIC EVENT</span>' : '';
+        
+        return \`
+            <div class="event-item \${event.severity}">
+                <div class="event-date">\${dateStr}</div>
+                <div class="event-title">\${event.title}</div>
+                <span class="event-category">\${event.category}</span>
+                \${dynamicBadge}
+                <div class="event-description">\${event.description}</div>
+                <div class="event-impact">\${event.impact}</div>
+            </div>
+        \`;
+    }).join('');
+}
+
+// Initial load
+loadEvents();
+
+// Auto-refresh every 30 seconds
+setInterval(loadEvents, 30000);
+    </script>
+    <script>
+async function updateEraTheme() {
+    const response = await fetch('/api/time');
+    const data = await response.json();
+    const gameDate = new Date(data.currentTime);
+    const year = gameDate.getFullYear();
+    applyEraTheme(year);
+}
+
+updateEraTheme();
+setInterval(updateEraTheme, 10000);
+    </script>
+    `
+}) %>
