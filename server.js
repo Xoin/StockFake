@@ -996,6 +996,11 @@ function assessWealthTax() {
   if (lastWealthTaxCheck !== yearKey) {
     lastWealthTaxCheck = yearKey;
     
+    // Get dynamic tax rates for the current year
+    const taxRates = constants.getTaxRates(currentYear);
+    const wealthTaxRate = taxRates.wealthTaxRate;
+    const wealthTaxThreshold = taxRates.wealthTaxThreshold;
+    
     // Calculate total net worth (cash + portfolio value - debts)
     const portfolioValue = calculatePortfolioValue();
     const marginDebt = userAccount.marginAccount.marginBalance;
@@ -1011,9 +1016,9 @@ function assessWealthTax() {
     const netWorth = userAccount.cash + portfolioValue - marginDebt - totalLoanDebt;
     
     // Only apply wealth tax if net worth exceeds threshold
-    if (netWorth > WEALTH_TAX_THRESHOLD) {
-      const taxableWealth = netWorth - WEALTH_TAX_THRESHOLD;
-      const wealthTax = taxableWealth * WEALTH_TAX_RATE;
+    if (netWorth > wealthTaxThreshold) {
+      const taxableWealth = netWorth - wealthTaxThreshold;
+      const wealthTax = taxableWealth * wealthTaxRate;
       
       // Check if user has sufficient cash to pay wealth tax
       if (userAccount.cash >= wealthTax) {
@@ -1025,7 +1030,7 @@ function assessWealthTax() {
           date: new Date(gameTime),
           type: 'wealth',
           amount: wealthTax,
-          description: `Annual wealth tax for ${currentYear} (${(WEALTH_TAX_RATE * 100).toFixed(2)}% on net worth above $${WEALTH_TAX_THRESHOLD.toLocaleString()})`
+          description: `Annual wealth tax for ${currentYear} (${(wealthTaxRate * 100).toFixed(2)}% on net worth above $${wealthTaxThreshold.toLocaleString()})`
         });
         
         console.log(`Wealth tax assessed for ${currentYear}: $${wealthTax.toFixed(2)} (Net worth: $${netWorth.toFixed(2)})`);
@@ -3554,8 +3559,8 @@ app.get('/api/taxes', (req, res) => {
       shortTermCapitalGains: taxRatesForYear.shortTermTaxRate * 100,
       longTermCapitalGains: taxRatesForYear.longTermTaxRate * 100,
       dividends: taxRatesForYear.dividendTaxRate * 100,
-      wealth: WEALTH_TAX_RATE * 100,
-      wealthTaxThreshold: WEALTH_TAX_THRESHOLD
+      wealth: taxRatesForYear.wealthTaxRate * 100,
+      wealthTaxThreshold: taxRatesForYear.wealthTaxThreshold
     }
   });
 });

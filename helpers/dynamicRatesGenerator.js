@@ -16,12 +16,15 @@ const DYNAMIC_RATES_CONFIG = {
   baseShortTermTaxRate: 0.30,  // 30% short-term capital gains
   baseLongTermTaxRate: 0.15,   // 15% long-term capital gains
   baseDividendTaxRate: 0.15,   // 15% dividend tax
+  baseWealthTaxRate: 0.01,     // 1% wealth tax
+  baseWealthTaxThreshold: 50000, // $50,000 threshold
   
   // Variation parameters for realism
   inflationVolatility: 1.5,  // Standard deviation for inflation variation
   taxVolatility: 0.02,        // Standard deviation for tax rate changes
   dividendGrowthRate: 0.03,   // Average annual dividend growth rate
   dividendVolatility: 0.10,   // Dividend rate variation
+  wealthTaxVolatility: 0.002, // Wealth tax rate variation (0.2%)
 };
 
 /**
@@ -231,7 +234,9 @@ function generateTaxRates(year) {
     return {
       shortTermTaxRate: DYNAMIC_RATES_CONFIG.baseShortTermTaxRate,
       longTermTaxRate: DYNAMIC_RATES_CONFIG.baseLongTermTaxRate,
-      dividendTaxRate: DYNAMIC_RATES_CONFIG.baseDividendTaxRate
+      dividendTaxRate: DYNAMIC_RATES_CONFIG.baseDividendTaxRate,
+      wealthTaxRate: DYNAMIC_RATES_CONFIG.baseWealthTaxRate,
+      wealthTaxThreshold: DYNAMIC_RATES_CONFIG.baseWealthTaxThreshold
     };
   }
   
@@ -240,6 +245,8 @@ function generateTaxRates(year) {
   const random1 = seededRandom(seed + 100);
   const random2 = seededRandom(seed + 200);
   const random3 = seededRandom(seed + 300);
+  const random4 = seededRandom(seed + 400);
+  const random5 = seededRandom(seed + 500);
   
   // Tax rates change slowly and rarely
   // Model rare legislative changes
@@ -248,6 +255,8 @@ function generateTaxRates(year) {
   let shortTermRate = DYNAMIC_RATES_CONFIG.baseShortTermTaxRate;
   let longTermRate = DYNAMIC_RATES_CONFIG.baseLongTermTaxRate;
   let dividendRate = DYNAMIC_RATES_CONFIG.baseDividendTaxRate;
+  let wealthRate = DYNAMIC_RATES_CONFIG.baseWealthTaxRate;
+  let wealthThreshold = DYNAMIC_RATES_CONFIG.baseWealthTaxThreshold;
   
   // Small variations around base rates
   if (random1 > changeThreshold) {
@@ -265,10 +274,23 @@ function generateTaxRates(year) {
     dividendRate = Math.max(0.10, Math.min(0.25, dividendRate + variation));
   }
   
+  // Wealth tax changes (rarer and smaller variations)
+  if (random4 > 0.97) {  // 3% chance of change per year
+    const variation = (random5 - 0.5) * DYNAMIC_RATES_CONFIG.wealthTaxVolatility;
+    wealthRate = Math.max(0.005, Math.min(0.02, wealthRate + variation));
+  }
+  
+  // Wealth tax threshold adjusts with inflation approximately
+  const yearsSince2024 = year - 2024;
+  const avgInflationAdjustment = Math.pow(1.025, yearsSince2024);  // Assume 2.5% avg inflation
+  wealthThreshold = Math.round(DYNAMIC_RATES_CONFIG.baseWealthTaxThreshold * avgInflationAdjustment);
+  
   return {
     shortTermTaxRate: Math.round(shortTermRate * 100) / 100,
     longTermTaxRate: Math.round(longTermRate * 100) / 100,
-    dividendTaxRate: Math.round(dividendRate * 100) / 100
+    dividendTaxRate: Math.round(dividendRate * 100) / 100,
+    wealthTaxRate: Math.round(wealthRate * 1000) / 1000,  // 3 decimal places for wealth tax
+    wealthTaxThreshold: wealthThreshold
   };
 }
 

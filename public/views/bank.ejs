@@ -1160,7 +1160,18 @@
         }
         
         updateAccount();
-        setInterval(updateAccount, 2000);
+        
+        // Update account, but only if market is open OR game is not paused
+        setInterval(async () => {
+            const timeRes = await fetch('/api/time');
+            const timeData = await timeRes.json();
+            
+            // Update if market is open OR game is running (not paused)
+            // Skip updates only when BOTH market is closed AND game is paused
+            if (timeData.isMarketOpen || !timeData.isPaused) {
+                await updateAccount();
+            }
+        }, 2000);
     </script>
     <script>
         // Apply era theme based on game time

@@ -179,9 +179,17 @@ try {
     throw new Error('Missing required tax rates');
   }
   
+  if (!taxRates2025.wealthTaxRate || !taxRates2025.wealthTaxThreshold) {
+    throw new Error('Missing wealth tax rates');
+  }
+  
   // Tax rates should be in reasonable ranges
   if (taxRates2025.shortTermTaxRate < 0.20 || taxRates2025.shortTermTaxRate > 0.40) {
     throw new Error('Short-term tax rate out of bounds');
+  }
+  
+  if (taxRates2025.wealthTaxRate < 0.005 || taxRates2025.wealthTaxRate > 0.02) {
+    throw new Error('Wealth tax rate out of bounds');
   }
   
   console.log('✓ Future tax rates generated');
@@ -189,10 +197,14 @@ try {
   console.log(`    Short-term: ${(taxRates2025.shortTermTaxRate * 100).toFixed(0)}%`);
   console.log(`    Long-term: ${(taxRates2025.longTermTaxRate * 100).toFixed(0)}%`);
   console.log(`    Dividend: ${(taxRates2025.dividendTaxRate * 100).toFixed(0)}%`);
+  console.log(`    Wealth: ${(taxRates2025.wealthTaxRate * 100).toFixed(2)}%`);
+  console.log(`    Wealth Threshold: $${taxRates2025.wealthTaxThreshold.toLocaleString()}`);
   console.log(`  2030:`);
   console.log(`    Short-term: ${(taxRates2030.shortTermTaxRate * 100).toFixed(0)}%`);
   console.log(`    Long-term: ${(taxRates2030.longTermTaxRate * 100).toFixed(0)}%`);
-  console.log(`    Dividend: ${(taxRates2030.dividendTaxRate * 100).toFixed(0)}%\n`);
+  console.log(`    Dividend: ${(taxRates2030.dividendTaxRate * 100).toFixed(0)}%`);
+  console.log(`    Wealth: ${(taxRates2030.wealthTaxRate * 100).toFixed(2)}%`);
+  console.log(`    Wealth Threshold: $${taxRates2030.wealthTaxThreshold.toLocaleString()}\n`);
 } catch (error) {
   console.error('✗ Failed to generate tax rates:', error.message);
   process.exit(1);
