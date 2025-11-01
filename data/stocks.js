@@ -26,7 +26,6 @@ for (const [symbol, stockInfo] of Object.entries(historicalStockData.data)) {
 // Price cache for when market is closed
 let priceCache = {};
 let lastMarketState = null;
-let lastCacheTime = null;
 
 // Stock market hours (NYSE) - same as server.js
 const MARKET_OPEN_HOUR = 9;
@@ -71,36 +70,49 @@ function seededRandom(symbol, time) {
   return Math.abs(Math.sin(hash) * 10000) % 1;
 }
 
+// Volatility scaling constants
+const SPEED_SLOW_THRESHOLD = 60;        // 1s = 1min
+const SPEED_MODERATE_THRESHOLD = 600;   // 1s = 10min  
+const SPEED_NORMAL = 3600;              // 1s = 1hr (baseline)
+const SPEED_FAST = 86400;               // 1s = 1day
+
+const VOLATILITY_SLOW = 0.25;           // 25% at very slow speeds
+const VOLATILITY_LOW = 0.75;            // 75% at moderate speeds
+const VOLATILITY_NORMAL = 1.0;          // 100% baseline
+const VOLATILITY_HIGH = 1.5;            // 150% at very fast speeds
+
 // Calculate volatility scale factor based on game speed
 // Slower speeds = less volatility, faster speeds = more volatility
 function getVolatilityScale(timeMultiplier) {
-  // Default multiplier is 3600 (1s = 1hr)
-  const defaultMultiplier = 3600;
-  
   if (!timeMultiplier) {
-    return 1.0; // No scaling if no multiplier provided
+    return VOLATILITY_NORMAL; // No scaling if no multiplier provided
   }
   
   // Speed categories:
-  // Slow: 60 (1s = 1min) -> 25% volatility
-  // Normal: 3600 (1s = 1hr) -> 100% volatility
-  // Fast: 86400 (1s = 1day) -> 150% volatility
+  // Very slow (<=60): 25% volatility
+  // Slow (60-600): scale between 25% and 75%
+  // Moderate (600-3600): scale between 75% and 100%
+  // Fast (3600-86400): scale between 100% and 150%
+  // Very fast (>86400): 150% volatility
   
-  if (timeMultiplier <= 60) {
+  if (timeMultiplier <= SPEED_SLOW_THRESHOLD) {
     // Very slow speeds: reduce to 25%
-    return 0.25;
-  } else if (timeMultiplier <= 600) {
+    return VOLATILITY_SLOW;
+  } else if (timeMultiplier <= SPEED_MODERATE_THRESHOLD) {
     // Slow speeds: scale between 25% and 75%
-    return 0.25 + (timeMultiplier - 60) / (600 - 60) * 0.5;
-  } else if (timeMultiplier <= 3600) {
+    const progress = (timeMultiplier - SPEED_SLOW_THRESHOLD) / (SPEED_MODERATE_THRESHOLD - SPEED_SLOW_THRESHOLD);
+    return VOLATILITY_SLOW + progress * (VOLATILITY_LOW - VOLATILITY_SLOW);
+  } else if (timeMultiplier <= SPEED_NORMAL) {
     // Moderate speeds: scale between 75% and 100%
-    return 0.75 + (timeMultiplier - 600) / (3600 - 600) * 0.25;
-  } else if (timeMultiplier <= 86400) {
+    const progress = (timeMultiplier - SPEED_MODERATE_THRESHOLD) / (SPEED_NORMAL - SPEED_MODERATE_THRESHOLD);
+    return VOLATILITY_LOW + progress * (VOLATILITY_NORMAL - VOLATILITY_LOW);
+  } else if (timeMultiplier <= SPEED_FAST) {
     // Fast speeds: scale between 100% and 150%
-    return 1.0 + (timeMultiplier - 3600) / (86400 - 3600) * 0.5;
+    const progress = (timeMultiplier - SPEED_NORMAL) / (SPEED_FAST - SPEED_NORMAL);
+    return VOLATILITY_NORMAL + progress * (VOLATILITY_HIGH - VOLATILITY_NORMAL);
   } else {
     // Very fast speeds: cap at 150%
-    return 1.5;
+    return VOLATILITY_HIGH;
   }
 }
 
@@ -115,12 +127,10 @@ function getStockPrice(symbol, currentTime, timeMultiplier) {
   // Check if market state has changed
   if (lastMarketState !== null && lastMarketState !== currentMarketState) {
     if (!currentMarketState) {
-      // Market just closed - cache current time for reference
-      lastCacheTime = currentTime;
+      // Market just closed - keep cache as is
     } else {
       // Market just opened - clear cache
       priceCache = {};
-      lastCacheTime = null;
     }
   }
   lastMarketState = currentMarketState;

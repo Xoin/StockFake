@@ -664,18 +664,47 @@ function assessWealthTax() {
       const taxableWealth = netWorth - WEALTH_TAX_THRESHOLD;
       const wealthTax = taxableWealth * WEALTH_TAX_RATE;
       
-      // Deduct wealth tax from cash
-      userAccount.cash -= wealthTax;
-      
-      // Record tax payment
-      userAccount.taxes.push({
-        date: new Date(gameTime),
-        type: 'wealth',
-        amount: wealthTax,
-        description: `Annual wealth tax for ${currentYear} (${(WEALTH_TAX_RATE * 100).toFixed(2)}% on net worth above $${WEALTH_TAX_THRESHOLD.toLocaleString()})`
-      });
-      
-      console.log(`Wealth tax assessed for ${currentYear}: $${wealthTax.toFixed(2)} (Net worth: $${netWorth.toFixed(2)})`);
+      // Check if user has sufficient cash to pay wealth tax
+      if (userAccount.cash >= wealthTax) {
+        // Deduct wealth tax from cash
+        userAccount.cash -= wealthTax;
+        
+        // Record tax payment
+        userAccount.taxes.push({
+          date: new Date(gameTime),
+          type: 'wealth',
+          amount: wealthTax,
+          description: `Annual wealth tax for ${currentYear} (${(WEALTH_TAX_RATE * 100).toFixed(2)}% on net worth above $${WEALTH_TAX_THRESHOLD.toLocaleString()})`
+        });
+        
+        console.log(`Wealth tax assessed for ${currentYear}: $${wealthTax.toFixed(2)} (Net worth: $${netWorth.toFixed(2)})`);
+      } else {
+        // User cannot pay - record as unpaid tax (could trigger penalties in future enhancement)
+        console.log(`⚠️ Insufficient cash to pay wealth tax for ${currentYear}: $${wealthTax.toFixed(2)} (Cash: $${userAccount.cash.toFixed(2)})`);
+        
+        // Deduct whatever cash is available
+        const partialPayment = userAccount.cash;
+        const unpaidAmount = wealthTax - partialPayment;
+        
+        if (partialPayment > 0) {
+          userAccount.cash = 0;
+          
+          userAccount.taxes.push({
+            date: new Date(gameTime),
+            type: 'wealth',
+            amount: partialPayment,
+            description: `Partial wealth tax payment for ${currentYear} (Unpaid: $${unpaidAmount.toFixed(2)})`
+          });
+        }
+        
+        // Record unpaid tax as a fee for tracking
+        userAccount.fees.push({
+          date: new Date(gameTime),
+          type: 'unpaid-wealth-tax',
+          amount: unpaidAmount,
+          description: `Unpaid wealth tax for ${currentYear} - may incur penalties`
+        });
+      }
     }
   }
 }
