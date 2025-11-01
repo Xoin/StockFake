@@ -140,6 +140,12 @@ Deep dive into company profiles with financials and product history
 - **Russell 2000 Small Cap**: Small-cap stock exposure
 - **Sector Funds**: Energy, Technology, Financial Services, Healthcare
 - **Expense Ratios**: 0.15% - 0.40% annually, deducted on sale
+- **Dynamic Rebalancing**: Automatic rebalancing based on market-cap changes
+  - **Periodic Rebalancing**: Quarterly, monthly, semi-annual, or annual schedules
+  - **Threshold-Based Rebalancing**: Triggered when constituent weights drift beyond configured thresholds
+  - **Market-Cap Weighted**: Constituents weighted by estimated market capitalization
+  - **Historical Tracking**: Complete history of all rebalancing events and weight changes
+  - **Configurable Strategies**: Customize rebalancing frequency and drift thresholds per fund
 
 ### Margin Trading
 - **Leverage**: Buy stocks with borrowed money (up to 2:1)
@@ -201,6 +207,12 @@ Deep dive into company profiles with financials and product history
 - `GET /api/indexfunds/:symbol` - Detailed fund information and constituents
 - `GET /api/indexfunds/:symbol/history` - Historical fund prices
 - `POST /api/indexfunds/trade` - Buy or sell index fund shares
+- `GET /api/indexfunds/:symbol/rebalancing` - Get rebalancing history for a specific fund
+- `GET /api/indexfunds/:symbol/weights` - Get current constituent weights and market-cap data
+- `GET /api/indexfunds/:symbol/config` - Get rebalancing configuration (strategy, frequency, thresholds)
+- `POST /api/indexfunds/:symbol/config` - Update rebalancing configuration
+- `POST /api/indexfunds/:symbol/rebalance` - Manually trigger rebalancing for a fund
+- `GET /api/rebalancing/events` - Get all rebalancing events across all funds
 
 ### Companies
 - `GET /api/companies` - List all available companies
@@ -244,6 +256,11 @@ StockFake uses SQLite for data persistence with the following schema:
 - **index_fund_holdings**: Index fund shares
 - **short_positions**: Short sale positions with borrow details
 - **margin_account**: Margin balance, interest rate, status
+
+### Index Fund Rebalancing
+- **index_fund_constituents**: Historical constituent weights and market-cap data over time
+- **index_fund_rebalancing_events**: Complete history of rebalancing events with details
+- **index_fund_rebalancing_config**: Per-fund rebalancing strategy and configuration
 
 ### Transaction Tracking
 - **transactions**: Complete trading history
@@ -308,6 +325,7 @@ StockFake/
 ├── helpers/                  # Modular helper functions
 │   ├── gameState.js         # Time and game state management
 │   ├── userAccount.js       # Account database operations
+│   ├── indexFundRebalancing.js # Index fund rebalancing engine
 │   └── constants.js         # Trading constants and rates
 ├── data/                     # Game data modules
 │   ├── stocks.js            # Stock price data
@@ -318,6 +336,8 @@ StockFake/
 │   ├── emails.js            # Email generation
 │   ├── trade-halts.js       # Market suspension events
 │   └── share-availability.js # Public float tracking
+├── test-rebalancing.js      # Integration test for rebalancing
+├── test-rebalancing-api.js  # API integration test for rebalancing
 └── public/                   # Frontend HTML/CSS/JS
     ├── index.html           # Portal page
     ├── trading.html         # Trading platform
