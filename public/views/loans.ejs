@@ -1,6 +1,105 @@
 <%- include('partials/header', { 
     title: 'Loans',
-    pageTitle: '💰 LOANS'
+    pageTitle: '💰 LOANS',
+    pageStyles: `
+        .credit-score {
+            background-color: #000;
+            border: 2px solid #00ff00;
+            padding: 20px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        .score-display {
+            font-size: 3em;
+            font-weight: bold;
+            margin: 10px 0;
+        }
+        .score-excellent {
+            color: #00ff00;
+        }
+        .score-good {
+            color: #88ff00;
+        }
+        .score-fair {
+            color: #ffff00;
+        }
+        .score-poor {
+            color: #ff8800;
+        }
+        .score-bad {
+            color: #ff0000;
+        }
+        .active-loans {
+            background-color: #000;
+            border: 2px solid #00ff00;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        .loan-item {
+            background-color: #001100;
+            border: 1px solid #003300;
+            padding: 15px;
+            margin-bottom: 15px;
+        }
+        .available-companies {
+            background-color: #000;
+            border: 2px solid #00ff00;
+            padding: 20px;
+        }
+        .company-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+        .company-card {
+            background-color: #001100;
+            border: 2px solid #003300;
+            padding: 20px;
+            transition: all 0.3s;
+        }
+        .company-card:hover {
+            background-color: #002200;
+            border-color: #00ff00;
+        }
+        .trust-high {
+            border-color: #00ff00;
+        }
+        .trust-medium {
+            border-color: #ffff00;
+        }
+        .trust-low {
+            border-color: #ff0000;
+        }
+        .company-card button {
+            width: 100%;
+            background-color: #003300;
+            border: 2px solid #00ff00;
+            color: #00ff00;
+            padding: 10px;
+            margin-top: 10px;
+            cursor: pointer;
+            font-family: 'Courier New', monospace;
+        }
+        .company-card button:hover {
+            background-color: #004400;
+        }
+        .message {
+            padding: 10px;
+            margin: 10px 0;
+            border: 1px solid;
+        }
+        .message.success {
+            background-color: #001100;
+            border-color: #00ff00;
+            color: #00ff00;
+        }
+        .message.error {
+            background-color: #110000;
+            border-color: #ff0000;
+            color: #ff0000;
+        }
+    `
 }) %>
 
 <div class="credit-score">

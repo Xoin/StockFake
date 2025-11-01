@@ -1,10 +1,174 @@
 <%- include('partials/header', { 
     title: 'Trading',
-    pageTitle: '📈 STOCK TRADING'
+    pageTitle: '📈 STOCK TRADING',
+    pageStyles: `
+        .content-wrapper {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        #filterSidebar {
+            flex: 0 0 250px;
+        }
+        .stocks-container {
+            flex: 1;
+            background-color: #000;
+            border: 2px solid #00ff00;
+            padding: 15px;
+        }
+        .stocks-container table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 15px 0;
+        }
+        .stocks-container th {
+            background-color: #001100;
+            color: #00ff00;
+            padding: 10px;
+            text-align: left;
+            border: 1px solid #003300;
+        }
+        .stocks-container td {
+            padding: 8px 10px;
+            border: 1px solid #003300;
+        }
+        .stocks-container tr:hover {
+            background-color: #002200;
+        }
+        .positive {
+            color: #00ff00;
+        }
+        .negative {
+            color: #ff0000;
+        }
+        .trade-form {
+            background-color: #000;
+            border: 2px solid #00ff00;
+            padding: 20px;
+            margin-top: 20px;
+        }
+        .trade-form select, .trade-form input {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 10px;
+            background-color: #001100;
+            border: 1px solid #00ff00;
+            color: #00ff00;
+            font-family: 'Courier New', monospace;
+        }
+        .buy-btn, .sell-btn {
+            background-color: #003300;
+            border: 2px solid #00ff00;
+            color: #00ff00;
+            padding: 10px 20px;
+            margin: 5px;
+            cursor: pointer;
+            font-family: 'Courier New', monospace;
+        }
+        .sell-btn {
+            background-color: #330000;
+            border-color: #ff0000;
+            color: #ff0000;
+        }
+        .buy-btn:hover {
+            background-color: #004400;
+        }
+        .sell-btn:hover {
+            background-color: #440000;
+        }
+        .cost-calculator {
+            background-color: #001100;
+            border: 1px solid #003300;
+            padding: 10px;
+            margin: 10px 0;
+        }
+        .calc-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 5px 0;
+        }
+        .calc-total {
+            border-top: 1px solid #00ff00;
+            margin-top: 5px;
+            padding-top: 10px;
+            font-weight: bold;
+        }
+        .affordability-info {
+            padding: 10px;
+            margin: 10px 0;
+            border: 1px solid #00ff00;
+        }
+        .can-afford {
+            background-color: #001100;
+            color: #00ff00;
+        }
+        .cannot-afford {
+            background-color: #110000;
+            color: #ff0000;
+        }
+        .concentration-panel {
+            background-color: #000;
+            border: 2px solid #00ff00;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+        .halt-warning {
+            background-color: #331100;
+            border: 2px solid #ff8800;
+            color: #ffaa00;
+            padding: 15px;
+            margin-bottom: 20px;
+            text-align: center;
+            font-weight: bold;
+        }
+        .message {
+            padding: 10px;
+            margin: 10px 0;
+            border: 1px solid;
+        }
+        .message.success {
+            background-color: #001100;
+            border-color: #00ff00;
+            color: #00ff00;
+        }
+        .message.error {
+            background-color: #110000;
+            border-color: #ff0000;
+            color: #ff0000;
+        }
+        .pagination-controls {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 10px;
+            margin: 15px 0;
+            flex-wrap: wrap;
+        }
+        .page-btn {
+            background-color: #003300;
+            border: 1px solid #00ff00;
+            color: #00ff00;
+            padding: 5px 10px;
+            cursor: pointer;
+            font-family: 'Courier New', monospace;
+        }
+        .page-btn:hover:not(:disabled) {
+            background-color: #004400;
+        }
+        .page-btn.active {
+            background-color: #00ff00;
+            color: #000;
+        }
+        .page-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        .page-info {
+            color: #00aa00;
+            padding: 0 10px;
+        }
+    `
 }) %>
-
-<!-- Shared header component -->
-        <div id="shared-header" data-title="📈 TRADING PLATFORM"></div>
         
         <div id="haltWarning" class="halt-warning" style="display: none;"></div>
         
@@ -97,7 +261,7 @@
 
 <%- include('partials/footer', {
     pageScripts: `
-    <script src="header.js"></script>
+    <script src="/asset-filter.js"></script>
     <script>
 let stocks = [];
         let paginator;

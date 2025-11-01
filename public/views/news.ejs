@@ -1,10 +1,69 @@
 <%- include('partials/header', { 
     title: 'News',
-    pageTitle: '📰 FINANCIAL NEWS'
+    pageTitle: '📰 FINANCIAL NEWS',
+    pageStyles: `
+        .news-container {
+            background-color: #000;
+            border: 2px solid #00ff00;
+            padding: 15px;
+        }
+        .news-item {
+            background-color: #001100;
+            border: 1px solid #003300;
+            margin-bottom: 15px;
+            padding: 15px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .news-item:hover {
+            background-color: #002200;
+        }
+        .news-item.unread {
+            border-color: #00ff00;
+            border-width: 2px;
+        }
+        .news-item.expanded {
+            background-color: #002200;
+        }
+        .news-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        .news-source {
+            color: #00aa00;
+            font-weight: bold;
+        }
+        .news-date {
+            color: #00aa00;
+            font-size: 0.9em;
+        }
+        .news-title {
+            color: #00ff00;
+            font-size: 1.1em;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+        .news-body {
+            color: #00cc00;
+            display: none;
+            margin-top: 10px;
+            line-height: 1.6;
+        }
+        .news-item.expanded .news-body {
+            display: block;
+        }
+        .no-news {
+            text-align: center;
+            padding: 30px;
+            color: #00aa00;
+        }
+        .pagination-controls-container {
+            margin: 15px 0;
+        }
+    `
 }) %>
-
-<!-- Shared header component - auto-loads via header.js -->
-        <div id="shared-header" data-title="📰 HISTORICAL NEWS"></div>
         
         <div class="pagination-controls-container"></div>
         <div class="news-container" id="newsContainer">

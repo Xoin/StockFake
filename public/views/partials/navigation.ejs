@@ -1,3 +1,10 @@
+        <!-- Game Status Display -->
+        <div class="time-display">
+            <div id="gameTime">Loading...</div>
+            <span id="marketStatus" class="market-status">...</span>
+            <span id="gameSpeed" style="margin-left: 15px; font-size: 0.9em;">...</span>
+        </div>
+        
         <div class="nav">
             <a href="/">🏠 Portal</a> |
             <a href="/bank">🏦 Bank</a> |
@@ -9,3 +16,53 @@
             <a href="/news">📰 News</a> |
             <a href="/email">📧 Email</a>
         </div>
+        
+        <script>
+        // Update game time, market status, and speed on all pages
+        async function updateGameStatus() {
+            try {
+                const response = await fetch('/api/time');
+                const data = await response.json();
+                const date = new Date(data.currentTime);
+                
+                const timeEl = document.getElementById('gameTime');
+                if (timeEl) {
+                    timeEl.textContent = date.toLocaleString();
+                }
+                
+                const statusEl = document.getElementById('marketStatus');
+                if (statusEl) {
+                    if (data.isMarketOpen) {
+                        statusEl.textContent = '🟢 MARKET OPEN';
+                        statusEl.className = 'market-status market-open';
+                    } else {
+                        statusEl.textContent = '🔴 MARKET CLOSED';
+                        statusEl.className = 'market-status market-closed';
+                    }
+                }
+                
+                const speedEl = document.getElementById('gameSpeed');
+                if (speedEl) {
+                    let speedText = '';
+                    if (data.isPaused) {
+                        speedText = '⏸ PAUSED';
+                    } else if (data.timeMultiplier === 60) {
+                        speedText = '🐌 Speed: Slow (1s = 1min)';
+                    } else if (data.timeMultiplier === 3600) {
+                        speedText = '⚡ Speed: Normal (1s = 1hr)';
+                    } else if (data.timeMultiplier === 86400) {
+                        speedText = '🚀 Speed: Fast (1s = 1day)';
+                    } else {
+                        speedText = `⏱ Speed: Custom (1s = ${data.timeMultiplier}s)`;
+                    }
+                    speedEl.textContent = speedText;
+                }
+            } catch (error) {
+                console.error('Error updating game status:', error);
+            }
+        }
+        
+        // Initialize and update
+        updateGameStatus();
+        setInterval(updateGameStatus, 1000);
+        </script>
