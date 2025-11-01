@@ -17,6 +17,19 @@ class Paginator {
         const end = start + this.itemsPerPage;
         return this.items.slice(start, end);
     }
+    
+    updateItems(newItems) {
+        this.items = newItems;
+        // Adjust current page if it's beyond the new total
+        if (this.currentPage > this.totalPages && this.totalPages > 0) {
+            this.currentPage = this.totalPages;
+        }
+    }
+    
+    sortItems(compareFn) {
+        this.items.sort(compareFn);
+        return true;
+    }
 
     nextPage() {
         if (this.currentPage < this.totalPages) {
@@ -123,6 +136,47 @@ function escapeHtml(text) {
     const div = document.createElement('div');
     div.textContent = text;
     return div.innerHTML;
+}
+
+// Factory function to create a paginator with automatic control rendering
+function createPaginator(items, itemsPerPage, renderCallback) {
+    const pag = new Paginator(items, itemsPerPage);
+    
+    // Override methods to auto-render
+    const originalNextPage = pag.nextPage.bind(pag);
+    const originalPrevPage = pag.prevPage.bind(pag);
+    const originalGoToPage = pag.goToPage.bind(pag);
+    
+    pag.nextPage = function() {
+        if (originalNextPage()) {
+            if (renderCallback) renderCallback();
+            return true;
+        }
+        return false;
+    };
+    
+    pag.prevPage = function() {
+        if (originalPrevPage()) {
+            if (renderCallback) renderCallback();
+            return true;
+        }
+        return false;
+    };
+    
+    pag.goToPage = function(page) {
+        if (originalGoToPage(page)) {
+            if (renderCallback) renderCallback();
+            return true;
+        }
+        return false;
+    };
+    
+    // Helper to get current page for rendering
+    pag.getCurrentPage = function() {
+        return this.getCurrentPageItems();
+    };
+    
+    return pag;
 }
 
 // Notification badge update function

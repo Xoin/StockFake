@@ -357,6 +357,22 @@ app.get('/api/stocks/:symbol/history', (req, res) => {
     }
   }
   
+  // If insufficient data, use hourly intervals for recent data
+  if (history.length < 3 && daysToFetch <= 7) {
+    history.length = 0; // Clear and rebuild with hourly data
+    const hoursToFetch = Math.min(daysToFetch * 24, 168); // Max 7 days of hourly data
+    for (let i = hoursToFetch; i >= 0; i -= 1) {
+      const date = new Date(gameTime.getTime() - (i * 60 * 60 * 1000));
+      const price = stocks.getStockPrice(symbol, date, timeMultiplier);
+      if (price) {
+        history.push({
+          date: date.toISOString(),
+          price: price.price
+        });
+      }
+    }
+  }
+  
   res.json(history);
 });
 
@@ -401,6 +417,25 @@ app.get('/api/market/index', (req, res) => {
         value: avgPrice,
         count: allStocks.length
       });
+    }
+  }
+  
+  // If insufficient data, use hourly intervals for recent data
+  if (history.length < 3 && daysToFetch <= 7) {
+    history.length = 0; // Clear and rebuild with hourly data
+    const hoursToFetch = Math.min(daysToFetch * 24, 168); // Max 7 days of hourly data
+    for (let i = hoursToFetch; i >= 0; i -= 1) {
+      const date = new Date(gameTime.getTime() - (i * 60 * 60 * 1000));
+      const allStocks = stocks.getStockData(date, timeMultiplier);
+      
+      if (allStocks.length > 0) {
+        const avgPrice = allStocks.reduce((sum, s) => sum + s.price, 0) / allStocks.length;
+        history.push({
+          date: date.toISOString(),
+          value: avgPrice,
+          count: allStocks.length
+        });
+      }
     }
   }
   

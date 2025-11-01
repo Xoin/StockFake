@@ -107,76 +107,25 @@ let marketChart = null;
             }
             
             const marketCtx = document.getElementById('marketChart').getContext('2d');
-            marketChart = new Chart(marketCtx, {
-                type: 'line',
-                data: {
-                    labels: marketData.map(d => new Date(d.date).toLocaleDateString()),
-                    datasets: [{
-                        label: 'Market Index',
-                        data: marketData.map(d => d.value),
-                        borderColor: '#00ff00',
-                        backgroundColor: 'rgba(0, 255, 0, 0.1)',
-                        tension: 0.1
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: true,
-                    plugins: {
-                        legend: {
-                            labels: {
-                                color: '#00ff00',
-                                font: {
-                                    family: 'Courier New'
-                                }
-                            }
-                        }
-                    },
-                    scales: {
-                        x: {
-                            ticks: {
-                                color: '#00ff00',
-                                font: {
-                                    family: 'Courier New'
-                                },
-                                maxTicksLimit: 10
-                            },
-                            grid: {
-                                color: '#003300'
-                            }
-                        },
-                        y: {
-                            ticks: {
-                                color: '#00ff00',
-                                font: {
-                                    family: 'Courier New'
-                                }
-                            },
-                            grid: {
-                                color: '#003300'
-                            }
-                        }
-                    }
-                }
-            });
             
-            // Update stock chart if symbol is selected
-            if (symbol) {
-                const stockResponse = await fetch(\`/api/stocks/\${symbol}/history?days=\${days}\`);
-                const stockData = await stockResponse.json();
-                
-                if (stockChart) {
-                    stockChart.destroy();
-                }
-                
-                const stockCtx = document.getElementById('stockChart').getContext('2d');
-                stockChart = new Chart(stockCtx, {
+            if (marketData.length < 2) {
+                // Show message when insufficient data
+                marketCtx.clearRect(0, 0, marketCtx.canvas.width, marketCtx.canvas.height);
+                marketCtx.fillStyle = '#00aa00';
+                marketCtx.font = '16px Courier New';
+                marketCtx.textAlign = 'center';
+                marketCtx.fillText('Insufficient historical data for this time period', 
+                    marketCtx.canvas.width / 2, marketCtx.canvas.height / 2 - 10);
+                marketCtx.fillText('Try running the game longer or selecting a shorter time period', 
+                    marketCtx.canvas.width / 2, marketCtx.canvas.height / 2 + 10);
+            } else {
+                marketChart = new Chart(marketCtx, {
                     type: 'line',
                     data: {
-                        labels: stockData.map(d => new Date(d.date).toLocaleDateString()),
+                        labels: marketData.map(d => new Date(d.date).toLocaleDateString()),
                         datasets: [{
-                            label: \`\${symbol} Price\`,
-                            data: stockData.map(d => d.price),
+                            label: 'Market Index',
+                            data: marketData.map(d => d.value),
                             borderColor: '#00ff00',
                             backgroundColor: 'rgba(0, 255, 0, 0.1)',
                             tension: 0.1
@@ -213,9 +162,6 @@ let marketChart = null;
                                     color: '#00ff00',
                                     font: {
                                         family: 'Courier New'
-                                    },
-                                    callback: function(value) {
-                                        return '$' + value.toFixed(2);
                                     }
                                 },
                                 grid: {
@@ -225,6 +171,86 @@ let marketChart = null;
                         }
                     }
                 });
+            }
+            
+            // Update stock chart if symbol is selected
+            if (symbol) {
+                const stockResponse = await fetch(\`/api/stocks/\${symbol}/history?days=\${days}\`);
+                const stockData = await stockResponse.json();
+                
+                if (stockChart) {
+                    stockChart.destroy();
+                }
+                
+                const stockCtx = document.getElementById('stockChart').getContext('2d');
+                
+                if (stockData.length < 2) {
+                    // Show message when insufficient data
+                    stockCtx.clearRect(0, 0, stockCtx.canvas.width, stockCtx.canvas.height);
+                    stockCtx.fillStyle = '#00aa00';
+                    stockCtx.font = '16px Courier New';
+                    stockCtx.textAlign = 'center';
+                    stockCtx.fillText('Insufficient historical data for this stock and time period', 
+                        stockCtx.canvas.width / 2, stockCtx.canvas.height / 2 - 10);
+                    stockCtx.fillText('Try running the game longer or selecting a shorter time period', 
+                        stockCtx.canvas.width / 2, stockCtx.canvas.height / 2 + 10);
+                } else {
+                    stockChart = new Chart(stockCtx, {
+                        type: 'line',
+                        data: {
+                            labels: stockData.map(d => new Date(d.date).toLocaleDateString()),
+                            datasets: [{
+                                label: \`\${symbol} Price\`,
+                                data: stockData.map(d => d.price),
+                                borderColor: '#00ff00',
+                                backgroundColor: 'rgba(0, 255, 0, 0.1)',
+                                tension: 0.1
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: true,
+                            plugins: {
+                                legend: {
+                                    labels: {
+                                        color: '#00ff00',
+                                        font: {
+                                            family: 'Courier New'
+                                        }
+                                    }
+                                }
+                            },
+                            scales: {
+                                x: {
+                                    ticks: {
+                                        color: '#00ff00',
+                                        font: {
+                                            family: 'Courier New'
+                                        },
+                                        maxTicksLimit: 10
+                                    },
+                                    grid: {
+                                        color: '#003300'
+                                    }
+                                },
+                                y: {
+                                    ticks: {
+                                        color: '#00ff00',
+                                        font: {
+                                            family: 'Courier New'
+                                        },
+                                        callback: function(value) {
+                                            return '$' + value.toFixed(2);
+                                        }
+                                    },
+                                    grid: {
+                                        color: '#003300'
+                                    }
+                                }
+                            }
+                        }
+                    });
+                }
             }
         }
         
