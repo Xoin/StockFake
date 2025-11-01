@@ -33,6 +33,9 @@
         .controls button:hover {
             background-color: #004400;
         }
+        .controls button.active {
+            background-color: #005500;
+        }
         .chart-container {
             background-color: #000;
             border: 2px solid #00ff00;
@@ -43,236 +46,988 @@
             width: 100% !important;
             height: 400px !important;
         }
+        .chart-container h2 {
+            color: #00ff00;
+            margin-top: 0;
+        }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        .stat-box {
+            background-color: #001100;
+            border: 1px solid #00ff00;
+            padding: 15px;
+            text-align: center;
+        }
+        .stat-box h3 {
+            color: #00ff00;
+            margin: 0 0 10px 0;
+            font-size: 14px;
+        }
+        .stat-box .value {
+            color: #00ff00;
+            font-size: 24px;
+            font-weight: bold;
+        }
+        .stat-box .subvalue {
+            color: #00aa00;
+            font-size: 12px;
+            margin-top: 5px;
+        }
+        .tab-buttons {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+        .tab-button {
+            background-color: #003300;
+            border: 2px solid #00ff00;
+            color: #00ff00;
+            padding: 10px 20px;
+            cursor: pointer;
+            font-family: 'Courier New', monospace;
+        }
+        .tab-button:hover {
+            background-color: #004400;
+        }
+        .tab-button.active {
+            background-color: #005500;
+            border-color: #00ff00;
+        }
+        .tab-content {
+            display: none;
+        }
+        .tab-content.active {
+            display: block;
+        }
+        .sector-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        .sector-item {
+            background-color: #001100;
+            border: 1px solid #00ff00;
+            padding: 10px;
+            cursor: pointer;
+            text-align: center;
+            transition: background-color 0.2s;
+        }
+        .sector-item:hover {
+            background-color: #002200;
+        }
+        .sector-item.selected {
+            background-color: #003300;
+            border-color: #00ff00;
+        }
     `
 }) %>
 
 <div class="controls">
-            <label for="stockSelect">Select Stock:</label>
-            <select id="stockSelect">
-                <option value="">Loading...</option>
-            </select>
-            <label for="daysSelect">Time Period:</label>
-            <select id="daysSelect">
-                <option value="7">7 Days</option>
-                <option value="30" selected>30 Days</option>
-                <option value="90">90 Days</option>
-                <option value="180">6 Months</option>
-                <option value="365">1 Year</option>
-                <option value="730">2 Years</option>
-                <option value="1825">5 Years</option>
-            </select>
-            <button onclick="updateCharts()">Update Charts</button>
+    <label for="daysSelect">Time Period:</label>
+    <select id="daysSelect">
+        <option value="7">7 Days</option>
+        <option value="30" selected>30 Days</option>
+        <option value="90">90 Days</option>
+        <option value="180">6 Months</option>
+        <option value="365">1 Year</option>
+        <option value="730">2 Years</option>
+        <option value="1825">5 Years</option>
+        <option value="3650">10 Years</option>
+        <option value="7300">20 Years</option>
+        <option value="18250">All Time</option>
+    </select>
+    <button onclick="updateAllCharts()">Update All Charts</button>
+</div>
+
+<!-- Market Statistics Dashboard -->
+<div class="stats-grid" id="statsGrid">
+    <div class="stat-box">
+        <h3>Total Stocks</h3>
+        <div class="value" id="statTotalStocks">-</div>
+    </div>
+    <div class="stat-box">
+        <h3>Market Average</h3>
+        <div class="value" id="statAvgPrice">-</div>
+    </div>
+    <div class="stat-box">
+        <h3>Advancing</h3>
+        <div class="value" id="statAdvancing">-</div>
+        <div class="subvalue" id="statAdvancingPct">-</div>
+    </div>
+    <div class="stat-box">
+        <h3>Declining</h3>
+        <div class="value" id="statDeclining">-</div>
+        <div class="subvalue" id="statDecliningPct">-</div>
+    </div>
+    <div class="stat-box">
+        <h3>Sectors</h3>
+        <div class="value" id="statSectors">-</div>
+    </div>
+</div>
+
+<!-- Tab Navigation -->
+<div class="tab-buttons">
+    <button class="tab-button active" onclick="switchTab('overview', event)">Market Overview</button>
+    <button class="tab-button" onclick="switchTab('sectors', event)">Sector Performance</button>
+    <button class="tab-button" onclick="switchTab('health', event)">Market Health</button>
+    <button class="tab-button" onclick="switchTab('indexfunds', event)">Index Funds</button>
+    <button class="tab-button" onclick="switchTab('stocks', event)">Individual Stocks</button>
+</div>
+
+<!-- Overview Tab -->
+<div id="tab-overview" class="tab-content active">
+    <div class="chart-container">
+        <h2>Market Index - Full History</h2>
+        <canvas id="marketChart"></canvas>
+    </div>
+    
+    <div class="chart-container">
+        <h2>Market Breadth (Advancing vs Declining)</h2>
+        <canvas id="breadthChart"></canvas>
+    </div>
+</div>
+
+<!-- Sectors Tab -->
+<div id="tab-sectors" class="tab-content">
+    <div class="chart-container">
+        <h2>Sector Performance Comparison</h2>
+        <div id="sectorList" class="sector-list">
+            <!-- Populated dynamically -->
         </div>
-        
-        <div class="chart-container">
-            <h2>Market Index</h2>
-            <canvas id="marketChart"></canvas>
-        </div>
-        
-        <div class="chart-container">
-            <h2>Stock Price History</h2>
-            <canvas id="stockChart"></canvas>
-        </div>
+        <canvas id="sectorChart"></canvas>
+    </div>
+    
+    <div class="chart-container">
+        <h2>Sector Distribution</h2>
+        <canvas id="sectorPieChart"></canvas>
+    </div>
+</div>
+
+<!-- Market Health Tab -->
+<div id="tab-health" class="tab-content">
+    <div class="chart-container">
+        <h2>Market Volatility</h2>
+        <canvas id="volatilityChart"></canvas>
+    </div>
+    
+    <div class="chart-container">
+        <h2>Market Breadth Ratio</h2>
+        <canvas id="breadthRatioChart"></canvas>
+    </div>
+</div>
+
+<!-- Index Funds Tab -->
+<div id="tab-indexfunds" class="tab-content">
+    <div class="chart-container">
+        <h2>Index Fund Performance</h2>
+        <canvas id="indexFundChart"></canvas>
+    </div>
+</div>
+
+<!-- Stocks Tab -->
+<div id="tab-stocks" class="tab-content">
+    <div class="controls">
+        <label for="stockSelect">Select Stock:</label>
+        <select id="stockSelect">
+            <option value="">Loading...</option>
+        </select>
+    </div>
+    
+    <div class="chart-container">
+        <h2>Stock Price History</h2>
+        <canvas id="stockChart"></canvas>
+    </div>
+</div>
 
 <%- include('partials/footer', {
     pageScripts: `
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <script>
-let marketChart = null;
-        let stockChart = null;
+// Chart instances
+let charts = {
+    market: null,
+    breadth: null,
+    sector: null,
+    sectorPie: null,
+    volatility: null,
+    breadthRatio: null,
+    indexFund: null,
+    stock: null
+};
+
+// Constants
+const MAX_INDEX_FUNDS_DISPLAY = 10;
+
+// Current state
+let currentTab = 'overview';
+let selectedSectors = [];
+let allSectors = [];
+
+// Color palette for multiple series
+const colorPalette = [
+    '#00ff00', '#00ffff', '#ff00ff', '#ffff00', '#ff0000', 
+    '#00ff88', '#88ff00', '#0088ff', '#ff8800', '#8800ff',
+    '#ff0088', '#88ff88', '#00ff00', '#ffaa00', '#aa00ff'
+];
+
+// Helper function to show insufficient data message on canvas
+function showInsufficientDataMessage(ctx, primaryMessage, secondaryMessage) {
+    ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+    ctx.fillStyle = '#00aa00';
+    ctx.font = '16px Courier New';
+    ctx.textAlign = 'center';
+    ctx.fillText(primaryMessage, ctx.canvas.width / 2, ctx.canvas.height / 2 - 10);
+    if (secondaryMessage) {
+        ctx.fillText(secondaryMessage, ctx.canvas.width / 2, ctx.canvas.height / 2 + 10);
+    }
+}
+
+// Tab switching
+function switchTab(tabName, event) {
+    currentTab = tabName;
+    
+    // Update button states
+    document.querySelectorAll('.tab-button').forEach(btn => {
+        btn.classList.remove('active');
+    });
+    if (event && event.target) {
+        event.target.classList.add('active');
+    }
+    
+    // Update content visibility
+    document.querySelectorAll('.tab-content').forEach(content => {
+        content.classList.remove('active');
+    });
+    document.getElementById('tab-' + tabName).classList.add('active');
+    
+    // Load data for the tab
+    updateAllCharts();
+}
+
+// Load market statistics
+async function loadMarketStats() {
+    try {
+        const response = await fetch('/api/market/stats');
+        const stats = await response.json();
         
-        // Helper function to show insufficient data message on canvas
-        function showInsufficientDataMessage(ctx, primaryMessage, secondaryMessage) {
-            ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
-            ctx.fillStyle = '#00aa00';
-            ctx.font = '16px Courier New';
-            ctx.textAlign = 'center';
-            ctx.fillText(primaryMessage, ctx.canvas.width / 2, ctx.canvas.height / 2 - 10);
-            ctx.fillText(secondaryMessage, ctx.canvas.width / 2, ctx.canvas.height / 2 + 10);
+        document.getElementById('statTotalStocks').textContent = stats.totalStocks || 0;
+        document.getElementById('statAvgPrice').textContent = stats.avgPrice ? '$' + stats.avgPrice.toFixed(2) : '-';
+        document.getElementById('statSectors').textContent = stats.sectors ? stats.sectors.length : 0;
+        
+        // Update advancing/declining from health data
+        const days = document.getElementById('daysSelect').value;
+        const healthResponse = await fetch(\`/api/market/health?days=\${days}\`);
+        const healthData = await healthResponse.json();
+        
+        if (healthData.length > 0) {
+            const latest = healthData[healthData.length - 1];
+            document.getElementById('statAdvancing').textContent = latest.advancing;
+            document.getElementById('statDeclining').textContent = latest.declining;
+            document.getElementById('statAdvancingPct').textContent = 
+                ((latest.advancing / latest.totalStocks) * 100).toFixed(1) + '%';
+            document.getElementById('statDecliningPct').textContent = 
+                ((latest.declining / latest.totalStocks) * 100).toFixed(1) + '%';
         }
         
-        async function loadStocks() {
-            const response = await fetch('/api/stocks');
-            const stocks = await response.json();
-            
-            const select = document.getElementById('stockSelect');
-            select.innerHTML = '<option value="">Select Stock</option>' + 
-                stocks.map(s => \`<option value="\${s.symbol}">\${s.symbol} - \${s.name}</option>\`).join('');
-            
-            if (stocks.length > 0) {
-                select.value = stocks[0].symbol;
-            }
+        return stats;
+    } catch (error) {
+        console.error('Failed to load market stats:', error);
+    }
+}
+
+// Load stocks list
+async function loadStocks() {
+    try {
+        const response = await fetch('/api/stocks');
+        const stocks = await response.json();
+        
+        const select = document.getElementById('stockSelect');
+        select.innerHTML = '<option value="">Select Stock</option>' + 
+            stocks.map(s => \`<option value="\${s.symbol}">\${s.symbol} - \${s.name}</option>\`).join('');
+        
+        if (stocks.length > 0) {
+            select.value = stocks[0].symbol;
+        }
+    } catch (error) {
+        console.error('Failed to load stocks:', error);
+    }
+}
+
+// Update market index chart
+async function updateMarketChart() {
+    const days = document.getElementById('daysSelect').value;
+    
+    try {
+        const response = await fetch(\`/api/market/index?days=\${days}\`);
+        const marketData = await response.json();
+        
+        if (charts.market) {
+            charts.market.destroy();
         }
         
-        async function updateCharts() {
-            const days = document.getElementById('daysSelect').value;
-            const symbol = document.getElementById('stockSelect').value;
-            
-            // Update market index chart
-            const marketResponse = await fetch(\`/api/market/index?days=\${days}\`);
-            const marketData = await marketResponse.json();
-            
-            if (marketChart) {
-                marketChart.destroy();
-            }
-            
-            const marketCtx = document.getElementById('marketChart').getContext('2d');
-            
-            if (marketData.length < 2) {
-                // Show message when insufficient data
-                const marketCtx = document.getElementById('marketChart').getContext('2d');
-                showInsufficientDataMessage(marketCtx, 
-                    'Insufficient historical data for this time period',
-                    'Try running the game longer or selecting a shorter time period');
-            } else {
-                marketChart = new Chart(marketCtx, {
-                    type: 'line',
-                    data: {
-                        labels: marketData.map(d => new Date(d.date).toLocaleDateString()),
-                        datasets: [{
-                            label: 'Market Index',
-                            data: marketData.map(d => d.value),
-                            borderColor: '#00ff00',
-                            backgroundColor: 'rgba(0, 255, 0, 0.1)',
-                            tension: 0.1
-                        }]
-                    },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: true,
-                        plugins: {
-                            legend: {
-                                labels: {
-                                    color: '#00ff00',
-                                    font: {
-                                        family: 'Courier New'
-                                    }
-                                }
-                            }
-                        },
-                        scales: {
-                            x: {
-                                ticks: {
-                                    color: '#00ff00',
-                                    font: {
-                                        family: 'Courier New'
-                                    },
-                                    maxTicksLimit: 10
-                                },
-                                grid: {
-                                    color: '#003300'
-                                }
-                            },
-                            y: {
-                                ticks: {
-                                    color: '#00ff00',
-                                    font: {
-                                        family: 'Courier New'
-                                    }
-                                },
-                                grid: {
-                                    color: '#003300'
-                                }
-                            }
+        const ctx = document.getElementById('marketChart').getContext('2d');
+        
+        if (marketData.length < 2) {
+            showInsufficientDataMessage(ctx, 
+                'Insufficient historical data for this time period',
+                'Try running the game longer or selecting a shorter time period');
+            return;
+        }
+        
+        charts.market = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: marketData.map(d => new Date(d.date).toLocaleDateString()),
+                datasets: [{
+                    label: 'Market Index',
+                    data: marketData.map(d => d.value),
+                    borderColor: '#00ff00',
+                    backgroundColor: 'rgba(0, 255, 0, 0.1)',
+                    tension: 0.1,
+                    fill: true
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                plugins: {
+                    legend: {
+                        labels: {
+                            color: '#00ff00',
+                            font: { family: 'Courier New' }
                         }
                     }
-                });
-            }
-            
-            // Update stock chart if symbol is selected
-            if (symbol) {
-                const stockResponse = await fetch(\`/api/stocks/\${symbol}/history?days=\${days}\`);
-                const stockData = await stockResponse.json();
-                
-                if (stockChart) {
-                    stockChart.destroy();
-                }
-                
-                const stockCtx = document.getElementById('stockChart').getContext('2d');
-                
-                if (stockData.length < 2) {
-                    // Show message when insufficient data
-                    const stockCtx = document.getElementById('stockChart').getContext('2d');
-                    showInsufficientDataMessage(stockCtx,
-                        'Insufficient historical data for this stock and time period',
-                        'Try running the game longer or selecting a shorter time period');
-                } else {
-                    stockChart = new Chart(stockCtx, {
-                        type: 'line',
-                        data: {
-                            labels: stockData.map(d => new Date(d.date).toLocaleDateString()),
-                            datasets: [{
-                                label: \`\${symbol} Price\`,
-                                data: stockData.map(d => d.price),
-                                borderColor: '#00ff00',
-                                backgroundColor: 'rgba(0, 255, 0, 0.1)',
-                                tension: 0.1
-                            }]
+                },
+                scales: {
+                    x: {
+                        ticks: {
+                            color: '#00ff00',
+                            font: { family: 'Courier New' },
+                            maxTicksLimit: 10
                         },
-                        options: {
-                            responsive: true,
-                            maintainAspectRatio: true,
-                            plugins: {
-                                legend: {
-                                    labels: {
-                                        color: '#00ff00',
-                                        font: {
-                                            family: 'Courier New'
-                                        }
-                                    }
-                                }
-                            },
-                            scales: {
-                                x: {
-                                    ticks: {
-                                        color: '#00ff00',
-                                        font: {
-                                            family: 'Courier New'
-                                        },
-                                        maxTicksLimit: 10
-                                    },
-                                    grid: {
-                                        color: '#003300'
-                                    }
-                                },
-                                y: {
-                                    ticks: {
-                                        color: '#00ff00',
-                                        font: {
-                                            family: 'Courier New'
-                                        },
-                                        callback: function(value) {
-                                            return '$' + value.toFixed(2);
-                                        }
-                                    },
-                                    grid: {
-                                        color: '#003300'
-                                    }
-                                }
-                            }
+                        grid: { color: '#003300' }
+                    },
+                    y: {
+                        ticks: {
+                            color: '#00ff00',
+                            font: { family: 'Courier New' }
+                        },
+                        grid: { color: '#003300' }
+                    }
+                }
+            }
+        });
+    } catch (error) {
+        console.error('Failed to update market chart:', error);
+    }
+}
+
+// Update market breadth chart
+async function updateBreadthChart() {
+    const days = document.getElementById('daysSelect').value;
+    
+    try {
+        const response = await fetch(\`/api/market/health?days=\${days}\`);
+        const healthData = await response.json();
+        
+        if (charts.breadth) {
+            charts.breadth.destroy();
+        }
+        
+        const ctx = document.getElementById('breadthChart').getContext('2d');
+        
+        if (healthData.length < 2) {
+            showInsufficientDataMessage(ctx, 
+                'Insufficient historical data for this time period');
+            return;
+        }
+        
+        charts.breadth = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: healthData.map(d => new Date(d.date).toLocaleDateString()),
+                datasets: [
+                    {
+                        label: 'Advancing',
+                        data: healthData.map(d => d.advancing),
+                        backgroundColor: 'rgba(0, 255, 0, 0.5)',
+                        borderColor: '#00ff00',
+                        borderWidth: 1
+                    },
+                    {
+                        label: 'Declining',
+                        data: healthData.map(d => -d.declining),
+                        backgroundColor: 'rgba(255, 0, 0, 0.5)',
+                        borderColor: '#ff0000',
+                        borderWidth: 1
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                plugins: {
+                    legend: {
+                        labels: {
+                            color: '#00ff00',
+                            font: { family: 'Courier New' }
                         }
+                    }
+                },
+                scales: {
+                    x: {
+                        stacked: false,
+                        ticks: {
+                            color: '#00ff00',
+                            font: { family: 'Courier New' },
+                            maxTicksLimit: 10
+                        },
+                        grid: { color: '#003300' }
+                    },
+                    y: {
+                        ticks: {
+                            color: '#00ff00',
+                            font: { family: 'Courier New' },
+                            callback: function(value) {
+                                return Math.abs(value);
+                            }
+                        },
+                        grid: { color: '#003300' }
+                    }
+                }
+            }
+        });
+    } catch (error) {
+        console.error('Failed to update breadth chart:', error);
+    }
+}
+
+// Update sector charts
+async function updateSectorCharts() {
+    const days = document.getElementById('daysSelect').value;
+    
+    try {
+        const response = await fetch(\`/api/market/sectors?days=\${days}\`);
+        const sectorData = await response.json();
+        
+        allSectors = sectorData.sectors || [];
+        
+        // Populate sector list
+        const sectorList = document.getElementById('sectorList');
+        sectorList.innerHTML = allSectors.map((sector, idx) => 
+            \`<div class="sector-item \${selectedSectors.includes(sector) ? 'selected' : ''}" 
+                  onclick="toggleSector('\${sector}')" 
+                  style="color: \${colorPalette[idx % colorPalette.length]}">
+                \${sector}
+            </div>\`
+        ).join('');
+        
+        // If no sectors selected, select first 5
+        if (selectedSectors.length === 0 && allSectors.length > 0) {
+            selectedSectors = allSectors.slice(0, Math.min(5, allSectors.length));
+        }
+        
+        // Update sector performance chart
+        if (charts.sector) {
+            charts.sector.destroy();
+        }
+        
+        const ctx = document.getElementById('sectorChart').getContext('2d');
+        
+        if (selectedSectors.length === 0) {
+            showInsufficientDataMessage(ctx, 'Select sectors to compare');
+            return;
+        }
+        
+        const datasets = selectedSectors.map((sector, idx) => {
+            const history = sectorData.history[sector] || [];
+            return {
+                label: sector,
+                data: history.map(d => d.value),
+                borderColor: colorPalette[allSectors.indexOf(sector) % colorPalette.length],
+                backgroundColor: 'transparent',
+                tension: 0.1
+            };
+        });
+        
+        // Get labels from first sector's history
+        const firstSectorHistory = sectorData.history[selectedSectors[0]] || [];
+        const labels = firstSectorHistory.map(d => new Date(d.date).toLocaleDateString());
+        
+        charts.sector = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: datasets
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                plugins: {
+                    legend: {
+                        labels: {
+                            color: '#00ff00',
+                            font: { family: 'Courier New' }
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        ticks: {
+                            color: '#00ff00',
+                            font: { family: 'Courier New' },
+                            maxTicksLimit: 10
+                        },
+                        grid: { color: '#003300' }
+                    },
+                    y: {
+                        ticks: {
+                            color: '#00ff00',
+                            font: { family: 'Courier New' }
+                        },
+                        grid: { color: '#003300' }
+                    }
+                }
+            }
+        });
+        
+        // Update sector pie chart
+        await updateSectorPieChart();
+    } catch (error) {
+        console.error('Failed to update sector charts:', error);
+    }
+}
+
+// Update sector pie chart
+async function updateSectorPieChart() {
+    try {
+        const response = await fetch('/api/market/stats');
+        const stats = await response.json();
+        
+        if (charts.sectorPie) {
+            charts.sectorPie.destroy();
+        }
+        
+        const ctx = document.getElementById('sectorPieChart').getContext('2d');
+        
+        const sectorBreakdown = stats.sectorBreakdown || {};
+        const sectors = Object.keys(sectorBreakdown).sort();
+        
+        if (sectors.length === 0) {
+            showInsufficientDataMessage(ctx, 'No sector data available');
+            return;
+        }
+        
+        charts.sectorPie = new Chart(ctx, {
+            type: 'pie',
+            data: {
+                labels: sectors,
+                datasets: [{
+                    data: sectors.map(s => sectorBreakdown[s].count),
+                    backgroundColor: sectors.map((s, idx) => colorPalette[idx % colorPalette.length]),
+                    borderColor: '#00ff00',
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                plugins: {
+                    legend: {
+                        position: 'right',
+                        labels: {
+                            color: '#00ff00',
+                            font: { family: 'Courier New', size: 10 }
+                        }
+                    }
+                }
+            }
+        });
+    } catch (error) {
+        console.error('Failed to update sector pie chart:', error);
+    }
+}
+
+// Toggle sector selection
+function toggleSector(sector) {
+    const idx = selectedSectors.indexOf(sector);
+    if (idx > -1) {
+        selectedSectors.splice(idx, 1);
+    } else {
+        selectedSectors.push(sector);
+    }
+    updateSectorCharts();
+}
+
+// Update volatility chart
+async function updateVolatilityChart() {
+    const days = document.getElementById('daysSelect').value;
+    
+    try {
+        const response = await fetch(\`/api/market/health?days=\${days}\`);
+        const healthData = await response.json();
+        
+        if (charts.volatility) {
+            charts.volatility.destroy();
+        }
+        
+        const ctx = document.getElementById('volatilityChart').getContext('2d');
+        
+        if (healthData.length < 2) {
+            showInsufficientDataMessage(ctx, 
+                'Insufficient historical data for this time period');
+            return;
+        }
+        
+        charts.volatility = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: healthData.map(d => new Date(d.date).toLocaleDateString()),
+                datasets: [{
+                    label: 'Market Volatility',
+                    data: healthData.map(d => d.volatility),
+                    borderColor: '#ffff00',
+                    backgroundColor: 'rgba(255, 255, 0, 0.1)',
+                    tension: 0.1,
+                    fill: true
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                plugins: {
+                    legend: {
+                        labels: {
+                            color: '#00ff00',
+                            font: { family: 'Courier New' }
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        ticks: {
+                            color: '#00ff00',
+                            font: { family: 'Courier New' },
+                            maxTicksLimit: 10
+                        },
+                        grid: { color: '#003300' }
+                    },
+                    y: {
+                        ticks: {
+                            color: '#00ff00',
+                            font: { family: 'Courier New' }
+                        },
+                        grid: { color: '#003300' }
+                    }
+                }
+            }
+        });
+    } catch (error) {
+        console.error('Failed to update volatility chart:', error);
+    }
+}
+
+// Update breadth ratio chart
+async function updateBreadthRatioChart() {
+    const days = document.getElementById('daysSelect').value;
+    
+    try {
+        const response = await fetch(\`/api/market/health?days=\${days}\`);
+        const healthData = await response.json();
+        
+        if (charts.breadthRatio) {
+            charts.breadthRatio.destroy();
+        }
+        
+        const ctx = document.getElementById('breadthRatioChart').getContext('2d');
+        
+        if (healthData.length < 2) {
+            showInsufficientDataMessage(ctx, 
+                'Insufficient historical data for this time period');
+            return;
+        }
+        
+        charts.breadthRatio = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: healthData.map(d => new Date(d.date).toLocaleDateString()),
+                datasets: [{
+                    label: 'Breadth Ratio',
+                    data: healthData.map(d => d.breadthRatio),
+                    borderColor: '#00ffff',
+                    backgroundColor: 'rgba(0, 255, 255, 0.1)',
+                    tension: 0.1,
+                    fill: true
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                plugins: {
+                    legend: {
+                        labels: {
+                            color: '#00ff00',
+                            font: { family: 'Courier New' }
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        ticks: {
+                            color: '#00ff00',
+                            font: { family: 'Courier New' },
+                            maxTicksLimit: 10
+                        },
+                        grid: { color: '#003300' }
+                    },
+                    y: {
+                        ticks: {
+                            color: '#00ff00',
+                            font: { family: 'Courier New' }
+                        },
+                        grid: { color: '#003300' }
+                    }
+                }
+            }
+        });
+    } catch (error) {
+        console.error('Failed to update breadth ratio chart:', error);
+    }
+}
+
+// Update index fund chart
+async function updateIndexFundChart() {
+    const days = document.getElementById('daysSelect').value;
+    
+    try {
+        const fundsResponse = await fetch('/api/indexfunds');
+        const funds = await fundsResponse.json();
+        
+        if (charts.indexFund) {
+            charts.indexFund.destroy();
+        }
+        
+        const ctx = document.getElementById('indexFundChart').getContext('2d');
+        
+        if (funds.length === 0) {
+            showInsufficientDataMessage(ctx, 'No index funds available yet');
+            return;
+        }
+        
+        // Fetch history for each fund
+        const datasets = [];
+        for (let i = 0; i < Math.min(funds.length, MAX_INDEX_FUNDS_DISPLAY); i++) {
+            const fund = funds[i];
+            try {
+                const histResponse = await fetch(\`/api/indexfunds/\${fund.symbol}/history?days=\${days}\`);
+                const history = await histResponse.json();
+                
+                if (history.length > 0) {
+                    datasets.push({
+                        label: fund.name,
+                        data: history.map(d => d.price),
+                        borderColor: colorPalette[i % colorPalette.length],
+                        backgroundColor: 'transparent',
+                        tension: 0.1
                     });
                 }
+            } catch (err) {
+                console.error(\`Failed to load history for \${fund.symbol}\`, err);
             }
         }
         
-        // Initial load
-        loadStocks().then(() => updateCharts());
+        if (datasets.length === 0) {
+            showInsufficientDataMessage(ctx, 'No index fund data available for this period');
+            return;
+        }
         
-        // Auto-refresh every 10 seconds
-        setInterval(updateCharts, 10000);
+        // Use first fund's history for labels
+        const firstFundHistory = datasets[0].data;
+        const fundResponse = await fetch(\`/api/indexfunds/\${funds[0].symbol}/history?days=\${days}\`);
+        const firstHistory = await fundResponse.json();
+        const labels = firstHistory.map(d => new Date(d.date).toLocaleDateString());
+        
+        charts.indexFund = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: datasets
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                plugins: {
+                    legend: {
+                        labels: {
+                            color: '#00ff00',
+                            font: { family: 'Courier New' }
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        ticks: {
+                            color: '#00ff00',
+                            font: { family: 'Courier New' },
+                            maxTicksLimit: 10
+                        },
+                        grid: { color: '#003300' }
+                    },
+                    y: {
+                        ticks: {
+                            color: '#00ff00',
+                            font: { family: 'Courier New' },
+                            callback: function(value) {
+                                return '$' + value.toFixed(2);
+                            }
+                        },
+                        grid: { color: '#003300' }
+                    }
+                }
+            }
+        });
+    } catch (error) {
+        console.error('Failed to update index fund chart:', error);
+    }
+}
+
+// Update stock chart
+async function updateStockChart() {
+    const days = document.getElementById('daysSelect').value;
+    const symbol = document.getElementById('stockSelect').value;
+    
+    if (!symbol) return;
+    
+    try {
+        const response = await fetch(\`/api/stocks/\${symbol}/history?days=\${days}\`);
+        const stockData = await response.json();
+        
+        if (charts.stock) {
+            charts.stock.destroy();
+        }
+        
+        const ctx = document.getElementById('stockChart').getContext('2d');
+        
+        if (stockData.length < 2) {
+            showInsufficientDataMessage(ctx,
+                'Insufficient historical data for this stock and time period',
+                'Try running the game longer or selecting a shorter time period');
+            return;
+        }
+        
+        charts.stock = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: stockData.map(d => new Date(d.date).toLocaleDateString()),
+                datasets: [{
+                    label: \`\${symbol} Price\`,
+                    data: stockData.map(d => d.price),
+                    borderColor: '#00ff00',
+                    backgroundColor: 'rgba(0, 255, 0, 0.1)',
+                    tension: 0.1,
+                    fill: true
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                plugins: {
+                    legend: {
+                        labels: {
+                            color: '#00ff00',
+                            font: { family: 'Courier New' }
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        ticks: {
+                            color: '#00ff00',
+                            font: { family: 'Courier New' },
+                            maxTicksLimit: 10
+                        },
+                        grid: { color: '#003300' }
+                    },
+                    y: {
+                        ticks: {
+                            color: '#00ff00',
+                            font: { family: 'Courier New' },
+                            callback: function(value) {
+                                return '$' + value.toFixed(2);
+                            }
+                        },
+                        grid: { color: '#003300' }
+                    }
+                }
+            }
+        });
+    } catch (error) {
+        console.error('Failed to update stock chart:', error);
+    }
+}
+
+// Update all charts based on current tab
+async function updateAllCharts() {
+    await loadMarketStats();
+    
+    switch(currentTab) {
+        case 'overview':
+            await updateMarketChart();
+            await updateBreadthChart();
+            break;
+        case 'sectors':
+            await updateSectorCharts();
+            break;
+        case 'health':
+            await updateVolatilityChart();
+            await updateBreadthRatioChart();
+            break;
+        case 'indexfunds':
+            await updateIndexFundChart();
+            break;
+        case 'stocks':
+            await updateStockChart();
+            break;
+    }
+}
+
+// Initial load
+async function initialize() {
+    await loadStocks();
+    await updateAllCharts();
+}
+
+initialize();
+
+// Auto-refresh every 10 seconds
+setInterval(() => {
+    loadMarketStats();
+}, 10000);
+
+// Listen for stock selection change
+document.getElementById('stockSelect').addEventListener('change', () => {
+    if (currentTab === 'stocks') {
+        updateStockChart();
+    }
+});
     </script>
     <script>
 async function updateEraTheme() {
-            const response = await fetch('/api/time');
-            const data = await response.json();
-            const gameDate = new Date(data.currentTime);
-            const year = gameDate.getFullYear();
-            applyEraTheme(year);
-        }
-        
-        updateEraTheme();
-        setInterval(updateEraTheme, 10000);
+    const response = await fetch('/api/time');
+    const data = await response.json();
+    const gameDate = new Date(data.currentTime);
+    const year = gameDate.getFullYear();
+    applyEraTheme(year);
+}
+
+updateEraTheme();
+setInterval(updateEraTheme, 10000);
     </script>
     `
 }) %>
