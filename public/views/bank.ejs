@@ -402,6 +402,12 @@
             let totalCost = 0;
             const positions = [];
             
+            // Save current checkbox states before re-rendering
+            const checkedSymbols = new Set();
+            document.querySelectorAll('.position-checkbox:checked').forEach(cb => {
+                checkedSymbols.add(cb.dataset.symbol);
+            });
+            
             // Fetch index funds data
             const indexFundsRes = await fetch('/api/indexfunds');
             const indexFunds = await indexFundsRes.json();
@@ -525,6 +531,13 @@
                         </tr>
                     \`;
                 }).join('');
+                
+                // Restore checkbox states after rendering
+                document.querySelectorAll('.position-checkbox').forEach(cb => {
+                    if (checkedSymbols.has(cb.dataset.symbol)) {
+                        cb.checked = true;
+                    }
+                });
                 
                 // Initialize or refresh sorter
                 if (!portfolioSorter) {
