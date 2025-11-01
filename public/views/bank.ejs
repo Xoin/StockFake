@@ -109,6 +109,14 @@
         
         <div class="portfolio">
             <h2>📈 Combined Portfolio (Stocks & Index Funds)</h2>
+            <div style="margin-bottom: 15px; display: flex; gap: 10px;">
+                <button class="quick-sell-btn" onclick="sellAllPositions()" style="padding: 8px 16px; font-size: 1em;">
+                    🔴 Sell All Positions
+                </button>
+                <button class="quick-sell-btn" onclick="sellToZeroGains()" style="padding: 8px 16px; font-size: 1em;">
+                    ⚖️ Sell to Zero Gains
+                </button>
+            </div>
             <table id="combinedPortfolioTable">
                 <thead>
                     <tr>
@@ -145,6 +153,11 @@
         
         <div class="portfolio" id="shortPositionsSection" style="display: none;">
             <h2>Short Positions</h2>
+            <div style="margin-bottom: 15px;">
+                <button class="quick-btn" onclick="coverAllShorts()" style="padding: 8px 16px; font-size: 1em;">
+                    🔄 Cover All Shorts
+                </button>
+            </div>
             <table>
                 <thead>
                     <tr>
@@ -153,10 +166,11 @@
                         <th>Borrow Price</th>
                         <th>Current Price</th>
                         <th>P&L</th>
+                        <th>Quick Actions</th>
                     </tr>
                 </thead>
                 <tbody id="shortPositionsList">
-                    <tr><td colspan="5">No short positions</td></tr>
+                    <tr><td colspan="6">No short positions</td></tr>
                 </tbody>
             </table>
         </div>
@@ -298,6 +312,9 @@
                                 <td>$\${position.borrowPrice.toFixed(2)}</td>
                                 <td>$\${currentPrice.toFixed(2)}</td>
                                 <td class="\${pnlClass}">$\${pnl.toFixed(2)}</td>
+                                <td>
+                                    <button class="quick-btn" onclick="coverShort('\${escapeHtml(symbol)}', \${position.shares})">Cover</button>
+                                </td>
                             </tr>
                         \`;
                     }).join('');
@@ -582,6 +599,290 @@
             } catch (error) {
                 alert(\`✗ Error: \${error.message}\`);
             }
+        }
+        
+        // Sell all positions
+        async function sellAllPositions() {
+            if (!confirm('Are you sure you want to sell ALL positions? This action cannot be undone.')) {
+                return;
+            }
+            
+            const accountRes = await fetch('/api/account');
+            const account = await accountRes.json();
+            
+            let successCount = 0;
+            let failCount = 0;
+            
+            // Sell all stocks
+            for (const [symbol, shares] of Object.entries(account.portfolio)) {
+                if (shares > 0) {
+                    try {
+                        const response = await fetch('/api/trade', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                symbol: symbol,
+                                shares: shares,
+                                action: 'sell'
+                            })
+                        });
+                        
+                        if (response.ok) {
+                            successCount++;
+                        } else {
+                            failCount++;
+                        }
+                    } catch (error) {
+                        failCount++;
+                    }
+                }
+            }
+            
+            // Sell all index funds
+            if (account.indexFundHoldings) {
+                for (const [symbol, holding] of Object.entries(account.indexFundHoldings)) {
+                    if (holding.shares > 0) {
+                        try {
+                            const response = await fetch('/api/indexfunds/trade', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                    symbol: symbol,
+                                    shares: holding.shares,
+                                    action: 'sell'
+                                })
+                            });
+                            
+                            if (response.ok) {
+                                successCount++;
+                            } else {
+                                failCount++;
+                            }
+                        } catch (error) {
+                            failCount++;
+                        }
+                    }
+                }
+            }
+            
+            if (successCount > 0) {
+                alert(\`✓ Sold \${successCount} position(s).\${failCount > 0 ? ' Failed to sell ' + failCount + ' position(s).' : ''}\`);
+            } else {
+                alert('✗ Failed to sell positions.');
+            }
+            
+            updateAccount();
+        }
+        
+        // Sell to zero gains (sell losing positions)
+        async function sellToZeroGains() {
+            if (!confirm('This will sell all positions with losses (negative gain/loss). Continue?')) {
+                return;
+            }
+            
+            const accountRes = await fetch('/api/account');
+            const account = await accountRes.json();
+            
+            const stocksRes = await fetch('/api/stocks');
+            const stocks = await stocksRes.json();
+            
+            const indexFundsRes = await fetch('/api/indexfunds');
+            const indexFunds = await indexFundsRes.json();
+            
+            let successCount = 0;
+            let failCount = 0;
+            
+            // Check stock positions
+            for (const [symbol, shares] of Object.entries(account.portfolio)) {
+                if (shares <= 0) continue;
+                
+                const stock = stocks.find(s => s.symbol === symbol);
+                if (!stock) continue;
+                
+                const currentPrice = stock.price;
+                const totalValue = shares * currentPrice;
+                
+                // Calculate cost
+                let positionCost = 0;
+                if (account.purchaseHistory && account.purchaseHistory[symbol]) {
+                    let totalShares = 0;
+                    let totalPaid = 0;
+                    account.purchaseHistory[symbol].forEach(purchase => {
+                        totalShares += purchase.shares;
+                        totalPaid += purchase.shares * purchase.pricePerShare;
+                    });
+                    if (totalShares > 0) {
+                        const avgCost = totalPaid / totalShares;
+                        positionCost = shares * avgCost;
+                    }
+                }
+                
+                const gainLoss = totalValue - positionCost;
+                
+                // Sell if at a loss
+                if (gainLoss < 0) {
+                    try {
+                        const response = await fetch('/api/trade', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                symbol: symbol,
+                                shares: shares,
+                                action: 'sell'
+                            })
+                        });
+                        
+                        if (response.ok) {
+                            successCount++;
+                        } else {
+                            failCount++;
+                        }
+                    } catch (error) {
+                        failCount++;
+                    }
+                }
+            }
+            
+            // Check index fund positions
+            if (account.indexFundHoldings) {
+                for (const [symbol, holding] of Object.entries(account.indexFundHoldings)) {
+                    if (holding.shares <= 0) continue;
+                    
+                    const fund = indexFunds.find(f => f.symbol === symbol);
+                    if (!fund) continue;
+                    
+                    const currentPrice = fund.price;
+                    const totalValue = holding.shares * currentPrice;
+                    
+                    // Calculate cost
+                    let positionCost = 0;
+                    if (holding.purchaseHistory && holding.purchaseHistory.length > 0) {
+                        let totalShares = 0;
+                        let totalPaid = 0;
+                        holding.purchaseHistory.forEach(purchase => {
+                            totalShares += purchase.shares;
+                            totalPaid += purchase.shares * purchase.pricePerShare;
+                        });
+                        if (totalShares > 0) {
+                            const avgCost = totalPaid / totalShares;
+                            positionCost = holding.shares * avgCost;
+                        }
+                    }
+                    
+                    const gainLoss = totalValue - positionCost;
+                    
+                    // Sell if at a loss
+                    if (gainLoss < 0) {
+                        try {
+                            const response = await fetch('/api/indexfunds/trade', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                    symbol: symbol,
+                                    shares: holding.shares,
+                                    action: 'sell'
+                                })
+                            });
+                            
+                            if (response.ok) {
+                                successCount++;
+                            } else {
+                                failCount++;
+                            }
+                        } catch (error) {
+                            failCount++;
+                        }
+                    }
+                }
+            }
+            
+            if (successCount > 0) {
+                alert(\`✓ Sold \${successCount} losing position(s).\${failCount > 0 ? ' Failed to sell ' + failCount + ' position(s).' : ''}\`);
+            } else {
+                alert('No losing positions to sell.');
+            }
+            
+            updateAccount();
+        }
+        
+        // Cover a single short position
+        async function coverShort(symbol, shares) {
+            if (!confirm(\`Cover \${shares} shares of \${symbol}?\`)) {
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/trade', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        symbol: symbol,
+                        shares: shares,
+                        action: 'cover'
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok) {
+                    alert(\`✓ Successfully covered \${shares} shares of \${symbol}!\`);
+                    updateAccount();
+                } else {
+                    alert(\`✗ Error: \${result.error || 'Cover failed'}\`);
+                }
+            } catch (error) {
+                alert(\`✗ Error: \${error.message}\`);
+            }
+        }
+        
+        // Cover all short positions
+        async function coverAllShorts() {
+            if (!confirm('Are you sure you want to cover ALL short positions?')) {
+                return;
+            }
+            
+            const accountRes = await fetch('/api/account');
+            const account = await accountRes.json();
+            
+            if (!account.shortPositions || Object.keys(account.shortPositions).length === 0) {
+                alert('No short positions to cover.');
+                return;
+            }
+            
+            let successCount = 0;
+            let failCount = 0;
+            
+            for (const [symbol, position] of Object.entries(account.shortPositions)) {
+                if (position.shares > 0) {
+                    try {
+                        const response = await fetch('/api/trade', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                symbol: symbol,
+                                shares: position.shares,
+                                action: 'cover'
+                            })
+                        });
+                        
+                        if (response.ok) {
+                            successCount++;
+                        } else {
+                            failCount++;
+                        }
+                    } catch (error) {
+                        failCount++;
+                    }
+                }
+            }
+            
+            if (successCount > 0) {
+                alert(\`✓ Covered \${successCount} short position(s).\${failCount > 0 ? ' Failed to cover ' + failCount + ' position(s).' : ''}\`);
+            } else {
+                alert('✗ Failed to cover short positions.');
+            }
+            
+            updateAccount();
         }
         
         updateAccount();

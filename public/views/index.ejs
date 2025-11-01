@@ -9,9 +9,11 @@
                 <span id="speedStatus" class="status-indicator speed-indicator">...</span>
             </div>
             <button onclick="togglePause()">⏯ Pause/Resume</button>
+            <button onclick="setSpeed(1)">🕐 Realtime (1s = 1s)</button>
             <button onclick="setSpeed(60)">🐌 Slow (1s = 1min)</button>
             <button onclick="setSpeed(3600)">⚡ Normal (1s = 1hr)</button>
             <button onclick="setSpeed(86400)">🚀 Fast (1s = 1day)</button>
+            <button onclick="setSpeed(2592000)">📅 Monthly (1s = 1month)</button>
         </div>
         <div class="portal-links">
             <a href="/trading" class="portal-link">
@@ -85,12 +87,16 @@ async function updateTime() {
             // Update speed status
             const speedStatusEl = document.getElementById('speedStatus');
             let speedText = '';
-            if (data.timeMultiplier === 60) {
+            if (data.timeMultiplier === 1) {
+                speedText = '🕐 REALTIME (1s = 1s)';
+            } else if (data.timeMultiplier === 60) {
                 speedText = '🐌 SLOW (1s = 1min)';
             } else if (data.timeMultiplier === 3600) {
                 speedText = '⚡ NORMAL (1s = 1hr)';
             } else if (data.timeMultiplier === 86400) {
                 speedText = '🚀 FAST (1s = 1day)';
+            } else if (data.timeMultiplier === 2592000) {
+                speedText = '📅 MONTHLY (1s = 1month)';
             } else {
                 speedText = \`⏱ CUSTOM (1s = \${data.timeMultiplier}s)\`;
             }

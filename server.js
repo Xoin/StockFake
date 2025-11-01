@@ -218,7 +218,8 @@ app.post('/api/time/pause', (req, res) => {
 app.post('/api/time/speed', (req, res) => {
   const { multiplier } = req.body;
   // Validate multiplier is a positive number within reasonable bounds
-  if (multiplier && typeof multiplier === 'number' && multiplier > 0 && multiplier <= 86400) {
+  // Allow up to 2592000 (30 days) for monthly speed
+  if (multiplier && typeof multiplier === 'number' && multiplier > 0 && multiplier <= 2592000) {
     timeMultiplier = multiplier;
   }
   res.json({ timeMultiplier });
@@ -534,47 +535,96 @@ function checkAndPayDividends() {
   const currentYear = currentDate.getFullYear();
   const quarterKey = `${currentYear}-Q${currentQuarter + 1}`;
   
+  // Handle potential skipped quarters when time advances rapidly
   if (lastDividendQuarter !== quarterKey) {
-    lastDividendQuarter = quarterKey;
+    // Parse the last quarter processed
+    let quartersToProcess = [];
     
-    let totalDividends = 0;
-    const dividendDetails = [];
-    
-    for (const [symbol, shares] of Object.entries(userAccount.portfolio)) {
-      if (shares > 0 && dividendRates[symbol]) {
-        const dividend = shares * dividendRates[symbol];
-        totalDividends += dividend;
-        dividendDetails.push({ symbol, shares, dividend });
+    if (lastDividendQuarter) {
+      const lastMatch = lastDividendQuarter.match(/^(\d+)-Q(\d)$/);
+      if (lastMatch) {
+        const lastYear = parseInt(lastMatch[1]);
+        const lastQ = parseInt(lastMatch[2]);
+        
+        // Calculate quarters that were skipped
+        let checkYear = lastYear;
+        let checkQ = lastQ;
+        
+        while (true) {
+          // Advance to next quarter
+          checkQ++;
+          if (checkQ > 4) {
+            checkQ = 1;
+            checkYear++;
+          }
+          
+          const checkQuarterKey = `${checkYear}-Q${checkQ}`;
+          if (checkQuarterKey === quarterKey) {
+            quartersToProcess.push(checkQuarterKey);
+            break;
+          }
+          
+          quartersToProcess.push(checkQuarterKey);
+          
+          // Safety check: don't process more than 40 quarters (10 years)
+          if (quartersToProcess.length > 40) {
+            console.warn(`Too many skipped quarters detected (${quartersToProcess.length}). Only processing current quarter.`);
+            quartersToProcess = [quarterKey];
+            break;
+          }
+        }
+      } else {
+        quartersToProcess = [quarterKey];
       }
+    } else {
+      // First dividend payment ever
+      quartersToProcess = [quarterKey];
     }
     
-    if (totalDividends > 0) {
-      // Calculate tax on dividends
-      const dividendTax = totalDividends * DIVIDEND_TAX_RATE;
-      const netDividends = totalDividends - dividendTax;
+    // Process all skipped quarters
+    for (const qKey of quartersToProcess) {
+      let totalDividends = 0;
+      const dividendDetails = [];
       
-      userAccount.cash += netDividends;
+      for (const [symbol, shares] of Object.entries(userAccount.portfolio)) {
+        if (shares > 0 && dividendRates[symbol]) {
+          const dividend = shares * dividendRates[symbol];
+          totalDividends += dividend;
+          dividendDetails.push({ symbol, shares, dividend });
+        }
+      }
       
-      // Record dividend payment
-      userAccount.dividends.push({
-        date: new Date(gameTime),
-        quarter: quarterKey,
-        grossAmount: totalDividends,
-        tax: dividendTax,
-        netAmount: netDividends,
-        details: dividendDetails
-      });
-      
-      // Record tax payment
-      if (dividendTax > 0) {
-        userAccount.taxes.push({
+      if (totalDividends > 0) {
+        // Calculate tax on dividends
+        const dividendTax = totalDividends * DIVIDEND_TAX_RATE;
+        const netDividends = totalDividends - dividendTax;
+        
+        userAccount.cash += netDividends;
+        
+        // Record dividend payment
+        userAccount.dividends.push({
           date: new Date(gameTime),
-          type: 'dividend',
-          amount: dividendTax,
-          description: `Dividend tax for ${quarterKey}`
+          quarter: qKey,
+          grossAmount: totalDividends,
+          tax: dividendTax,
+          netAmount: netDividends,
+          details: dividendDetails
         });
+        
+        // Record tax payment
+        if (dividendTax > 0) {
+          userAccount.taxes.push({
+            date: new Date(gameTime),
+            type: 'dividend',
+            amount: dividendTax,
+            description: `Dividend tax for ${qKey}`
+          });
+        }
       }
     }
+    
+    // Update the last processed quarter
+    lastDividendQuarter = quarterKey;
   }
 }
 

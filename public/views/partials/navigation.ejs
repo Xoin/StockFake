@@ -49,12 +49,16 @@
                     let speedText = '';
                     if (data.isPaused) {
                         speedText = '⏸ PAUSED';
+                    } else if (data.timeMultiplier === 1) {
+                        speedText = '🕐 Speed: Realtime (1s = 1s)';
                     } else if (data.timeMultiplier === 60) {
                         speedText = '🐌 Speed: Slow (1s = 1min)';
                     } else if (data.timeMultiplier === 3600) {
                         speedText = '⚡ Speed: Normal (1s = 1hr)';
                     } else if (data.timeMultiplier === 86400) {
                         speedText = '🚀 Speed: Fast (1s = 1day)';
+                    } else if (data.timeMultiplier === 2592000) {
+                        speedText = '📅 Speed: Monthly (1s = 1month)';
                     } else {
                         speedText = `⏱ Speed: Custom (1s = ${data.timeMultiplier}s)`;
                     }
