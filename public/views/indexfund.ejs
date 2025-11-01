@@ -1,153 +1,6 @@
 <%- include('partials/header', { 
     title: 'Index Fund',
-    pageTitle: 'INDEX FUND',
-    pageStyles: `margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-            max-width: 1200px;
-            margin: 0 auto;
-        }
-        .fund-header {
-            background-color: #000;
-            border: 2px solid #00ff00;
-            padding: 20px;
-            margin-bottom: 20px;
-        }
-        .fund-name {
-            font-size: 2em;
-            color: #00ff00;
-            margin-bottom: 10px;
-        }
-        .fund-symbol {
-            font-size: 1.5em;
-            color: #00aa00;
-            margin-bottom: 15px;
-        }
-        .fund-info-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 15px;
-            margin-top: 15px;
-        }
-        .info-card {
-            background-color: #001100;
-            border: 1px solid #00ff00;
-            padding: 15px;
-        }
-        .info-label {
-            color: #00aa00;
-            font-size: 0.9em;
-            margin-bottom: 5px;
-        }
-        .info-value {
-            color: #00ff00;
-            font-size: 1.3em;
-            font-weight: bold;
-        }
-        .positive {
-            color: #00ff00;
-        }
-        .negative {
-            color: #ff0000;
-        }
-        .chart-container {
-            background-color: #000;
-            border: 2px solid #00ff00;
-            padding: 20px;
-            margin-bottom: 20px;
-        }
-        canvas {
-            max-width: 100%;
-            height: 400px;
-        }
-        .constituents-container {
-            background-color: #000;
-            border: 2px solid #00ff00;
-            padding: 20px;
-            margin-bottom: 20px;
-        }
-        .trade-section {
-            background-color: #000;
-            border: 2px solid #00ff00;
-            padding: 20px;
-            margin-bottom: 20px;
-        }
-        table {
-            width: 100%;
-            border-collapse: collapse;
-        }
-        th, td {
-            padding: 10px;
-            text-align: left;
-            border-bottom: 1px solid #003300;
-        }
-        th {
-            background-color: #003300;
-        }
-        button {
-            background-color: #003300;
-            color: #00ff00;
-            border: 2px solid #00ff00;
-            padding: 10px 20px;
-            margin: 5px;
-            cursor: pointer;
-        }
-        button:hover {
-            background-color: #00ff00;
-            color: #000;
-        }
-        button:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-        }
-        .buy-btn {
-            background-color: #003300;
-        }
-        .sell-btn {
-            background-color: #330000;
-            border-color: #ff0000;
-            color: #ff0000;
-        }
-        .sell-btn:hover {
-            background-color: #ff0000;
-            color: #000;
-        }
-        input, select {
-            background-color: #000;
-            color: #00ff00;
-            border: 1px solid #00ff00;
-            padding: 8px;
-            margin: 5px 0;
-            width: 100%;
-            max-width: 300px;
-        }
-        .message {
-            padding: 10px;
-            margin: 10px 0;
-            border: 1px solid #00ff00;
-        }
-        .error {
-            border-color: #ff0000;
-            color: #ff0000;
-            background-color: #220000;
-        }
-        .success {
-            border-color: #00ff00;
-            color: #00ff00;
-            background-color: #002200;
-        }
-        .time-range-selector {
-            margin-bottom: 15px;
-        }
-        .time-range-selector button {
-            padding: 8px 15px;
-            font-size: 0.9em;
-        }
-        .time-range-selector button.active {
-            background-color: #00ff00;
-            color: #000;
-        }`
+    pageTitle: 'INDEX FUND'
 }) %>
 
 <!-- Shared header component -->
@@ -208,7 +61,7 @@
             
             <div>
                 <button id="executeTrade" onclick="executeTrade()" class="buy-btn">Execute Trade</button>
-                <a href="/indexfunds.html" style="margin-left: 10px; color: #00ff00; text-decoration: none; border: 1px solid #00ff00; padding: 10px 20px; display: inline-block;">Back to All Funds</a>
+                <a href="/indexfunds" style="margin-left: 10px; color: #00ff00; text-decoration: none; border: 1px solid #00ff00; padding: 10px 20px; display: inline-block;">Back to All Funds</a>
             </div>
         </div>
         
@@ -243,7 +96,7 @@ let fundSymbol = null;
         
         if (!fundSymbol) {
             document.getElementById('fundHeader').innerHTML = 
-                '<div class="message error">No fund symbol specified. <a href="/indexfunds.html" style="color: #ff0000;">Go back to index funds</a></div>';
+                '<div class="message error">No fund symbol specified. <a href="/indexfunds" style="color: #ff0000;">Go back to index funds</a></div>';
         }
         
         async function loadFundDetails() {
@@ -293,7 +146,7 @@ let fundSymbol = null;
             } catch (error) {
                 console.error('Error loading fund details:', error);
                 document.getElementById('fundHeader').innerHTML = 
-                    \`<div class="message error">Error: \${escapeHtml(error.message)}. <a href="/indexfunds.html" style="color: #ff0000;">Go back to index funds</a></div>\`;
+                    \`<div class="message error">Error: \${escapeHtml(error.message)}. <a href="/indexfunds" style="color: #ff0000;">Go back to index funds</a></div>\`;
             }
         }
         
