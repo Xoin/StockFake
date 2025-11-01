@@ -19,6 +19,9 @@ const tradeHalts = require('./data/trade-halts');
 const shareAvailability = require('./data/share-availability');
 const indexFunds = require('./data/index-funds');
 
+// Load helper modules
+const indexFundRebalancing = require('./helpers/indexFundRebalancing');
+
 // Set up EJS as the view engine
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'public', 'views'));
@@ -57,6 +60,10 @@ console.log(`Loaded game state from database:`);
 console.log(`  Game time: ${gameTime.toISOString()}`);
 console.log(`  Is paused: ${isPaused}`);
 console.log(`  Time multiplier: ${timeMultiplier}`);
+
+// Initialize rebalancing configurations for all index funds
+indexFundRebalancing.initializeRebalancingConfigs(indexFunds.indexFunds, gameTime);
+console.log('Index fund rebalancing configurations initialized');
 
 // Save game state to database periodically (every 5 seconds)
 function saveGameState() {
@@ -773,6 +780,31 @@ function checkAndPayDividends() {
 
 // Call this periodically
 setInterval(checkAndPayDividends, 5000);
+
+// Rebalancing check interval (30 seconds)
+const REBALANCING_CHECK_INTERVAL_MS = 30000;
+
+// Check and process index fund rebalancing
+function checkIndexFundRebalancing() {
+  if (!isPaused) {
+    const results = indexFundRebalancing.processAutoRebalancing(
+      indexFunds.indexFunds,
+      gameTime,
+      timeMultiplier,
+      isPaused
+    );
+    
+    if (results.length > 0) {
+      console.log(`Rebalanced ${results.length} index fund(s)`);
+      for (const result of results) {
+        console.log(`  - ${result.fundName}: ${result.changes.adjusted.length} constituents adjusted, ${result.changes.added.length} added, ${result.changes.removed.length} removed`);
+      }
+    }
+  }
+}
+
+// Call this periodically
+setInterval(checkIndexFundRebalancing, REBALANCING_CHECK_INTERVAL_MS);
 
 // Calculate trading fee based on year (fees decreased over time)
 function getTradingFee(tradeValue, currentTime) {
@@ -3010,22 +3042,6 @@ app.post('/api/indexfunds/trade', (req, res) => {
       remainingShares -= sharesToSell;
     }
     
-    // Track which purchases were used in the sale for expense ratio calculation
-    const purchasesUsedInSale = [];
-    let remainingForExpense = shares;
-    
-    for (const purchase of holding.purchaseHistory) {
-      if (remainingForExpense <= 0) break;
-      
-      const sharesFromThisPurchase = Math.min(remainingForExpense, purchase.shares);
-      purchasesUsedInSale.push({
-        shares: sharesFromThisPurchase,
-        pricePerShare: purchase.pricePerShare,
-        date: purchase.date
-      });
-      remainingForExpense -= sharesFromThisPurchase;
-    }
-    
     // Update holding purchase history
     holding.purchaseHistory = purchases;
     
@@ -3096,6 +3112,206 @@ app.post('/api/indexfunds/trade', (req, res) => {
   }
   
   res.json(userAccount);
+});
+
+// Index Fund Rebalancing API Endpoints
+
+// Get rebalancing history for a specific fund
+app.get('/api/indexfunds/:symbol/rebalancing', (req, res) => {
+  const { symbol } = req.params;
+  const { limit } = req.query;
+  
+  const limitValue = parseInt(limit) || 50;
+  const history = indexFundRebalancing.getRebalancingHistory(symbol, limitValue);
+  
+  res.json(history);
+});
+
+// Get current constituent weights for a fund
+app.get('/api/indexfunds/:symbol/weights', (req, res) => {
+  const { symbol } = req.params;
+  
+  const weights = indexFundRebalancing.getCurrentWeights(symbol, gameTime);
+  
+  if (!weights || weights.length === 0) {
+    // If no weights found, calculate and return current theoretical weights
+    const fund = indexFunds.indexFunds.find(f => f.symbol === symbol);
+    if (!fund) {
+      return res.status(404).json({ error: 'Index fund not found' });
+    }
+    
+    const theoreticalWeights = indexFundRebalancing.calculateMarketCapWeights(
+      fund.constituents,
+      gameTime,
+      timeMultiplier,
+      isPaused
+    );
+    
+    return res.json({
+      weights: theoreticalWeights,
+      isTheoretical: true,
+      message: 'No historical weights found. Showing current market-cap weighted values.'
+    });
+  }
+  
+  res.json({
+    weights: weights,
+    isTheoretical: false
+  });
+});
+
+// Get rebalancing configuration for a fund
+app.get('/api/indexfunds/:symbol/config', (req, res) => {
+  const { symbol } = req.params;
+  
+  const config = dbModule.getRebalancingConfig.get(symbol);
+  
+  if (!config) {
+    return res.status(404).json({ error: 'Rebalancing configuration not found for this fund' });
+  }
+  
+  res.json({
+    fundSymbol: config.fund_symbol,
+    strategy: config.strategy,
+    frequency: config.rebalancing_frequency,
+    driftThreshold: config.drift_threshold,
+    lastRebalancing: config.last_rebalancing_date,
+    nextScheduled: config.next_scheduled_rebalancing,
+    autoRebalanceEnabled: Boolean(config.auto_rebalance_enabled)
+  });
+});
+
+// Update rebalancing configuration for a fund
+app.post('/api/indexfunds/:symbol/config', (req, res) => {
+  const { symbol } = req.params;
+  const { strategy, frequency, driftThreshold, autoRebalanceEnabled } = req.body;
+  
+  // Validate fund exists
+  const fund = indexFunds.indexFunds.find(f => f.symbol === symbol);
+  if (!fund) {
+    return res.status(404).json({ error: 'Index fund not found' });
+  }
+  
+  // Get current config
+  const currentConfig = dbModule.getRebalancingConfig.get(symbol);
+  if (!currentConfig) {
+    return res.status(404).json({ error: 'Rebalancing configuration not found' });
+  }
+  
+  // Validate strategy
+  const validStrategies = Object.values(indexFundRebalancing.REBALANCING_STRATEGIES);
+  if (strategy && !validStrategies.includes(strategy)) {
+    return res.status(400).json({ 
+      error: `Invalid strategy. Must be one of: ${validStrategies.join(', ')}` 
+    });
+  }
+  
+  // Validate frequency
+  const validFrequencies = Object.values(indexFundRebalancing.REBALANCING_FREQUENCIES);
+  if (frequency && !validFrequencies.includes(frequency)) {
+    return res.status(400).json({ 
+      error: `Invalid frequency. Must be one of: ${validFrequencies.join(', ')}` 
+    });
+  }
+  
+  // Validate drift threshold
+  if (driftThreshold !== undefined && (driftThreshold < 0 || driftThreshold > 1)) {
+    return res.status(400).json({ error: 'Drift threshold must be between 0 and 1' });
+  }
+  
+  // Calculate new next scheduled rebalancing if frequency changed
+  let nextScheduled = currentConfig.next_scheduled_rebalancing;
+  if (frequency && frequency !== currentConfig.rebalancing_frequency) {
+    const baseDate = currentConfig.last_rebalancing_date 
+      ? new Date(currentConfig.last_rebalancing_date)
+      : gameTime;
+    nextScheduled = indexFundRebalancing.calculateNextRebalancing(baseDate, frequency).toISOString();
+  }
+  
+  // Update configuration
+  dbModule.upsertRebalancingConfig.run(
+    symbol,
+    strategy || currentConfig.strategy,
+    frequency || currentConfig.rebalancing_frequency,
+    driftThreshold !== undefined ? driftThreshold : currentConfig.drift_threshold,
+    currentConfig.last_rebalancing_date,
+    nextScheduled,
+    autoRebalanceEnabled !== undefined ? (autoRebalanceEnabled ? 1 : 0) : currentConfig.auto_rebalance_enabled
+  );
+  
+  // Get updated config
+  const updatedConfig = dbModule.getRebalancingConfig.get(symbol);
+  
+  res.json({
+    success: true,
+    message: 'Rebalancing configuration updated',
+    config: {
+      fundSymbol: updatedConfig.fund_symbol,
+      strategy: updatedConfig.strategy,
+      frequency: updatedConfig.rebalancing_frequency,
+      driftThreshold: updatedConfig.drift_threshold,
+      lastRebalancing: updatedConfig.last_rebalancing_date,
+      nextScheduled: updatedConfig.next_scheduled_rebalancing,
+      autoRebalanceEnabled: Boolean(updatedConfig.auto_rebalance_enabled)
+    }
+  });
+});
+
+// Manually trigger rebalancing for a fund
+app.post('/api/indexfunds/:symbol/rebalance', (req, res) => {
+  const { symbol } = req.params;
+  
+  const fund = indexFunds.indexFunds.find(f => f.symbol === symbol);
+  if (!fund) {
+    return res.status(404).json({ error: 'Index fund not found' });
+  }
+  
+  if (gameTime < fund.inceptionDate) {
+    return res.status(400).json({ error: 'This index fund is not available yet' });
+  }
+  
+  const result = indexFundRebalancing.performRebalancing(
+    fund,
+    gameTime,
+    timeMultiplier,
+    isPaused,
+    indexFundRebalancing.TRIGGER_TYPES.MANUAL
+  );
+  
+  if (result.success) {
+    res.json({
+      success: true,
+      message: `Successfully rebalanced ${fund.name}`,
+      result: result
+    });
+  } else {
+    res.status(500).json({
+      success: false,
+      error: result.error
+    });
+  }
+});
+
+// Get all rebalancing events across all funds
+app.get('/api/rebalancing/events', (req, res) => {
+  const { limit } = req.query;
+  
+  const limitValue = parseInt(limit) || 100;
+  const events = dbModule.getAllRebalancingEvents.all(limitValue);
+  
+  const formattedEvents = events.map(event => ({
+    id: event.id,
+    fundSymbol: event.fund_symbol,
+    date: event.rebalancing_date,
+    triggerType: event.trigger_type,
+    constituentsAdded: event.constituents_added ? JSON.parse(event.constituents_added) : [],
+    constituentsRemoved: event.constituents_removed ? JSON.parse(event.constituents_removed) : [],
+    weightsAdjusted: event.weights_adjusted ? JSON.parse(event.weights_adjusted) : [],
+    totalConstituents: event.total_constituents,
+    createdAt: event.created_at
+  }));
+  
+  res.json(formattedEvents);
 });
 
 // Tax summary API endpoint
