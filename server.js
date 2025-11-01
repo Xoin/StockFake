@@ -27,11 +27,17 @@ app.set('views', path.join(__dirname, 'public', 'views'));
 app.use(express.json());
 
 // Middleware to handle legacy .html URLs (must be before static middleware)
+// Whitelist of known pages to prevent open redirects
+const validPages = new Set([
+  '/index', '/bank', '/trading', '/news', '/email', '/graphs', 
+  '/loans', '/taxes', '/cheat', '/indexfunds', '/indexfund', '/company'
+]);
+
 app.use((req, res, next) => {
   if (req.path.endsWith('.html')) {
     const newPath = req.path.replace('.html', '');
-    // Validate that the redirect path is a local path (security: prevent open redirects)
-    if (newPath.startsWith('/') && !newPath.includes('://') && !newPath.startsWith('//')) {
+    // Only redirect if the path (without .html) is in our whitelist or starts with /company/
+    if (validPages.has(newPath) || newPath.startsWith('/company/')) {
       return res.redirect(301, newPath);
     }
   }
