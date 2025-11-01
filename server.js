@@ -4006,9 +4006,21 @@ const dynamicEventGenerator = require('./helpers/dynamicEventGenerator');
 marketCrashSim.initializeMarketState();
 
 // Update crash events periodically
+// Periodically update crash events and generate dynamic events
 setInterval(() => {
   if (!isPaused) {
     marketCrashSim.updateCrashEvents(gameTime);
+    
+    // Check for and generate dynamic events
+    const newEvents = dynamicEventGenerator.generateDynamicEvents(gameTime);
+    
+    // Auto-trigger the generated events
+    for (const event of newEvents) {
+      const result = marketCrashSim.triggerCrashEvent(event, gameTime);
+      if (result.success) {
+        console.log(`Auto-triggered dynamic crash event: ${event.name} (${event.type})`);
+      }
+    }
   }
 }, 10000);  // Update every 10 seconds
 

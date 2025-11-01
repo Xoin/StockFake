@@ -12,13 +12,13 @@ const DYNAMIC_EVENT_CONFIG = {
   // When to start generating dynamic events (after historical data ends)
   historicalDataEndDate: new Date('2024-12-31T23:59:59'),
   
-  // Probability settings (per year)
-  annualCrashProbability: 0.15,        // 15% chance of crash per year
-  annualCorrectionProbability: 0.25,   // 25% chance of correction per year
-  annualSectorCrashProbability: 0.20,  // 20% chance of sector-specific crash per year
+  // Probability settings (per year) - increased to ensure events actually happen
+  annualCrashProbability: 0.30,        // 30% chance of crash per year
+  annualCorrectionProbability: 0.50,   // 50% chance of correction per year
+  annualSectorCrashProbability: 0.40,  // 40% chance of sector-specific crash per year
   
-  // Check intervals
-  checkIntervalDays: 30,  // Check for new events every 30 days
+  // Check intervals - increased to 180 days (6 months) to accumulate meaningful probability
+  checkIntervalDays: 180,  // Check for new events every 180 days
   
   // Event parameters
   minDaysBetweenEvents: 90,  // Minimum 90 days between major events
@@ -207,7 +207,9 @@ function generateDynamicCrash(eventDate, eventType, seed) {
  * Check if we should generate a new dynamic event
  */
 function shouldGenerateEvent(currentTime, lastCheck, eventType, probabilityPerYear) {
-  if (!lastCheck) return false;
+  if (!lastCheck) {
+    return false;
+  }
   
   const daysSinceLastCheck = (currentTime - lastCheck) / (1000 * 60 * 60 * 24);
   if (daysSinceLastCheck < DYNAMIC_EVENT_CONFIG.checkIntervalDays) {
@@ -277,8 +279,12 @@ function generateDynamicEvents(currentTime) {
     lastEventDate = currentTime;
   }
   
-  // Update last check time
-  lastEventCheck = currentTime;
+  // Only update last check time if we actually checked (passed the interval)
+  // This prevents resetting the clock before we've accumulated enough probability
+  const daysSinceLastCheck = (currentTime - lastEventCheck) / (1000 * 60 * 60 * 24);
+  if (daysSinceLastCheck >= DYNAMIC_EVENT_CONFIG.checkIntervalDays) {
+    lastEventCheck = currentTime;
+  }
   
   return newEvents;
 }
