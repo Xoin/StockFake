@@ -1,58 +1,96 @@
 <%- include('partials/header', { 
     title: 'News',
-    pageTitle: '📰 FINANCIAL NEWS',
+    pageTitle: '📰 FINANCIAL TIMES',
     pageStyles: `
+        .newspaper-header {
+            background-color: #000;
+            border: 3px double #00ff00;
+            padding: 20px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        .newspaper-masthead {
+            font-size: 2.5em;
+            font-weight: bold;
+            color: #00ff00;
+            letter-spacing: 3px;
+            margin-bottom: 5px;
+            font-family: 'Courier New', monospace;
+            text-transform: uppercase;
+        }
+        .newspaper-tagline {
+            color: #00aa00;
+            font-size: 0.9em;
+            font-style: italic;
+            margin-bottom: 10px;
+        }
+        .newspaper-date {
+            color: #00ff00;
+            font-size: 1.1em;
+            border-top: 1px solid #00ff00;
+            border-bottom: 1px solid #00ff00;
+            padding: 5px 0;
+            margin-top: 10px;
+        }
         .news-container {
             background-color: #000;
             border: 2px solid #00ff00;
-            padding: 15px;
+            padding: 20px;
         }
-        .news-item {
+        .news-columns {
+            column-count: 1;
+            column-gap: 20px;
+        }
+        @media (min-width: 768px) {
+            .news-columns {
+                column-count: 2;
+            }
+        }
+        .news-article {
             background-color: #001100;
             border: 1px solid #003300;
-            margin-bottom: 15px;
+            margin-bottom: 20px;
             padding: 15px;
-            cursor: pointer;
-            transition: all 0.2s;
+            break-inside: avoid;
+            page-break-inside: avoid;
         }
-        .news-item:hover {
+        .news-article.featured {
+            border: 2px solid #00ff00;
             background-color: #002200;
         }
-        .news-item.unread {
-            border-color: #00ff00;
-            border-width: 2px;
+        .news-article.unread {
+            border-left: 4px solid #00ff00;
         }
-        .news-item.expanded {
-            background-color: #002200;
-        }
-        .news-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 10px;
-        }
-        .news-source {
+        .article-category {
             color: #00aa00;
-            font-weight: bold;
+            font-size: 0.75em;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 5px;
         }
-        .news-date {
-            color: #00aa00;
-            font-size: 0.9em;
-        }
-        .news-title {
+        .article-headline {
             color: #00ff00;
-            font-size: 1.1em;
+            font-size: 1.2em;
             font-weight: bold;
+            margin-bottom: 8px;
+            line-height: 1.3;
+        }
+        .article-date {
+            color: #00aa00;
+            font-size: 0.85em;
             margin-bottom: 10px;
         }
-        .news-body {
+        .article-body {
             color: #00cc00;
-            display: none;
-            margin-top: 10px;
             line-height: 1.6;
+            margin-bottom: 10px;
         }
-        .news-item.expanded .news-body {
-            display: block;
+        .article-footer {
+            border-top: 1px solid #003300;
+            padding-top: 8px;
+            margin-top: 10px;
+            font-size: 0.85em;
+            color: #00aa00;
         }
         .no-news {
             text-align: center;
@@ -62,12 +100,53 @@
         .pagination-controls-container {
             margin: 15px 0;
         }
+        .filter-section {
+            background-color: #001100;
+            border: 1px solid #003300;
+            padding: 15px;
+            margin-bottom: 20px;
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+        .filter-section label {
+            color: #00ff00;
+        }
+        .filter-section select {
+            background-color: #000;
+            border: 1px solid #00ff00;
+            color: #00ff00;
+            padding: 5px 10px;
+            font-family: 'Courier New', monospace;
+        }
     `
 }) %>
         
+        <div class="newspaper-header">
+            <div class="newspaper-masthead">📰 The Financial Times 📰</div>
+            <div class="newspaper-tagline">"All The Market News That's Fit To Print"</div>
+            <div class="newspaper-date" id="newspaperDate">Loading...</div>
+        </div>
+        
+        <div class="filter-section">
+            <label for="categoryFilter">Category:</label>
+            <select id="categoryFilter" onchange="renderNewsPage()">
+                <option value="all">All News</option>
+                <option value="market">Market News</option>
+                <option value="historical">Historical Events</option>
+            </select>
+            <label style="margin-left: 20px;">
+                <input type="checkbox" id="unreadOnly" onchange="renderNewsPage()"> 
+                Show Unread Only
+            </label>
+        </div>
+        
         <div class="pagination-controls-container"></div>
-        <div class="news-container" id="newsContainer">
-            <div class="no-news">Loading news...</div>
+        <div class="news-container">
+            <div class="news-columns" id="newsContainer">
+                <div class="no-news">Loading news...</div>
+            </div>
         </div>
         <div class="pagination-controls-container"></div>
 
@@ -77,206 +156,131 @@
 let paginator;
         let allNews = [];
         let readNewsIds = new Set(JSON.parse(localStorage.getItem('readNewsIds') || '[]'));
-        let expandedNewsIds = new Set();
-        
-        // Toggle news item expansion
-        function toggleNews(newsId) {
-            if (expandedNewsIds.has(newsId)) {
-                expandedNewsIds.delete(newsId);
-            } else {
-                expandedNewsIds.add(newsId);
-                // Mark as read when expanded
-                markNewsAsRead(newsId);
-            }
-            renderNewsPage();
-        }
         
         // Mark news as read
         function markNewsAsRead(newsId) {
             readNewsIds.add(newsId);
             localStorage.setItem('readNewsIds', JSON.stringify([...readNewsIds]));
-            // Don't re-render to avoid collapsing expanded items
         }
         
-        // Format market update body as a table
-        function formatMarketUpdateTable(bodyText) {
-            // Parse numbered list format: "1. Company (SYMBOL) text... 2. Company text..."
-            const items = bodyText.split(/\\d+\\.\\s+/).filter(item => item.trim());
+        // Determine if news is dynamic (market movement) or historical
+        function getNewsCategory(newsItem) {
+            // Dynamic news typically has IDs >= 10000
+            if (newsItem.id >= 10000) return 'market';
+            return 'historical';
+        }
+        
+        // Render news article in newspaper style
+        function renderArticle(newsItem, index) {
+            const isUnread = !readNewsIds.has(newsItem.id);
+            const category = getNewsCategory(newsItem);
+            const isFeatured = index === 0; // First article is featured
             
-            if (items.length === 0) {
-                return \`<div class="news-body">\${escapeHtml(bodyText)}</div>\`;
-            }
+            const categoryLabel = category === 'market' ? '📊 Market Update' : '📜 Historical';
             
-            // Parse each item to extract stock info and movement
-            const movements = items.map(item => {
-                // Try to extract company name, symbol, and change percentage
-                const symbolMatch = item.match(/\\(([A-Z]+)\\)/);
-                const changeMatch = item.match(/(gained|advanced|declined|lost|moved|up|down)\\s+([\\d.]+)%/i);
-                const upMatch = item.match(/(surges|surged|jump|jumped|rally|rallied|gains|gained|advanced)/i);
-                const downMatch = item.match(/(plunges|plunged|drop|dropped|decline|declined|losses|lost|tumbled)/i);
-                
-                let symbol = symbolMatch ? symbolMatch[1] : '';
-                let change = changeMatch ? parseFloat(changeMatch[2]) : 0;
-                
-                // Determine direction from text if not in change match
-                if (upMatch && change === 0) {
-                    const percentMatch = item.match(/([\\d.]+)%/);
-                    if (percentMatch) change = parseFloat(percentMatch[1]);
-                }
-                if (downMatch && change === 0) {
-                    const percentMatch = item.match(/([\\d.]+)%/);
-                    if (percentMatch) change = -parseFloat(percentMatch[1]);
-                }
-                
-                // Extract company name (text before symbol or first few words)
-                let company = item;
-                if (symbolMatch) {
-                    company = item.substring(0, item.indexOf('(')).trim();
-                } else {
-                    company = item.split(/\\s+/).slice(0, 3).join(' ');
-                }
-                
-                // Clean up company name
-                company = company.replace(/^(Shares of|Investors|Market)\\s+/i, '').trim();
-                
-                return { company, symbol, change, text: item.trim() };
-            });
-            
-            let tableHtml = \`
-                <div class="news-body">
-                    <table class="market-update-table">
-                        <thead>
-                            <tr>
-                                <th>Company</th>
-                                <th>Symbol</th>
-                                <th>Change</th>
-                                <th>Details</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-            \`;
-            
-            movements.forEach(m => {
-                const changeClass = m.change >= 0 ? 'positive-change' : 'negative-change';
-                const changeSymbol = m.change >= 0 ? '▲' : '▼';
-                const changeText = m.change !== 0 ? \`\${escapeHtml(changeSymbol)} \${Math.abs(m.change).toFixed(1)}%\` : 'N/A';
-                
-                tableHtml += \`
-                    <tr>
-                        <td>\${escapeHtml(m.company)}</td>
-                        <td>\${escapeHtml(m.symbol)}</td>
-                        <td class="\${changeClass}">\${changeText}</td>
-                        <td>\${escapeHtml(m.text.substring(0, 100))}\${m.text.length > 100 ? '...' : ''}</td>
-                    </tr>
-                \`;
-            });
-            
-            tableHtml += \`
-                        </tbody>
-                    </table>
+            const article = \`
+                <div class="news-article \${isFeatured ? 'featured' : ''} \${isUnread ? 'unread' : ''}" 
+                     onclick="markNewsAsRead(\${newsItem.id}); this.classList.remove('unread');">
+                    <div class="article-category">\${categoryLabel}</div>
+                    <div class="article-headline">\${escapeHtml(newsItem.headline)}</div>
+                    <div class="article-date">\${new Date(newsItem.date).toLocaleDateString('en-US', { 
+                        weekday: 'long', 
+                        year: 'numeric', 
+                        month: 'long', 
+                        day: 'numeric' 
+                    })}</div>
+                    <div class="article-body">\${escapeHtml(newsItem.body)}</div>
+                    \${isUnread ? '<div class="article-footer">● New</div>' : ''}
                 </div>
             \`;
             
-            return tableHtml;
+            return article;
         }
         
-        // Pagination render function - used by pagination controls in common.js
-        function renderPage() {
-            renderNewsPage();
-        }
-        
-        async function renderNewsPage() {
+        // Render current page of news
+        function renderNewsPage() {
             if (!paginator) return;
             
-            const pageNews = paginator.getCurrentPageItems();
-            const container = document.getElementById('newsContainer');
+            const categoryFilter = document.getElementById('categoryFilter').value;
+            const unreadOnly = document.getElementById('unreadOnly').checked;
             
-            if (pageNews.length === 0 && allNews.length === 0) {
-                container.innerHTML = '<div class="no-news">No news available yet. Major events will appear as time progresses.</div>';
-            } else if (pageNews.length === 0) {
-                container.innerHTML = '<div class="no-news">No items on this page.</div>';
-            } else {
-                container.innerHTML = pageNews.map(item => {
-                    const isUnread = !readNewsIds.has(item.id);
-                    const isExpanded = expandedNewsIds.has(item.id);
-                    const unreadClass = isUnread ? 'unread' : '';
-                    const expandedClass = isExpanded ? 'expanded' : '';
-                    const isMarketUpdate = item.headline && item.headline.includes('Market Update');
-                    const marketUpdateClass = isMarketUpdate ? 'market-update' : '';
-                    
-                    // Format body - parse market updates into table format
-                    let bodyHtml = '';
-                    if (isMarketUpdate && item.body) {
-                        bodyHtml = formatMarketUpdateTable(item.body);
-                    } else {
-                        bodyHtml = \`<div class="news-body">\${escapeHtml(item.body)}</div>\`;
-                    }
-                    
-                    return \`
-                        <div class="news-item \${unreadClass} \${expandedClass} \${marketUpdateClass}" onclick="toggleNews(\${item.id})">
-                            <div class="news-date">\${new Date(item.date).toLocaleDateString()}</div>
-                            <div class="news-headline">\${escapeHtml(item.headline)}</div>
-                            \${bodyHtml}
-                        </div>
-                    \`;
-                }).join('');
+            // Filter news
+            let filteredNews = allNews;
+            
+            if (categoryFilter !== 'all') {
+                filteredNews = filteredNews.filter(item => getNewsCategory(item) === categoryFilter);
             }
             
-            // Update pagination controls
-            const paginationDivs = document.querySelectorAll('.pagination-controls-container');
-            paginationDivs.forEach(div => {
-                div.innerHTML = paginator.renderControls();
-            });
+            if (unreadOnly) {
+                filteredNews = filteredNews.filter(item => !readNewsIds.has(item.id));
+            }
+            
+            // Update paginator with filtered items
+            paginator.updateItems(filteredNews);
+            
+            const currentPage = paginator.getCurrentPage();
+            const container = document.getElementById('newsContainer');
+            
+            if (currentPage.length === 0) {
+                container.innerHTML = '<div class="no-news">No news articles match your filter.</div>';
+                return;
+            }
+            
+            container.innerHTML = currentPage.map((item, index) => renderArticle(item, index)).join('');
         }
         
-        async function updateNews() {
-            const response = await fetch('/api/news');
-            const rawNews = await response.json();
-            
-            // Merge multiple dynamic news items from the same day
-            const newsById = new Map();
-            const dynamicNewsByDate = new Map();
-            
-            rawNews.forEach(item => {
-                // Check if it's dynamic news (id >= 10000)
-                if (item.id >= 10000) {
-                    const dateKey = new Date(item.date).toDateString();
-                    if (!dynamicNewsByDate.has(dateKey)) {
-                        dynamicNewsByDate.set(dateKey, []);
-                    }
-                    dynamicNewsByDate.get(dateKey).push(item);
+        // Fetch and display news
+        async function fetchNews() {
+            try {
+                const [newsResponse, timeResponse] = await Promise.all([
+                    fetch('/api/news'),
+                    fetch('/api/time')
+                ]);
+                
+                allNews = await newsResponse.json();
+                const timeData = await timeResponse.json();
+                const gameDate = new Date(timeData.currentTime);
+                
+                // Update newspaper date
+                document.getElementById('newspaperDate').textContent = gameDate.toLocaleDateString('en-US', {
+                    weekday: 'long',
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric'
+                });
+                
+                // Initialize paginator with 10 items per page (reduced from default)
+                if (!paginator) {
+                    paginator = createPaginator(allNews, 10, renderNewsPage);
                 } else {
-                    newsById.set(item.id, item);
+                    paginator.updateItems(allNews);
                 }
-            });
-            
-            // Merge dynamic news items by date
-            dynamicNewsByDate.forEach((items, dateKey) => {
-                if (items.length > 1) {
-                    // Create merged news item with formatted list
-                    const mergedItem = {
-                        id: items[0].id, // Use first ID
-                        date: items[0].date,
-                        headline: 'Market Update: Multiple Stock Movements',
-                        body: items.map((item, idx) => \\\`\\\${idx + 1}. \\\${item.body}\\\`).join('\\n')
-                    };
-                    newsById.set(mergedItem.id, mergedItem);
-                } else {
-                    newsById.set(items[0].id, items[0]);
-                }
-            });
-            
-            allNews = Array.from(newsById.values()).sort((a, b) => new Date(b.date) - new Date(a.date));
-            
-            // Update localStorage with current count for badge
-            localStorage.setItem('lastNewsCount', allNews.length);
-            
-            paginator = new Paginator(allNews, 10);
-            renderNewsPage();
+                
+                renderNewsPage();
+            } catch (error) {
+                console.error('Error fetching news:', error);
+                document.getElementById('newsContainer').innerHTML = 
+                    '<div class="no-news">Error loading news. Please try again.</div>';
+            }
         }
         
-        updateNews();
-        setInterval(updateNews, 5000);
+        // Initial fetch
+        fetchNews();
+        
+        // Refresh periodically
+        setInterval(fetchNews, 10000); // Every 10 seconds
+    </script>
+    <script>
+async function updateEraTheme() {
+            const response = await fetch('/api/time');
+            const data = await response.json();
+            const gameDate = new Date(data.currentTime);
+            const year = gameDate.getFullYear();
+            applyEraTheme(year);
+        }
+        
+        updateEraTheme();
+        setInterval(updateEraTheme, 10000);
     </script>
     `
 }) %>

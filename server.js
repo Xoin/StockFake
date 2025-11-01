@@ -30,7 +30,7 @@ app.use(express.json());
 // Whitelist of known pages to prevent open redirects
 const validPages = new Set([
   '/index', '/bank', '/trading', '/news', '/email', '/graphs', 
-  '/loans', '/taxes', '/cheat', '/indexfunds', '/indexfund', '/company'
+  '/loans', '/taxes', '/cheat', '/indexfunds', '/indexfund', '/company', '/pendingorders'
 ]);
 
 app.use((req, res, next) => {
@@ -218,7 +218,8 @@ app.post('/api/time/pause', (req, res) => {
 app.post('/api/time/speed', (req, res) => {
   const { multiplier } = req.body;
   // Validate multiplier is a positive number within reasonable bounds
-  if (multiplier && typeof multiplier === 'number' && multiplier > 0 && multiplier <= 86400) {
+  // Allow up to 2592000 (30 days) for monthly speed
+  if (multiplier && typeof multiplier === 'number' && multiplier > 0 && multiplier <= 2592000) {
     timeMultiplier = multiplier;
   }
   res.json({ timeMultiplier });
@@ -267,6 +268,10 @@ app.get('/indexfunds', (req, res) => {
 
 app.get('/cheat', (req, res) => {
   res.render('cheat');
+});
+
+app.get('/pendingorders', (req, res) => {
+  res.render('pendingorders');
 });
 
 app.get('/', (req, res) => {
@@ -318,13 +323,35 @@ app.get('/api/stocks/:symbol/history', (req, res) => {
   const daysToFetch = parseInt(days) || 30;
   const history = [];
   
+  // Determine sampling interval based on time period
+  // For longer periods, sample less frequently to reduce data points
+  let sampleInterval = 1; // days
+  if (daysToFetch > 365) {
+    sampleInterval = 7; // Weekly for > 1 year
+  } else if (daysToFetch > 180) {
+    sampleInterval = 3; // Every 3 days for > 6 months
+  } else if (daysToFetch > 90) {
+    sampleInterval = 2; // Every 2 days for > 3 months
+  }
+  
   // Get historical prices for the specified number of days
-  for (let i = daysToFetch; i >= 0; i--) {
+  for (let i = daysToFetch; i >= 0; i -= sampleInterval) {
     const date = new Date(gameTime.getTime() - (i * 24 * 60 * 60 * 1000));
     const price = stocks.getStockPrice(symbol, date, timeMultiplier);
     if (price) {
       history.push({
         date: date.toISOString(),
+        price: price.price
+      });
+    }
+  }
+  
+  // Always include the most recent data point
+  if (history.length === 0 || history[history.length - 1].date !== gameTime.toISOString()) {
+    const price = stocks.getStockPrice(symbol, gameTime, timeMultiplier);
+    if (price) {
+      history.push({
+        date: gameTime.toISOString(),
         price: price.price
       });
     }
@@ -339,8 +366,18 @@ app.get('/api/market/index', (req, res) => {
   const daysToFetch = parseInt(days) || 30;
   const history = [];
   
+  // Determine sampling interval based on time period
+  let sampleInterval = 1; // days
+  if (daysToFetch > 365) {
+    sampleInterval = 7; // Weekly for > 1 year
+  } else if (daysToFetch > 180) {
+    sampleInterval = 3; // Every 3 days for > 6 months
+  } else if (daysToFetch > 90) {
+    sampleInterval = 2; // Every 2 days for > 3 months
+  }
+  
   // Calculate simple market index based on average of all stocks
-  for (let i = daysToFetch; i >= 0; i--) {
+  for (let i = daysToFetch; i >= 0; i -= sampleInterval) {
     const date = new Date(gameTime.getTime() - (i * 24 * 60 * 60 * 1000));
     const allStocks = stocks.getStockData(date, timeMultiplier);
     
@@ -348,6 +385,19 @@ app.get('/api/market/index', (req, res) => {
       const avgPrice = allStocks.reduce((sum, s) => sum + s.price, 0) / allStocks.length;
       history.push({
         date: date.toISOString(),
+        value: avgPrice,
+        count: allStocks.length
+      });
+    }
+  }
+  
+  // Always include the most recent data point
+  if (history.length === 0 || history[history.length - 1].date !== gameTime.toISOString()) {
+    const allStocks = stocks.getStockData(gameTime, timeMultiplier);
+    if (allStocks.length > 0) {
+      const avgPrice = allStocks.reduce((sum, s) => sum + s.price, 0) / allStocks.length;
+      history.push({
+        date: gameTime.toISOString(),
         value: avgPrice,
         count: allStocks.length
       });
@@ -426,6 +476,9 @@ const INITIAL_MARGIN_REQUIREMENT_1970 = 0.70; // 70% initial margin in early 197
 const MAINTENANCE_MARGIN_REQUIREMENT = 0.30; // 30% maintenance margin (25% is typical, using 30% for safety)
 const MARGIN_CALL_GRACE_PERIOD_DAYS = 5; // Days to meet margin call before forced liquidation
 const MARGIN_INTEREST_RATE_BASE = 0.08; // 8% annual base rate on margin loans
+
+// Dividend processing constant
+const MAX_DIVIDEND_QUARTERS_TO_PROCESS = 40; // Safety limit: maximum quarters to process when catching up (prevents processing too many at once)
 
 // Tax rates
 const SHORT_TERM_TAX_RATE = 0.30; // 30% for holdings < 1 year
@@ -534,47 +587,96 @@ function checkAndPayDividends() {
   const currentYear = currentDate.getFullYear();
   const quarterKey = `${currentYear}-Q${currentQuarter + 1}`;
   
+  // Handle potential skipped quarters when time advances rapidly
   if (lastDividendQuarter !== quarterKey) {
-    lastDividendQuarter = quarterKey;
+    // Parse the last quarter processed
+    let quartersToProcess = [];
     
-    let totalDividends = 0;
-    const dividendDetails = [];
-    
-    for (const [symbol, shares] of Object.entries(userAccount.portfolio)) {
-      if (shares > 0 && dividendRates[symbol]) {
-        const dividend = shares * dividendRates[symbol];
-        totalDividends += dividend;
-        dividendDetails.push({ symbol, shares, dividend });
+    if (lastDividendQuarter) {
+      const lastMatch = lastDividendQuarter.match(/^(\d+)-Q(\d)$/);
+      if (lastMatch) {
+        const lastYear = parseInt(lastMatch[1]);
+        const lastQ = parseInt(lastMatch[2]);
+        
+        // Calculate quarters that were skipped
+        let checkYear = lastYear;
+        let checkQ = lastQ;
+        
+        while (true) {
+          // Advance to next quarter
+          checkQ++;
+          if (checkQ > 4) {
+            checkQ = 1;
+            checkYear++;
+          }
+          
+          const checkQuarterKey = `${checkYear}-Q${checkQ}`;
+          if (checkQuarterKey === quarterKey) {
+            quartersToProcess.push(checkQuarterKey);
+            break;
+          }
+          
+          quartersToProcess.push(checkQuarterKey);
+          
+          // Safety check: don't process more than MAX_DIVIDEND_QUARTERS_TO_PROCESS quarters
+          if (quartersToProcess.length > MAX_DIVIDEND_QUARTERS_TO_PROCESS) {
+            console.warn(`Too many skipped quarters detected (${quartersToProcess.length}). Only processing current quarter.`);
+            quartersToProcess = [quarterKey];
+            break;
+          }
+        }
+      } else {
+        quartersToProcess = [quarterKey];
       }
+    } else {
+      // First dividend payment ever
+      quartersToProcess = [quarterKey];
     }
     
-    if (totalDividends > 0) {
-      // Calculate tax on dividends
-      const dividendTax = totalDividends * DIVIDEND_TAX_RATE;
-      const netDividends = totalDividends - dividendTax;
+    // Process all skipped quarters
+    for (const qKey of quartersToProcess) {
+      let totalDividends = 0;
+      const dividendDetails = [];
       
-      userAccount.cash += netDividends;
+      for (const [symbol, shares] of Object.entries(userAccount.portfolio)) {
+        if (shares > 0 && dividendRates[symbol]) {
+          const dividend = shares * dividendRates[symbol];
+          totalDividends += dividend;
+          dividendDetails.push({ symbol, shares, dividend });
+        }
+      }
       
-      // Record dividend payment
-      userAccount.dividends.push({
-        date: new Date(gameTime),
-        quarter: quarterKey,
-        grossAmount: totalDividends,
-        tax: dividendTax,
-        netAmount: netDividends,
-        details: dividendDetails
-      });
-      
-      // Record tax payment
-      if (dividendTax > 0) {
-        userAccount.taxes.push({
+      if (totalDividends > 0) {
+        // Calculate tax on dividends
+        const dividendTax = totalDividends * DIVIDEND_TAX_RATE;
+        const netDividends = totalDividends - dividendTax;
+        
+        userAccount.cash += netDividends;
+        
+        // Record dividend payment
+        userAccount.dividends.push({
           date: new Date(gameTime),
-          type: 'dividend',
-          amount: dividendTax,
-          description: `Dividend tax for ${quarterKey}`
+          quarter: qKey,
+          grossAmount: totalDividends,
+          tax: dividendTax,
+          netAmount: netDividends,
+          details: dividendDetails
         });
+        
+        // Record tax payment
+        if (dividendTax > 0) {
+          userAccount.taxes.push({
+            date: new Date(gameTime),
+            type: 'dividend',
+            amount: dividendTax,
+            description: `Dividend tax for ${qKey}`
+          });
+        }
       }
     }
+    
+    // Update the last processed quarter
+    lastDividendQuarter = quarterKey;
   }
 }
 
@@ -2860,7 +2962,49 @@ app.get('/api/pendingorders/status/:status', (req, res) => {
   }
 });
 
-// Cancel a pending order
+// Cancel a pending order (POST endpoint)
+app.post('/api/pendingorders/:id/cancel', (req, res) => {
+  try {
+    const { id } = req.params;
+    const orderId = parseInt(id);
+    
+    if (isNaN(orderId)) {
+      return res.status(400).json({ error: 'Invalid order ID' });
+    }
+    
+    // Get the order to check if it's pending
+    const order = dbModule.getPendingOrder.get(orderId);
+    
+    if (!order) {
+      return res.status(404).json({ error: 'Order not found' });
+    }
+    
+    if (order.status !== 'pending') {
+      return res.status(400).json({ 
+        error: `Cannot cancel order with status '${order.status}'. Only pending orders can be cancelled.` 
+      });
+    }
+    
+    // Mark the order as cancelled
+    dbModule.updatePendingOrderStatus.run(
+      'cancelled',
+      gameTime.toISOString(),
+      null,
+      'Cancelled by user',
+      orderId
+    );
+    
+    res.json({ 
+      success: true,
+      message: 'Order cancelled successfully',
+      orderId: orderId
+    });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to cancel order: ' + error.message });
+  }
+});
+
+// Cancel a pending order (DELETE endpoint)
 app.delete('/api/pendingorders/:id', (req, res) => {
   try {
     const { id } = req.params;

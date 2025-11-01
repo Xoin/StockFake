@@ -99,6 +99,12 @@
                     <div style="font-size: 0.8em; color: #00aa00;">From dividend income</div>
                 </div>
                 
+                <div class="tax-card">
+                    <h3>Wealth Tax</h3>
+                    <div class="tax-amount">$<span id="wealthTax">0.00</span></div>
+                    <div style="font-size: 0.8em; color: #00aa00;">1% on net worth > $50K</div>
+                </div>
+                
                 <div class="tax-card" style="border-color: #ffff00;">
                     <h3>Total Tax Paid</h3>
                     <div class="tax-amount" style="color: #ffff00;">$<span id="totalTax">0.00</span></div>
@@ -158,7 +164,8 @@
                 <strong>Current Tax Rates:</strong><br>
                 • Short-term capital gains (< 1 year): <span id="shortTermRate">30</span>%<br>
                 • Long-term capital gains (≥ 1 year): <span id="longTermRate">15</span>%<br>
-                • Dividend income: <span id="dividendRate">15</span>%
+                • Dividend income: <span id="dividendRate">15</span>%<br>
+                • Wealth tax (annual): <span id="wealthTaxRate">1</span>% on net worth above $<span id="wealthTaxThreshold">50,000</span>
             </div>
         </div>
 
@@ -243,6 +250,7 @@ let availableYears = [];
                 document.getElementById('capitalGainsTax').textContent = data.taxBreakdown.capitalGains.toFixed(2);
                 document.getElementById('shortGainsTax').textContent = data.taxBreakdown.shortGains.toFixed(2);
                 document.getElementById('dividendTax').textContent = data.taxBreakdown.dividends.toFixed(2);
+                document.getElementById('wealthTax').textContent = data.taxBreakdown.wealth.toFixed(2);
                 document.getElementById('totalTax').textContent = data.taxBreakdown.total.toFixed(2);
                 
                 // Update dividend summary
@@ -260,6 +268,8 @@ let availableYears = [];
                 document.getElementById('shortTermRate').textContent = data.currentTaxRates.shortTermCapitalGains;
                 document.getElementById('longTermRate').textContent = data.currentTaxRates.longTermCapitalGains;
                 document.getElementById('dividendRate').textContent = data.currentTaxRates.dividends;
+                document.getElementById('wealthTaxRate').textContent = data.currentTaxRates.wealth;
+                document.getElementById('wealthTaxThreshold').textContent = data.currentTaxRates.wealthTaxThreshold.toLocaleString();
                 
                 // Update detailed transactions
                 const tbody = document.getElementById('taxTransactions').querySelector('tbody');
