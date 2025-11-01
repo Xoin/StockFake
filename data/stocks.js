@@ -4,6 +4,15 @@
 const fs = require('fs');
 const path = require('path');
 
+// Load crash simulation module for price impact calculation
+let crashSimModule = null;
+try {
+  crashSimModule = require('../helpers/marketCrashSimulation');
+} catch (err) {
+  // Crash simulation module not available or error loading
+  console.warn('Market crash simulation module not loaded:', err.message);
+}
+
 // Load historical stock data
 const historicalStockData = JSON.parse(
   fs.readFileSync(path.join(__dirname, 'historical-stock-data.json'), 'utf8')
@@ -159,9 +168,18 @@ function getStockPrice(symbol, currentTime, timeMultiplier, isPaused, bypassCach
   
   // If after the last data point, use last price
   if (currentTime >= stockData[stockData.length - 1].date) {
+    const basePrice = stockData[stockData.length - 1].price;
+    
+    // Apply crash simulation impact if module is loaded
+    let finalPrice = basePrice;
+    if (crashSimModule) {
+      const sector = getStockSector(symbol);
+      finalPrice = crashSimModule.calculateStockPriceImpact(symbol, sector, basePrice, currentTime);
+    }
+    
     const result = {
       symbol,
-      price: stockData[stockData.length - 1].price,
+      price: parseFloat(finalPrice.toFixed(2)),
       change: 0,
       name: getStockName(symbol),
       sector: getStockSector(symbol)
@@ -189,7 +207,13 @@ function getStockPrice(symbol, currentTime, timeMultiplier, isPaused, bypassCach
   const randomValue = seededRandom(symbol, currentTime.getTime());
   const baseFluctuation = (randomValue - 0.5) * 0.04 * basePrice;
   const fluctuation = baseFluctuation * volatilityScale;
-  const price = Math.max(0.01, basePrice + fluctuation);
+  let price = Math.max(0.01, basePrice + fluctuation);
+  
+  // Apply crash simulation impact if module is loaded
+  if (crashSimModule) {
+    const sector = getStockSector(symbol);
+    price = crashSimModule.calculateStockPriceImpact(symbol, sector, price, currentTime);
+  }
   
   // Calculate change from previous base price
   const change = ((price - before.price) / before.price) * 100;

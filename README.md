@@ -16,6 +16,7 @@ StockFake is a single-player financial simulation that lets you trade stocks usi
 - **NYSE Trading Hours**: Markets open 9:30 AM - 4:00 PM EST, Monday-Friday
 - **Historical Trade Halts**: Trading suspensions during major events (Black Monday 1987, 9/11, 2008 Crisis, COVID-19)
 - **Price Fluctuations**: Realistic ±2% variations between data points
+- **Market Crash Simulation**: Dynamic crash events with configurable magnitude, duration, and cascading effects
 
 ### 💼 Advanced Trading Features
 - **Multiple Order Types**: Buy, sell, short sell, and cover positions
@@ -189,6 +190,20 @@ Deep dive into company profiles with financials and product history
 - **2013+**: $0.99 (low-cost brokers)
 - **2019+**: $0.00 (commission-free era)
 
+### Market Crash Simulation 💥
+- **Historical Scenarios**: Black Monday 1987, Dot-Com Crash 2000, Financial Crisis 2008, COVID-19 Crash 2020, Flash Crash 2010
+- **Hypothetical Scenarios**: Tech bubble burst, banking crisis, energy crisis, geopolitical shock
+- **Dynamic Event Generation**: Automatic crash events for dates beyond historical data (post-2024)
+- **Configurable Probabilities**: Adjust crash frequency, severity distribution, and sector targeting
+- **Dynamic Impact**: Market-wide and sector-specific price impacts with configurable severity
+- **Cascading Effects**: Multi-stage impact propagation over time with recovery patterns
+- **Market State Changes**: Volatility multipliers (2.5x-10x), liquidity reduction (30%-90%), sentiment shifts
+- **Custom Events**: Create custom crash scenarios with configurable parameters
+- **Analytics**: Real-time market state monitoring and event history tracking
+- **API Integration**: Full REST API for triggering, managing, and analyzing crash events
+
+See [CRASH_SIMULATION.md](CRASH_SIMULATION.md) for detailed documentation.
+
 ## 📚 API Documentation
 
 ### Time & Market Status
@@ -245,6 +260,23 @@ Deep dive into company profiles with financials and product history
 - `GET /api/news` - Historical news events up to current time
 - `GET /api/emails` - Email notifications and updates
 
+### Market Crash Simulation
+- `GET /api/crash/scenarios` - List all available crash scenarios (historical and hypothetical)
+- `GET /api/crash/scenarios/:id` - Get detailed scenario configuration
+- `POST /api/crash/trigger` - Trigger a crash event (scenarioId or customConfig)
+- `GET /api/crash/active` - Get currently active crash events
+- `POST /api/crash/deactivate/:eventId` - Manually deactivate a crash event
+- `GET /api/crash/analytics` - Get crash analytics and market state
+- `GET /api/crash/market-state` - Get current market state (volatility, liquidity, sentiment)
+- `GET /api/crash/history` - Get crash event history (query: ?limit=50)
+- `POST /api/crash/custom` - Create custom crash scenario template
+
+### Dynamic Event Generation
+- `GET /api/crash/dynamic/config` - Get dynamic event generation configuration
+- `POST /api/crash/dynamic/config` - Update dynamic event generation configuration
+- `GET /api/crash/dynamic/events` - Get all dynamically generated events
+- `POST /api/crash/dynamic/generate` - Manually trigger dynamic event generation
+
 ## 🗄️ Database Architecture
 
 StockFake uses SQLite for data persistence with the following schema:
@@ -261,6 +293,10 @@ StockFake uses SQLite for data persistence with the following schema:
 - **index_fund_constituents**: Historical constituent weights and market-cap data over time
 - **index_fund_rebalancing_events**: Complete history of rebalancing events with details
 - **index_fund_rebalancing_config**: Per-fund rebalancing strategy and configuration
+
+### Market Crash Simulation
+- **market_crash_events**: Active and historical crash events with full configuration
+- **market_state**: Current market state (volatility, liquidity, sentiment)
 
 ### Transaction Tracking
 - **transactions**: Complete trading history

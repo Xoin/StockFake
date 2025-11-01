@@ -271,6 +271,43 @@ function initializeDatabase() {
     )
   `);
 
+  // Create market_crash_events table for tracking active and historical crash events
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS market_crash_events (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      type TEXT NOT NULL,
+      severity TEXT NOT NULL,
+      activated_at TEXT NOT NULL,
+      deactivated_at TEXT,
+      status TEXT NOT NULL DEFAULT 'active',
+      event_data TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+
+  // Create market_state table for tracking market conditions during crashes
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS market_state (
+      id INTEGER PRIMARY KEY CHECK (id = 1),
+      base_volatility REAL NOT NULL DEFAULT 1.0,
+      current_volatility REAL NOT NULL DEFAULT 1.0,
+      liquidity_level REAL NOT NULL DEFAULT 1.0,
+      sentiment_score REAL NOT NULL DEFAULT 0.0,
+      sector_sentiment TEXT,
+      last_updated TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+
+  // Insert default market state if not exists
+  const marketStateCount = db.prepare('SELECT COUNT(*) as count FROM market_state').get();
+  if (marketStateCount.count === 0) {
+    db.prepare(`
+      INSERT INTO market_state (id, base_volatility, current_volatility, liquidity_level, sentiment_score, sector_sentiment)
+      VALUES (1, 1.0, 1.0, 1.0, 0.0, '{}')
+    `).run();
+  }
+
   // Insert default game state if not exists
   const gameStateCount = db.prepare('SELECT COUNT(*) as count FROM game_state').get();
   if (gameStateCount.count === 0) {
@@ -520,6 +557,30 @@ const upsertRebalancingConfig = db.prepare(`
     updated_at = CURRENT_TIMESTAMP
 `);
 
+// Market crash events functions
+const getActiveCrashEvents = db.prepare('SELECT * FROM market_crash_events WHERE status = ? ORDER BY activated_at DESC');
+const getAllCrashEvents = db.prepare('SELECT * FROM market_crash_events ORDER BY activated_at DESC LIMIT ?');
+const getCrashEvent = db.prepare('SELECT * FROM market_crash_events WHERE id = ?');
+const insertCrashEvent = db.prepare(`
+  INSERT INTO market_crash_events (id, name, type, severity, activated_at, status, event_data)
+  VALUES (?, ?, ?, ?, ?, ?, ?)
+`);
+const updateCrashEventStatus = db.prepare(`
+  UPDATE market_crash_events 
+  SET status = ?, deactivated_at = ?
+  WHERE id = ?
+`);
+const deleteCrashEvent = db.prepare('DELETE FROM market_crash_events WHERE id = ?');
+
+// Market state functions
+const getMarketState = db.prepare('SELECT * FROM market_state WHERE id = 1');
+const updateMarketState = db.prepare(`
+  UPDATE market_state 
+  SET base_volatility = ?, current_volatility = ?, liquidity_level = ?, sentiment_score = ?, 
+      sector_sentiment = ?, last_updated = ?
+  WHERE id = 1
+`);
+
 module.exports = {
   db,
   initializeDatabase,
@@ -624,5 +685,17 @@ module.exports = {
   // Index fund rebalancing config
   getRebalancingConfig,
   getAllRebalancingConfigs,
-  upsertRebalancingConfig
+  upsertRebalancingConfig,
+  
+  // Market crash events
+  getActiveCrashEvents,
+  getAllCrashEvents,
+  getCrashEvent,
+  insertCrashEvent,
+  updateCrashEventStatus,
+  deleteCrashEvent,
+  
+  // Market crash state
+  getCrashMarketState: getMarketState,
+  updateCrashMarketState: updateMarketState
 };
