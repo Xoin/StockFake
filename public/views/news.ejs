@@ -101,7 +101,7 @@ let paginator;
         // Format market update body as a table
         function formatMarketUpdateTable(bodyText) {
             // Parse numbered list format: "1. Company (SYMBOL) text... 2. Company text..."
-            const items = bodyText.split(/\d+\.\s+/).filter(item => item.trim());
+            const items = bodyText.split(/\\d+\\.\\s+/).filter(item => item.trim());
             
             if (items.length === 0) {
                 return \`<div class="news-body">\${escapeHtml(bodyText)}</div>\`;
@@ -110,8 +110,8 @@ let paginator;
             // Parse each item to extract stock info and movement
             const movements = items.map(item => {
                 // Try to extract company name, symbol, and change percentage
-                const symbolMatch = item.match(/\(([A-Z]+)\)/);
-                const changeMatch = item.match(/(gained|advanced|declined|lost|moved|up|down)\s+([\d.]+)%/i);
+                const symbolMatch = item.match(/\\(([A-Z]+)\\)/);
+                const changeMatch = item.match(/(gained|advanced|declined|lost|moved|up|down)\\s+([\\d.]+)%/i);
                 const upMatch = item.match(/(surges|surged|jump|jumped|rally|rallied|gains|gained|advanced)/i);
                 const downMatch = item.match(/(plunges|plunged|drop|dropped|decline|declined|losses|lost|tumbled)/i);
                 
@@ -120,11 +120,11 @@ let paginator;
                 
                 // Determine direction from text if not in change match
                 if (upMatch && change === 0) {
-                    const percentMatch = item.match(/([\d.]+)%/);
+                    const percentMatch = item.match(/([\\d.]+)%/);
                     if (percentMatch) change = parseFloat(percentMatch[1]);
                 }
                 if (downMatch && change === 0) {
-                    const percentMatch = item.match(/([\d.]+)%/);
+                    const percentMatch = item.match(/([\\d.]+)%/);
                     if (percentMatch) change = -parseFloat(percentMatch[1]);
                 }
                 
@@ -133,11 +133,11 @@ let paginator;
                 if (symbolMatch) {
                     company = item.substring(0, item.indexOf('(')).trim();
                 } else {
-                    company = item.split(/\s+/).slice(0, 3).join(' ');
+                    company = item.split(/\\s+/).slice(0, 3).join(' ');
                 }
                 
                 // Clean up company name
-                company = company.replace(/^(Shares of|Investors|Market)\s+/i, '').trim();
+                company = company.replace(/^(Shares of|Investors|Market)\\s+/i, '').trim();
                 
                 return { company, symbol, change, text: item.trim() };
             });
