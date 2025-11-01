@@ -19,6 +19,10 @@ const tradeHalts = require('./data/trade-halts');
 const shareAvailability = require('./data/share-availability');
 const indexFunds = require('./data/index-funds');
 
+// Set up EJS as the view engine
+app.set('view engine', 'ejs');
+app.set('views', path.join(__dirname, 'public', 'views'));
+
 // Middleware
 app.use(express.json());
 app.use(express.static('public'));
@@ -203,7 +207,7 @@ app.post('/api/time/speed', (req, res) => {
 
 // Routes for different websites
 app.get('/bank', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'bank.html'));
+  res.render('bank');
 });
 
 app.get('/news', (req, res) => {
