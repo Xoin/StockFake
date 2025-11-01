@@ -193,6 +193,8 @@ Deep dive into company profiles with financials and product history
 ### Market Crash Simulation 💥
 - **Historical Scenarios**: Black Monday 1987, Dot-Com Crash 2000, Financial Crisis 2008, COVID-19 Crash 2020, Flash Crash 2010
 - **Hypothetical Scenarios**: Tech bubble burst, banking crisis, energy crisis, geopolitical shock
+- **Dynamic Event Generation**: Automatic crash events for dates beyond historical data (post-2024)
+- **Configurable Probabilities**: Adjust crash frequency, severity distribution, and sector targeting
 - **Dynamic Impact**: Market-wide and sector-specific price impacts with configurable severity
 - **Cascading Effects**: Multi-stage impact propagation over time with recovery patterns
 - **Market State Changes**: Volatility multipliers (2.5x-10x), liquidity reduction (30%-90%), sentiment shifts
@@ -268,6 +270,12 @@ See [CRASH_SIMULATION.md](CRASH_SIMULATION.md) for detailed documentation.
 - `GET /api/crash/market-state` - Get current market state (volatility, liquidity, sentiment)
 - `GET /api/crash/history` - Get crash event history (query: ?limit=50)
 - `POST /api/crash/custom` - Create custom crash scenario template
+
+### Dynamic Event Generation
+- `GET /api/crash/dynamic/config` - Get dynamic event generation configuration
+- `POST /api/crash/dynamic/config` - Update dynamic event generation configuration
+- `GET /api/crash/dynamic/events` - Get all dynamically generated events
+- `POST /api/crash/dynamic/generate` - Manually trigger dynamic event generation
 
 ## 🗄️ Database Architecture
 

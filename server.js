@@ -3737,6 +3737,7 @@ app.get('/api/emails', (req, res) => {
 
 const marketCrashSim = require('./helpers/marketCrashSimulation');
 const crashEvents = require('./data/market-crash-events');
+const dynamicEventGenerator = require('./helpers/dynamicEventGenerator');
 
 // Initialize crash simulation on server start
 marketCrashSim.initializeMarketState();
@@ -3880,6 +3881,79 @@ app.post('/api/crash/custom', (req, res) => {
     scenario: scenario,
     message: 'Custom crash scenario created. Use /api/crash/trigger to activate it.'
   });
+});
+
+// Dynamic Event Generation Endpoints
+
+// Get dynamic event configuration
+app.get('/api/crash/dynamic/config', (req, res) => {
+  const config = dynamicEventGenerator.getConfiguration();
+  res.json(config);
+});
+
+// Update dynamic event configuration
+app.post('/api/crash/dynamic/config', (req, res) => {
+  const newConfig = req.body;
+  
+  try {
+    dynamicEventGenerator.updateConfiguration(newConfig);
+    const updatedConfig = dynamicEventGenerator.getConfiguration();
+    
+    res.json({
+      success: true,
+      config: updatedConfig,
+      message: 'Dynamic event configuration updated'
+    });
+  } catch (error) {
+    res.status(400).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// Get all dynamically generated events
+app.get('/api/crash/dynamic/events', (req, res) => {
+  const generatedEvents = dynamicEventGenerator.getGeneratedEvents();
+  res.json({
+    count: generatedEvents.length,
+    events: generatedEvents.map(e => ({
+      id: e.id,
+      name: e.name,
+      type: e.type,
+      severity: e.severity,
+      generatedAt: e.generatedAt,
+      impact: e.impact
+    }))
+  });
+});
+
+// Manually trigger dynamic event generation
+app.post('/api/crash/dynamic/generate', (req, res) => {
+  try {
+    const newEvents = dynamicEventGenerator.generateDynamicEvents(gameTime);
+    
+    // Auto-trigger the generated events
+    const triggeredEvents = [];
+    for (const event of newEvents) {
+      const result = marketCrashSim.triggerCrashEvent(event, gameTime);
+      if (result.success) {
+        triggeredEvents.push(result.event);
+      }
+    }
+    
+    res.json({
+      success: true,
+      generatedCount: newEvents.length,
+      triggeredCount: triggeredEvents.length,
+      events: triggeredEvents
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
 });
 
 // Debug/Cheat API Endpoints

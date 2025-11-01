@@ -4,6 +4,7 @@
  */
 
 const crashEvents = require('../data/market-crash-events');
+const dynamicEventGenerator = require('./dynamicEventGenerator');
 
 /**
  * Active crash events state
@@ -277,6 +278,15 @@ function calculateStockPriceImpact(symbol, sector, basePrice, currentTime) {
  * @param {Date} currentTime - Current game time
  */
 function updateCrashEvents(currentTime) {
+  // Check for and generate dynamic events
+  const newDynamicEvents = dynamicEventGenerator.generateDynamicEvents(currentTime);
+  
+  // Auto-trigger dynamic events
+  for (const dynamicEvent of newDynamicEvents) {
+    console.log(`Auto-triggering dynamic event: ${dynamicEvent.name}`);
+    triggerCrashEvent(dynamicEvent, currentTime);
+  }
+  
   // Remove completed events
   activeEvents = activeEvents.filter(event => {
     if (event.endDate && currentTime > new Date(event.endDate)) {

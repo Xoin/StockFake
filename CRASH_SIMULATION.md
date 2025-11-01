@@ -4,6 +4,8 @@
 
 The Market Crash Simulation system provides a comprehensive framework for simulating dynamic market crashes and extreme market events. This system allows for injecting sudden, severe shocks into the market environment with configurable parameters for magnitude, duration, cascading effects, and recovery patterns.
 
+**New:** The system now includes **automatic dynamic event generation** for dates beyond historical data, ensuring continuous market volatility and realistic crash scenarios in future gameplay.
+
 ## Features
 
 ### Event Modeling
@@ -57,6 +59,34 @@ cascadingEffects: [
 - **Slow**: Logarithmic recovery (e.g., 2008 crisis)
 - **Prolonged**: Extended decline then slow recovery (e.g., dot-com)
 - **Immediate**: Very fast recovery (e.g., flash crash)
+
+### Dynamic Event Generation
+
+For dates beyond the historical data end point (December 31, 2024), the system automatically generates crash events using procedural algorithms:
+
+#### Generation Parameters
+- **Annual Crash Probability**: 15% per year
+- **Annual Correction Probability**: 25% per year
+- **Annual Sector Crash Probability**: 20% per year
+- **Check Interval**: Every 30 days
+- **Minimum Days Between Events**: 90 days
+
+#### Event Characteristics
+- **Deterministic**: Same seed (date) produces same events for replay consistency
+- **Configurable**: All probabilities and parameters can be adjusted via API
+- **Severity Distribution**: 
+  - 10% Catastrophic (-30% to -55% impact)
+  - 25% Severe (-20% to -35% impact)
+  - 35% Moderate (-10% to -22% impact)
+  - 30% Minor (-5% to -13% impact)
+
+#### Auto-Generated Properties
+- Realistic event names based on date and type
+- Sector-specific impacts with appropriate variations
+- Multi-stage cascading effects (4 stages)
+- Recovery patterns (V-shaped, gradual, or slow)
+- Volatility multipliers ranging from 1.5x to 10x
+- Liquidity reduction proportional to crash severity
 
 ## API Reference
 
@@ -303,6 +333,101 @@ Creates a custom crash scenario template.
 }
 ```
 
+## Dynamic Event Generation API
+
+### Get Dynamic Event Configuration
+```
+GET /api/crash/dynamic/config
+```
+
+Returns current configuration for dynamic event generation.
+
+**Response:**
+```json
+{
+  "historicalDataEndDate": "2024-12-31T23:59:59.000Z",
+  "annualCrashProbability": 0.15,
+  "annualCorrectionProbability": 0.25,
+  "annualSectorCrashProbability": 0.20,
+  "checkIntervalDays": 30,
+  "minDaysBetweenEvents": 90,
+  "sectorWeights": {
+    "Technology": 0.30,
+    "Financial": 0.25,
+    "Energy": 0.15
+  }
+}
+```
+
+### Update Dynamic Event Configuration
+```
+POST /api/crash/dynamic/config
+```
+
+Updates the configuration for dynamic event generation.
+
+**Request Body:**
+```json
+{
+  "annualCrashProbability": 0.20,
+  "minDaysBetweenEvents": 60,
+  "checkIntervalDays": 45
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "config": {...},
+  "message": "Dynamic event configuration updated"
+}
+```
+
+### Get Dynamically Generated Events
+```
+GET /api/crash/dynamic/events
+```
+
+Returns all events that have been dynamically generated.
+
+**Response:**
+```json
+{
+  "count": 3,
+  "events": [
+    {
+      "id": "dynamic_1749979800000_market_crash",
+      "name": "Global Market Turbulence 2025",
+      "type": "market_crash",
+      "severity": "severe",
+      "generatedAt": "2025-06-15T09:30:00.000Z",
+      "impact": {
+        "market": -0.28,
+        "volatilityMultiplier": 4.2
+      }
+    }
+  ]
+}
+```
+
+### Manually Trigger Dynamic Event Generation
+```
+POST /api/crash/dynamic/generate
+```
+
+Manually triggers the dynamic event generation process for the current game time.
+
+**Response:**
+```json
+{
+  "success": true,
+  "generatedCount": 1,
+  "triggeredCount": 1,
+  "events": [...]
+}
+```
+
 ## Usage Examples
 
 ### Example 1: Trigger Historical Crash
@@ -377,6 +502,40 @@ fetch('/api/crash/analytics')
   });
 ```
 
+### Example 5: Configure Dynamic Event Generation
+```javascript
+// Update dynamic event configuration
+fetch('/api/crash/dynamic/config', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    annualCrashProbability: 0.20,  // Increase crash frequency
+    minDaysBetweenEvents: 60,      // Reduce minimum interval
+    sectorWeights: {
+      'Technology': 0.40,          // Higher weight for tech crashes
+      'Financial': 0.30,
+      'Energy': 0.10,
+      'Healthcare': 0.10,
+      'Industrials': 0.05,
+      'Consumer': 0.05
+    }
+  })
+});
+```
+
+### Example 6: Monitor Dynamic Events
+```javascript
+// Check what events have been auto-generated
+fetch('/api/crash/dynamic/events')
+  .then(res => res.json())
+  .then(data => {
+    console.log(`${data.count} dynamic events generated`);
+    data.events.forEach(event => {
+      console.log(`- ${event.name}: ${event.type} (${event.severity})`);
+    });
+  });
+```
+
 ## Integration with Stock Prices
 
 The crash simulation automatically integrates with the stock price engine. When calculating stock prices, the system:
@@ -394,6 +553,7 @@ This ensures that stock prices accurately reflect the crash conditions without r
 
 Run the comprehensive integration tests:
 
+### Crash Simulation Tests
 ```bash
 node test-crash-simulation.js
 ```
@@ -407,6 +567,20 @@ This test suite validates:
 - Liquidity impact
 - Analytics and reporting
 - Custom scenario creation
+
+### Dynamic Event Generation Tests
+```bash
+node test-dynamic-events.js
+```
+
+This test suite validates:
+- Configuration management
+- Dynamic event generation
+- Historical period restrictions
+- Event determinism
+- Different event types
+- Event structure validation
+- Future date handling
 
 ## Database Schema
 
