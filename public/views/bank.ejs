@@ -119,7 +119,10 @@
                     🔴 Sell All Positions
                 </button>
                 <button class="quick-sell-btn" onclick="sellToZeroGains()" style="padding: 8px 16px; font-size: 1em;">
-                    ⚖️ Sell to Zero Gains
+                    ⚖️ Sell Losing Positions
+                </button>
+                <button class="quick-sell-btn" onclick="sellToZeroProfit()" style="padding: 8px 16px; font-size: 1em;">
+                    ⚖️ Sell Till Profit is 0
                 </button>
                 <button class="quick-sell-btn" onclick="sellSelectedPositions()" style="padding: 8px 16px; font-size: 1em;">
                     📋 Sell Selected
@@ -830,6 +833,172 @@
                 alert(\`✓ Sold \${successCount} losing position(s).\${failCount > 0 ? ' Failed to sell ' + failCount + ' position(s).' : ''}\`);
             } else {
                 alert('No losing positions to sell.');
+            }
+            
+            updateAccount();
+        }
+        
+        // Sell shares from profitable positions until total profit is approximately 0
+        async function sellToZeroProfit() {
+            if (!confirm('This will sell shares from profitable positions until your total gain/loss is approximately zero. Continue?')) {
+                return;
+            }
+            
+            const accountRes = await fetch('/api/account');
+            const account = await accountRes.json();
+            
+            const stocksRes = await fetch('/api/stocks');
+            const stocks = await stocksRes.json();
+            
+            const indexFundsRes = await fetch('/api/indexfunds');
+            const indexFunds = await indexFundsRes.json();
+            
+            // Calculate current total profit
+            let positions = [];
+            
+            // Process stock positions
+            for (const [symbol, shares] of Object.entries(account.portfolio)) {
+                if (shares <= 0) continue;
+                
+                const stock = stocks.find(s => s.symbol === symbol);
+                if (!stock) continue;
+                
+                const currentPrice = stock.price;
+                const totalValue = shares * currentPrice;
+                
+                // Calculate cost
+                let positionCost = 0;
+                if (account.purchaseHistory && account.purchaseHistory[symbol]) {
+                    let totalShares = 0;
+                    let totalPaid = 0;
+                    account.purchaseHistory[symbol].forEach(purchase => {
+                        totalShares += purchase.shares;
+                        totalPaid += purchase.shares * purchase.pricePerShare;
+                    });
+                    if (totalShares > 0) {
+                        positionCost = (totalPaid / totalShares) * shares;
+                    }
+                }
+                
+                const gainLoss = totalValue - positionCost;
+                
+                if (gainLoss > 0) {
+                    positions.push({
+                        symbol,
+                        isStock: true,
+                        shares,
+                        currentPrice,
+                        avgCost: positionCost / shares,
+                        gainLoss,
+                        totalValue
+                    });
+                }
+            }
+            
+            // Process index fund positions
+            if (account.indexFundHoldings) {
+                for (const [symbol, holding] of Object.entries(account.indexFundHoldings)) {
+                    if (holding.shares <= 0) continue;
+                    
+                    const fund = indexFunds.find(f => f.symbol === symbol);
+                    if (!fund) continue;
+                    
+                    const currentPrice = fund.price;
+                    const totalValue = holding.shares * currentPrice;
+                    
+                    // Calculate cost
+                    let positionCost = 0;
+                    if (holding.purchaseHistory && holding.purchaseHistory.length > 0) {
+                        let totalShares = 0;
+                        let totalPaid = 0;
+                        holding.purchaseHistory.forEach(purchase => {
+                            totalShares += purchase.shares;
+                            totalPaid += purchase.shares * purchase.pricePerShare;
+                        });
+                        if (totalShares > 0) {
+                            positionCost = (totalPaid / totalShares) * holding.shares;
+                        }
+                    }
+                    
+                    const gainLoss = totalValue - positionCost;
+                    
+                    if (gainLoss > 0) {
+                        positions.push({
+                            symbol,
+                            isStock: false,
+                            shares: holding.shares,
+                            currentPrice,
+                            avgCost: positionCost / holding.shares,
+                            gainLoss,
+                            totalValue
+                        });
+                    }
+                }
+            }
+            
+            if (positions.length === 0) {
+                alert('No profitable positions to sell.');
+                return;
+            }
+            
+            // Sort by profit percentage (sell highest profit % first)
+            positions.sort((a, b) => {
+                const aProfitPct = (a.gainLoss / (a.avgCost * a.shares)) * 100;
+                const bProfitPct = (b.gainLoss / (b.avgCost * b.shares)) * 100;
+                return bProfitPct - aProfitPct;
+            });
+            
+            // Calculate total current profit
+            const totalCurrentProfit = positions.reduce((sum, p) => sum + p.gainLoss, 0);
+            
+            let targetProfit = totalCurrentProfit; // Amount we need to reduce
+            let successCount = 0;
+            let failCount = 0;
+            let profitReduced = 0;
+            
+            for (const pos of positions) {
+                if (profitReduced >= targetProfit * 0.95) break; // Stop when we're within 5% of target
+                
+                // Calculate how many shares to sell to reach zero profit
+                const profitPerShare = pos.currentPrice - pos.avgCost;
+                let sharesToSell;
+                
+                if (profitReduced + pos.gainLoss <= targetProfit) {
+                    // Sell entire position
+                    sharesToSell = pos.shares;
+                } else {
+                    // Sell partial position
+                    const remainingProfitToReduce = targetProfit - profitReduced;
+                    sharesToSell = Math.min(pos.shares, Math.ceil(remainingProfitToReduce / profitPerShare));
+                }
+                
+                try {
+                    const endpoint = pos.isStock ? '/api/trade' : '/api/indexfunds/trade';
+                    const response = await fetch(endpoint, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            symbol: pos.symbol,
+                            shares: sharesToSell,
+                            action: 'sell'
+                        })
+                    });
+                    
+                    if (response.ok) {
+                        successCount++;
+                        profitReduced += sharesToSell * profitPerShare;
+                    } else {
+                        failCount++;
+                    }
+                } catch (error) {
+                    failCount++;
+                }
+            }
+            
+            if (successCount > 0) {
+                alert(\`✓ Sold shares from \${successCount} position(s) to reduce profit by $\${profitReduced.toFixed(2)}.\${failCount > 0 ? ' Failed to sell from ' + failCount + ' position(s).' : ''}\`);
+            } else {
+                alert('✗ Failed to sell positions.');
             }
             
             updateAccount();
