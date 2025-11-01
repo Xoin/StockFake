@@ -431,6 +431,8 @@ const MARGIN_INTEREST_RATE_BASE = 0.08; // 8% annual base rate on margin loans
 const SHORT_TERM_TAX_RATE = 0.30; // 30% for holdings < 1 year
 const LONG_TERM_TAX_RATE = 0.15; // 15% for holdings >= 1 year
 const DIVIDEND_TAX_RATE = 0.15; // 15% on dividends
+const WEALTH_TAX_RATE = 0.01; // 1% annual wealth tax on total net worth
+const WEALTH_TAX_THRESHOLD = 50000; // Only apply wealth tax if net worth exceeds this amount
 
 // Fee structure
 const TRADING_FEE_FLAT = 9.99; // Flat fee per trade in 1970s, will decrease over time
@@ -453,6 +455,7 @@ const inflationRates = {
 
 let lastMonthlyFeeCheck = null;
 let lastInflationCheck = null;
+let lastWealthTaxCheck = null;
 let cumulativeInflation = 1.0; // Tracks purchasing power relative to 1970
 
 // Dividend data (quarterly payouts per share)
@@ -633,6 +636,50 @@ function trackInflation() {
   }
 }
 
+// Assess and collect yearly wealth tax
+function assessWealthTax() {
+  const currentYear = gameTime.getFullYear();
+  const yearKey = `${currentYear}`;
+  
+  // Check once per year on January 1st
+  if (lastWealthTaxCheck !== yearKey) {
+    lastWealthTaxCheck = yearKey;
+    
+    // Calculate total net worth (cash + portfolio value - debts)
+    const portfolioValue = calculatePortfolioValue();
+    const marginDebt = userAccount.marginAccount.marginBalance;
+    
+    // Calculate total loan debt
+    let totalLoanDebt = 0;
+    for (const loan of userAccount.loans) {
+      if (loan.status === 'active') {
+        totalLoanDebt += loan.balance;
+      }
+    }
+    
+    const netWorth = userAccount.cash + portfolioValue - marginDebt - totalLoanDebt;
+    
+    // Only apply wealth tax if net worth exceeds threshold
+    if (netWorth > WEALTH_TAX_THRESHOLD) {
+      const taxableWealth = netWorth - WEALTH_TAX_THRESHOLD;
+      const wealthTax = taxableWealth * WEALTH_TAX_RATE;
+      
+      // Deduct wealth tax from cash
+      userAccount.cash -= wealthTax;
+      
+      // Record tax payment
+      userAccount.taxes.push({
+        date: new Date(gameTime),
+        type: 'wealth',
+        amount: wealthTax,
+        description: `Annual wealth tax for ${currentYear} (${(WEALTH_TAX_RATE * 100).toFixed(2)}% on net worth above $${WEALTH_TAX_THRESHOLD.toLocaleString()})`
+      });
+      
+      console.log(`Wealth tax assessed for ${currentYear}: $${wealthTax.toFixed(2)} (Net worth: $${netWorth.toFixed(2)})`);
+    }
+  }
+}
+
 // Update short positions (charge borrowing fees)
 function updateShortPositions() {
   const currentTime = new Date(gameTime);
@@ -667,6 +714,7 @@ function updateShortPositions() {
 // Call these periodically
 setInterval(checkAndChargeMonthlyFee, 10000);
 setInterval(trackInflation, 5000);
+setInterval(assessWealthTax, 5000);
 setInterval(updateShortPositions, 10000);
 
 // Margin account helper functions
@@ -2646,6 +2694,7 @@ app.get('/api/taxes', (req, res) => {
     capitalGains: 0,
     shortGains: 0,
     dividends: 0,
+    wealth: 0,
     total: 0
   };
   
@@ -2658,6 +2707,8 @@ app.get('/api/taxes', (req, res) => {
       taxBreakdown.shortGains += tax.amount;
     } else if (tax.type === 'dividend') {
       taxBreakdown.dividends += tax.amount;
+    } else if (tax.type === 'wealth') {
+      taxBreakdown.wealth += tax.amount;
     }
     taxBreakdown.total += tax.amount;
     
@@ -2722,7 +2773,9 @@ app.get('/api/taxes', (req, res) => {
     currentTaxRates: {
       shortTermCapitalGains: SHORT_TERM_TAX_RATE * 100,
       longTermCapitalGains: LONG_TERM_TAX_RATE * 100,
-      dividends: DIVIDEND_TAX_RATE * 100
+      dividends: DIVIDEND_TAX_RATE * 100,
+      wealth: WEALTH_TAX_RATE * 100,
+      wealthTaxThreshold: WEALTH_TAX_THRESHOLD
     }
   });
 });
