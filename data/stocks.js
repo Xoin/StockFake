@@ -174,9 +174,10 @@ function getStockPrice(symbol, currentTime, timeMultiplier, isPaused, bypassCach
     // Calculate time since last data point
     const daysSinceLastData = (currentTime.getTime() - lastDataDate.getTime()) / (1000 * 60 * 60 * 24);
     
-    // Apply continued growth: average 7% annual growth (historical market average)
+    // Apply continued growth: reduced to 5% annual growth to prevent hockey stick
+    // This is more conservative and allows market corrections to have meaningful impact
     // Compound daily: (1 + annual_rate)^(days/365.25)
-    const annualGrowthRate = 0.07; // 7% per year
+    const annualGrowthRate = 0.05; // 5% per year (reduced from 7%)
     const growthFactor = Math.pow(1 + annualGrowthRate, daysSinceLastData / 365.25);
     basePrice = basePrice * growthFactor;
     
@@ -192,10 +193,36 @@ function getStockPrice(symbol, currentTime, timeMultiplier, isPaused, bypassCach
       finalPrice = crashSimModule.calculateStockPriceImpact(symbol, sector, basePrice, currentTime);
     }
     
+    // Calculate change from previous day for percentage change
+    let change = 0;
+    const previousDay = new Date(currentTime.getTime() - (24 * 60 * 60 * 1000));
+    const previousDaysSinceLastData = (previousDay.getTime() - lastDataDate.getTime()) / (1000 * 60 * 60 * 24);
+    
+    if (previousDaysSinceLastData >= 0) {
+      // Calculate previous day's price with same methodology
+      let prevBasePrice = stockData[stockData.length - 1].price;
+      const prevGrowthFactor = Math.pow(1 + annualGrowthRate, previousDaysSinceLastData / 365.25);
+      prevBasePrice = prevBasePrice * prevGrowthFactor;
+      
+      const prevRandomValue = seededRandom(symbol, Math.floor(previousDay.getTime() / (1000 * 60 * 60 * 24)));
+      const prevVolatility = (prevRandomValue - 0.5) * 0.04;
+      prevBasePrice = prevBasePrice * (1 + prevVolatility);
+      
+      // Apply crash simulation impact for previous day
+      let prevFinalPrice = prevBasePrice;
+      if (crashSimModule) {
+        const sector = getStockSector(symbol);
+        prevFinalPrice = crashSimModule.calculateStockPriceImpact(symbol, sector, prevBasePrice, previousDay);
+      }
+      
+      // Calculate percentage change
+      change = ((finalPrice - prevFinalPrice) / prevFinalPrice) * 100;
+    }
+    
     const result = {
       symbol,
       price: parseFloat(finalPrice.toFixed(2)),
-      change: 0,
+      change: parseFloat(change.toFixed(2)),
       name: getStockName(symbol),
       sector: getStockSector(symbol)
     };

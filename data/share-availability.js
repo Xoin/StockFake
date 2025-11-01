@@ -149,11 +149,152 @@ function getOwnershipPercentage(symbol) {
   return (availability.playerOwned / availability.totalOutstanding) * 100;
 }
 
+// Track last buyback check date
+let lastBuybackCheck = null;
+
+/**
+ * Perform stock buybacks when economy is doing well
+ * Companies buy back their own shares, reducing available float
+ * @param {Date} currentTime - Current game time
+ * @param {number} marketSentiment - Market sentiment score (-1 to 1, where 1 is very positive)
+ * @returns {Array} - List of buyback events that occurred
+ */
+function processBuybacks(currentTime, marketSentiment = 0.5) {
+  const buybackEvents = [];
+  
+  // Only process buybacks once per month
+  if (lastBuybackCheck) {
+    const daysSinceLastCheck = (currentTime - lastBuybackCheck) / (1000 * 60 * 60 * 24);
+    if (daysSinceLastCheck < 30) {
+      return buybackEvents;
+    }
+  }
+  
+  lastBuybackCheck = currentTime;
+  
+  // Buyback probability increases with positive market sentiment
+  // When sentiment is high (>0.6), companies are more likely to buy back shares
+  if (marketSentiment < 0.3) {
+    return buybackEvents; // No buybacks in poor economy
+  }
+  
+  // Seeded random for deterministic behavior
+  const seed = Math.floor(currentTime.getTime() / (1000 * 60 * 60 * 24));
+  
+  for (const [symbol, availability] of Object.entries(shareAvailability)) {
+    // Skip if no shares available to buy back
+    if (availability.availableForTrading <= availability.totalOutstanding * 0.1) {
+      continue; // Keep at least 10% float
+    }
+    
+    // Probability of buyback increases with market sentiment
+    const buybackProbability = Math.max(0, (marketSentiment - 0.3) * 0.15); // 0-10.5% monthly chance
+    
+    // Use deterministic random
+    const random = Math.abs(Math.sin(seed + symbol.charCodeAt(0)) * 10000) % 1;
+    
+    if (random < buybackProbability) {
+      // Calculate buyback amount (0.5% to 2% of public float)
+      const buybackRandomFactor = Math.abs(Math.sin(seed * 2 + symbol.charCodeAt(0)) * 10000) % 1;
+      const buybackPercentage = 0.005 + (buybackRandomFactor * 0.015); // 0.5% to 2%
+      const sharesToBuyBack = Math.floor(availability.publicFloat * buybackPercentage);
+      
+      if (sharesToBuyBack > 0) {
+        // Reduce available shares and total outstanding
+        availability.availableForTrading = Math.max(
+          Math.floor(availability.totalOutstanding * 0.1), // Minimum 10% float
+          availability.availableForTrading - sharesToBuyBack
+        );
+        availability.totalOutstanding -= sharesToBuyBack;
+        availability.publicFloat -= sharesToBuyBack;
+        
+        buybackEvents.push({
+          symbol: symbol,
+          date: currentTime,
+          sharesBoughtBack: sharesToBuyBack,
+          percentageOfFloat: (buybackPercentage * 100).toFixed(2),
+          newTotalOutstanding: availability.totalOutstanding,
+          newAvailableForTrading: availability.availableForTrading
+        });
+      }
+    }
+  }
+  
+  return buybackEvents;
+}
+
+/**
+ * Issue new shares (opposite of buybacks)
+ * Companies issue new shares when they need capital, increasing available float
+ * @param {Date} currentTime - Current game time
+ * @param {number} marketSentiment - Market sentiment score (-1 to 1)
+ * @returns {Array} - List of stock issuance events
+ */
+function processShareIssuance(currentTime, marketSentiment = 0) {
+  const issuanceEvents = [];
+  
+  // Share issuance is more likely in poor economy or when companies need capital
+  // Only check quarterly
+  const seed = Math.floor(currentTime.getTime() / (1000 * 60 * 60 * 24 * 90));
+  
+  for (const [symbol, availability] of Object.entries(shareAvailability)) {
+    // Higher probability of issuance when market is weak
+    const issuanceProbability = marketSentiment < 0 ? 0.05 : 0.02; // 5% or 2% quarterly
+    
+    const random = Math.abs(Math.sin(seed * 3 + symbol.charCodeAt(0)) * 10000) % 1;
+    
+    if (random < issuanceProbability) {
+      // Calculate issuance amount (1% to 5% of current outstanding)
+      const issuanceRandomFactor = Math.abs(Math.sin(seed * 4 + symbol.charCodeAt(0)) * 10000) % 1;
+      const issuancePercentage = 0.01 + (issuanceRandomFactor * 0.04); // 1% to 5%
+      const sharesToIssue = Math.floor(availability.totalOutstanding * issuancePercentage);
+      
+      if (sharesToIssue > 0) {
+        // Increase available shares and total outstanding
+        availability.availableForTrading += sharesToIssue;
+        availability.totalOutstanding += sharesToIssue;
+        availability.publicFloat += sharesToIssue;
+        
+        issuanceEvents.push({
+          symbol: symbol,
+          date: currentTime,
+          sharesIssued: sharesToIssue,
+          percentageIncrease: (issuancePercentage * 100).toFixed(2),
+          newTotalOutstanding: availability.totalOutstanding,
+          newAvailableForTrading: availability.availableForTrading
+        });
+      }
+    }
+  }
+  
+  return issuanceEvents;
+}
+
+/**
+ * Adjust share counts based on historical stock splits
+ * @param {string} symbol - Stock symbol
+ * @param {number} splitRatio - Split ratio (e.g., 2 for 2:1 split)
+ */
+function applyStockSplit(symbol, splitRatio) {
+  const availability = shareAvailability[symbol];
+  if (!availability) return false;
+  
+  availability.totalOutstanding = Math.floor(availability.totalOutstanding * splitRatio);
+  availability.publicFloat = Math.floor(availability.publicFloat * splitRatio);
+  availability.availableForTrading = Math.floor(availability.availableForTrading * splitRatio);
+  availability.playerOwned = Math.floor(availability.playerOwned * splitRatio);
+  
+  return true;
+}
+
 module.exports = {
   getAvailableShares,
   canPurchaseShares,
   recordPurchase,
   recordSale,
   getAllShareAvailability,
-  getOwnershipPercentage
+  getOwnershipPercentage,
+  processBuybacks,
+  processShareIssuance,
+  applyStockSplit
 };

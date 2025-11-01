@@ -12,16 +12,16 @@ const DYNAMIC_EVENT_CONFIG = {
   // When to start generating dynamic events (after historical data ends)
   historicalDataEndDate: new Date('2024-12-31T23:59:59'),
   
-  // Probability settings (per year) - increased to ensure events actually happen
-  annualCrashProbability: 0.30,        // 30% chance of crash per year
-  annualCorrectionProbability: 0.50,   // 50% chance of correction per year
-  annualSectorCrashProbability: 0.40,  // 40% chance of sector-specific crash per year
+  // Probability settings (per year) - INCREASED to prevent hockey stick growth
+  annualCrashProbability: 0.40,        // 40% chance of crash per year (up from 30%)
+  annualCorrectionProbability: 0.70,   // 70% chance of correction per year (up from 50%)
+  annualSectorCrashProbability: 0.50,  // 50% chance of sector-specific crash per year (up from 40%)
   
-  // Check intervals - increased to 180 days (6 months) to accumulate meaningful probability
-  checkIntervalDays: 180,  // Check for new events every 180 days
+  // Check intervals - check more frequently to prevent runaway growth
+  checkIntervalDays: 90,  // Check for new events every 90 days (down from 180)
   
   // Event parameters
-  minDaysBetweenEvents: 90,  // Minimum 90 days between major events
+  minDaysBetweenEvents: 60,  // Minimum 60 days between major events (down from 90)
   
   // Sector weights for random selection
   sectorWeights: {
