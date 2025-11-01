@@ -1392,77 +1392,88 @@ function processLoans() {
     if (currentDate > dueDate) {
       const daysOverdue = (currentDate - dueDate) / (1000 * 60 * 60 * 24);
       
-      // After 30 days, mark as missed payment
-      if (daysOverdue > 30 && !loan.markedAsMissed) {
-        loan.missedPayments += 1;
-        loan.markedAsMissed = true;
+      // Calculate how many 30-day periods have passed since due date
+      // This allows for multiple missed payments to accumulate
+      const missedPaymentPeriods = Math.floor(daysOverdue / 30);
+      
+      // Only process if we have more missed periods than recorded
+      if (missedPaymentPeriods > loan.missedPayments) {
+        const newMissedPayments = missedPaymentPeriods - loan.missedPayments;
         
-        // Apply late payment penalty
-        const penalty = loan.balance * company.latePaymentPenalty;
-        loan.balance += penalty;
-        
-        // Decrease credit score
-        userAccount.creditScore = Math.max(300, userAccount.creditScore + company.creditScoreImpact.late);
-        
-        // Record fee
-        userAccount.fees.push({
-          date: new Date(gameTime),
-          type: 'loan-late-payment',
-          amount: penalty,
-          description: `Late payment penalty for loan #${loan.id} from ${company.name}`
-        });
-        
-        userAccount.loanHistory.push({
-          date: new Date(gameTime),
-          type: 'missed-payment',
-          loanId: loan.id,
-          companyId: loan.companyId,
-          penalty: penalty,
-          creditScoreChange: company.creditScoreImpact.late
-        });
-        
-        // After 3 missed payments, loan goes to default
-        if (loan.missedPayments >= 3) {
-          loan.status = 'default';
-          userAccount.creditScore = Math.max(300, userAccount.creditScore + company.creditScoreImpact.default);
+        for (let i = 0; i < newMissedPayments; i++) {
+          loan.missedPayments += 1;
+          
+          // Apply late payment penalty for each missed payment
+          const penalty = loan.balance * company.latePaymentPenalty;
+          loan.balance += penalty;
+          
+          // Decrease credit score
+          userAccount.creditScore = Math.max(300, userAccount.creditScore + company.creditScoreImpact.late);
+          
+          // Record fee
+          userAccount.fees.push({
+            date: new Date(gameTime),
+            type: 'loan-late-payment',
+            amount: penalty,
+            description: `Late payment penalty #${loan.missedPayments} for loan #${loan.id} from ${company.name}`
+          });
           
           userAccount.loanHistory.push({
             date: new Date(gameTime),
-            type: 'default',
+            type: 'missed-payment',
             loanId: loan.id,
             companyId: loan.companyId,
-            remainingBalance: loan.balance,
-            creditScoreChange: company.creditScoreImpact.default
+            penalty: penalty,
+            missedPaymentNumber: loan.missedPayments,
+            creditScoreChange: company.creditScoreImpact.late
           });
           
-          // Force collection: deduct from cash (can go negative)
-          if (userAccount.cash > 0) {
-            const amountCollected = Math.min(userAccount.cash, loan.balance);
-            userAccount.cash -= amountCollected;
-            loan.balance -= amountCollected;
+          // After 3 missed payments, loan goes to default
+          if (loan.missedPayments >= 3) {
+            loan.status = 'default';
+            userAccount.creditScore = Math.max(300, userAccount.creditScore + company.creditScoreImpact.default);
             
-            userAccount.transactions.push({
+            userAccount.loanHistory.push({
               date: new Date(gameTime),
-              type: 'loan-collection',
-              amount: -amountCollected,
-              description: `Forced collection on defaulted loan #${loan.id} from ${company.name}`
+              type: 'default',
+              loanId: loan.id,
+              companyId: loan.companyId,
+              remainingBalance: loan.balance,
+              creditScoreChange: company.creditScoreImpact.default
             });
-          }
-          
-          // If still have balance owed and cash is now negative or insufficient, 
-          // add to debt that will incur daily penalties
-          if (loan.balance > 0) {
-            // Negative cash balance will be handled by processNegativeBalance()
-            // which charges 10% APR penalty on negative balances
-            userAccount.cash -= loan.balance;
-            loan.balance = 0;
             
-            userAccount.transactions.push({
-              date: new Date(gameTime),
-              type: 'loan-default-debt',
-              amount: 0,
-              description: `Defaulted loan balance added to account debt. Total deficit: $${Math.abs(userAccount.cash).toLocaleString()}`
-            });
+            // Force collection: deduct from cash (can go negative)
+            if (userAccount.cash > 0) {
+              const amountCollected = Math.min(userAccount.cash, loan.balance);
+              userAccount.cash -= amountCollected;
+              loan.balance -= amountCollected;
+              
+              userAccount.transactions.push({
+                date: new Date(gameTime),
+                type: 'loan-collection',
+                amount: -amountCollected,
+                description: `Forced collection on defaulted loan #${loan.id} from ${company.name}`
+              });
+            }
+            
+            // If still have balance owed and cash is now negative or insufficient, 
+            // add to debt that will incur daily penalties
+            if (loan.balance > 0) {
+              // Negative cash balance will be handled by processNegativeBalance()
+              // which charges 10% APR penalty on negative balances
+              userAccount.cash -= loan.balance;
+              loan.balance = 0;
+              
+              userAccount.transactions.push({
+                date: new Date(gameTime),
+                type: 'loan-default-debt',
+                amount: 0,
+                description: `Defaulted loan balance added to account debt. Total deficit: $${Math.abs(userAccount.cash).toLocaleString()}`
+              });
+            }
+            
+            // Break out of the loop once defaulted
+            break;
           }
         }
       }
@@ -2806,7 +2817,6 @@ app.post('/api/loans/take', (req, res) => {
     lastInterestAccrual: new Date(gameTime),
     missedPayments: 0,
     status: 'active',
-    markedAsMissed: false,
     termDays: company.termDays
   };
   
@@ -2878,11 +2888,6 @@ app.post('/api/loans/pay', (req, res) => {
   const previousBalance = loan.balance;
   loan.balance = Math.max(0, loan.balance - amount);
   loan.lastPaymentDate = new Date(gameTime);
-  
-  // If this was an overdue payment, reset missed payment flag
-  if (loan.markedAsMissed) {
-    loan.markedAsMissed = false;
-  }
   
   // Check if loan is paid off
   const isPaidOff = loan.balance <= 0;
