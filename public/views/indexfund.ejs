@@ -402,5 +402,17 @@ let fundSymbol = null;
             loadChart(30);
         }
     </script>
+    <script>
+async function updateEraTheme() {
+            const response = await fetch('/api/time');
+            const data = await response.json();
+            const gameDate = new Date(data.currentTime);
+            const year = gameDate.getFullYear();
+            applyEraTheme(year);
+        }
+        
+        updateEraTheme();
+        setInterval(updateEraTheme, 10000);
+    </script>
     `
 }) %>
