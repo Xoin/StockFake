@@ -327,7 +327,7 @@ function generateTicker(name, existingTickers) {
   
   // Try using first letters of each word
   for (const word of words) {
-    if (word.length > 0 && /^[A-Z]/.test(word[0])) {
+    if (word.length > 0 && word[0] >= 'A' && word[0] <= 'Z') {
       ticker += word[0];
     }
   }
@@ -336,8 +336,9 @@ function generateTicker(name, existingTickers) {
   if (ticker.length < 3) {
     const firstWord = words[0];
     for (let i = 0; i < firstWord.length && ticker.length < 4; i++) {
-      if (/^[A-Z]/.test(firstWord[i]) && !ticker.includes(firstWord[i])) {
-        ticker += firstWord[i];
+      const char = firstWord[i];
+      if (char >= 'A' && char <= 'Z' && !ticker.includes(char)) {
+        ticker += char;
       }
     }
   }
@@ -345,12 +346,21 @@ function generateTicker(name, existingTickers) {
   // Truncate to 4 characters max
   ticker = ticker.substring(0, 4);
   
-  // Make sure it's unique
+  // Make sure it's unique - use single digit suffix to maintain 4-char limit
   let suffix = 1;
   let finalTicker = ticker;
   while (existingTickers.has(finalTicker)) {
-    finalTicker = ticker.substring(0, 3) + suffix;
+    if (suffix < 10) {
+      finalTicker = ticker.substring(0, 3) + suffix;
+    } else {
+      // If we run out of single digits, use 2-char suffix (max 99)
+      finalTicker = ticker.substring(0, 2) + suffix;
+    }
     suffix++;
+    if (suffix > 99) {
+      // Fallback: use random letters if we somehow exhaust all options
+      finalTicker = ticker.substring(0, 2) + String.fromCharCode(65 + (suffix % 26)) + String.fromCharCode(65 + ((suffix / 26) % 26));
+    }
   }
   
   existingTickers.add(finalTicker);
@@ -372,6 +382,13 @@ function generateSyntheticCompanies(existingCompanies, minPerSector = 10) {
   const syntheticCompanies = [];
   const sectors = Object.keys(sectorCounts);
   
+  // Seeded random for deterministic generation
+  let seed = 42; // Fixed seed for reproducibility
+  const seededRandom = () => {
+    seed = (seed * 9301 + 49297) % 233280;
+    return seed / 233280;
+  };
+  
   sectors.forEach(sector => {
     const needed = minPerSector - sectorCounts[sector];
     if (needed > 0) {
@@ -392,7 +409,7 @@ function generateSyntheticCompanies(existingCompanies, minPerSector = 10) {
         ];
         
         const era = eras[i % eras.length];
-        const foundedYear = era.start + Math.floor(Math.random() * (era.end - era.start + 1));
+        const foundedYear = era.start + Math.floor(seededRandom() * (era.end - era.start + 1));
         
         syntheticCompanies.push({
           symbol: ticker,
