@@ -712,6 +712,30 @@ app.get('/api/market/stats', (req, res) => {
   });
 });
 
+// Market year stats API - shows expected returns for different years
+app.get('/api/market/year-stats', (req, res) => {
+  const { year } = req.query;
+  
+  if (year) {
+    // Get stats for a specific year
+    const yearStats = stocks.getYearMarketStats(parseInt(year));
+    res.json(yearStats);
+  } else {
+    // Get stats for current year and next 10 years
+    const currentYear = gameTime.getFullYear();
+    const yearStats = [];
+    
+    for (let y = currentYear; y <= currentYear + 10; y++) {
+      yearStats.push(stocks.getYearMarketStats(y));
+    }
+    
+    res.json({
+      currentYear: currentYear,
+      stats: yearStats
+    });
+  }
+});
+
 // Company information API
 app.get('/api/companies/:symbol', (req, res) => {
   const { symbol } = req.params;
