@@ -30,7 +30,10 @@ app.use(express.json());
 app.use((req, res, next) => {
   if (req.path.endsWith('.html')) {
     const newPath = req.path.replace('.html', '');
-    return res.redirect(301, newPath);
+    // Validate that the redirect path is a local path (security: prevent open redirects)
+    if (newPath.startsWith('/') && !newPath.includes('://') && !newPath.startsWith('//')) {
+      return res.redirect(301, newPath);
+    }
   }
   next();
 });
