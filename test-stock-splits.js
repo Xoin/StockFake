@@ -1,4 +1,3 @@
-#!/usr/bin/env node
 // Test script for stock splits functionality
 
 const stockSplits = require('./helpers/stockSplits');
@@ -7,9 +6,9 @@ console.log('Testing Stock Split Functionality');
 console.log('==================================\n');
 
 // Test 1: Split thresholds
-console.log('Test 1: Split Thresholds');
-console.log('-------------------------');
-const years = [1980, 2000, 2015, 2025];
+console.log('Test 1: Split Thresholds (including dynamic thresholds)');
+console.log('--------------------------------------------------------');
+const years = [1980, 2000, 2015, 2025, 2030, 2040, 2050, 2075, 2100];
 years.forEach(year => {
   const threshold = stockSplits.getSplitThreshold(year);
   console.log(`Year ${year}: Threshold = $${threshold}`);

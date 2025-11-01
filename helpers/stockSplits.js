@@ -1,12 +1,29 @@
 // Stock split management for dynamic splitting during gameplay
-const db = require('../database');
+const dbModule = require('../database');
+
+// Get database instance
+function getDb() {
+  return dbModule.db;
+}
 
 // Determine stock split threshold based on year
 function getSplitThreshold(year) {
   if (year < 1991) return 150;      // 1970-1990: Split at $150
   if (year < 2011) return 200;      // 1991-2010: Split at $200
   if (year <= 2024) return 300;     // 2011-2024: Split at $300
-  return 450;                       // 2025+: Split at $450
+  
+  // Dynamic threshold for 2025+
+  // Increase threshold by ~3% per year to account for inflation and market growth
+  // This prevents excessive splitting in the far future while maintaining accessibility
+  const yearsSince2025 = year - 2025;
+  const baseThreshold = 450;
+  const annualGrowthRate = 0.03; // 3% per year
+  
+  // Compound growth: threshold * (1 + rate)^years
+  const dynamicThreshold = baseThreshold * Math.pow(1 + annualGrowthRate, yearsSince2025);
+  
+  // Round to nearest $50 for cleaner thresholds
+  return Math.round(dynamicThreshold / 50) * 50;
 }
 
 // Determine split ratio based on how far over threshold the price is
@@ -60,7 +77,7 @@ function checkForSplit(symbol, currentPrice, currentDate) {
 
 // Apply a stock split to the database
 function applySplit(symbol, splitDate, splitRatio, priceBeforeSplit, priceAfterSplit, stockName = null) {
-  const db = require('../database').db;
+  const db = getDb();
   
   try {
     // Check if this split already exists
@@ -110,12 +127,13 @@ function applySplit(symbol, splitDate, splitRatio, priceBeforeSplit, priceAfterS
       `).run(
         splitDate,
         symbol,
-        portfolio.shares * (splitRatio - 1), // New shares received
+        newShares, // Total shares after split
         priceAfterSplit,
         JSON.stringify({ 
           splitRatio: splitRatio,
           oldShares: portfolio.shares,
           newShares: newShares,
+          sharesAdded: newShares - portfolio.shares,
           priceBeforeSplit: priceBeforeSplit,
           priceAfterSplit: priceAfterSplit
         })
@@ -123,14 +141,13 @@ function applySplit(symbol, splitDate, splitRatio, priceBeforeSplit, priceAfterS
     }
     
     // Apply to short positions if they exist
-    const shortPosition = db.prepare('SELECT shares FROM short_positions WHERE symbol = ?').get(symbol);
+    const shortPosition = db.prepare('SELECT shares, borrow_price FROM short_positions WHERE symbol = ?').get(symbol);
     let shortPositionAffected = false;
     
     if (shortPosition && shortPosition.shares > 0) {
       shortPositionAffected = true;
       const newShortShares = shortPosition.shares * splitRatio;
-      const oldBorrowPrice = db.prepare('SELECT borrow_price FROM short_positions WHERE symbol = ?').get(symbol).borrow_price;
-      const newBorrowPrice = oldBorrowPrice / splitRatio;
+      const newBorrowPrice = shortPosition.borrow_price / splitRatio;
       
       // Update short position
       db.prepare(`
@@ -171,7 +188,7 @@ function applySplit(symbol, splitDate, splitRatio, priceBeforeSplit, priceAfterS
 
 // Check all stocks for potential splits at the current game time
 function checkAndApplySplits(currentDate, stockPrices) {
-  const db = require('../database').db;
+  const db = getDb();
   const splits = [];
   
   // Get last check date
@@ -179,8 +196,9 @@ function checkAndApplySplits(currentDate, stockPrices) {
   const lastCheckDate = lastCheck ? new Date(lastCheck.last_check_date) : new Date('1970-01-01');
   const currentDateObj = new Date(currentDate);
   
-  // Only check once per day
-  if (currentDateObj.toISOString().split('T')[0] === lastCheckDate.toISOString().split('T')[0]) {
+  // Only check once per day - use efficient date comparison
+  const daysSinceLastCheck = (currentDateObj.getTime() - lastCheckDate.getTime()) / (1000 * 60 * 60 * 24);
+  if (daysSinceLastCheck < 1) {
     return { splitsApplied: [], message: 'Already checked today' };
   }
   
@@ -229,7 +247,7 @@ function checkAndApplySplits(currentDate, stockPrices) {
 
 // Get all stock splits for a specific symbol
 function getSplitsForSymbol(symbol) {
-  const db = require('../database').db;
+  const db = getDb();
   
   const splits = db.prepare(`
     SELECT * FROM stock_splits 
@@ -242,7 +260,7 @@ function getSplitsForSymbol(symbol) {
 
 // Get recent stock splits
 function getRecentSplits(limit = 10) {
-  const db = require('../database').db;
+  const db = getDb();
   
   const splits = db.prepare(`
     SELECT * FROM stock_splits 

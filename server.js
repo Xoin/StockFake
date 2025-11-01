@@ -940,8 +940,8 @@ function checkIndexFundRebalancing() {
 // Call this periodically
 setInterval(checkIndexFundRebalancing, REBALANCING_CHECK_INTERVAL_MS);
 
-// Stock split check interval (60 seconds - checks once per day when conditions are met)
-const STOCK_SPLIT_CHECK_INTERVAL_MS = 60000;
+// Stock split check interval (30 minutes - checks daily when conditions are met)
+const STOCK_SPLIT_CHECK_INTERVAL_MS = 1800000; // 30 minutes
 
 // Check and process stock splits
 function checkStockSplits() {
