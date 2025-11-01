@@ -80,6 +80,11 @@
             <div style="text-align: center; color: #00ff00; margin: 10px 0; font-size: 1.2em;">
                 Credit Score: <span id="creditScore">---</span>
             </div>
+            <div id="wealthTaxInfo" style="text-align: center; color: #ffaa00; margin: 10px 0; padding: 10px; border: 1px solid #664400; background-color: #221100; display: none;">
+                <strong>⚠️ Wealth Tax Notice:</strong><br>
+                Net Worth: $<span id="netWorth">0</span> | Next Annual Tax: $<span id="estimatedWealthTax">0</span>
+                <span style="cursor: help; color: #ffaa00; margin-left: 8px;" title="You pay 1% annual wealth tax on net worth exceeding $50,000. This is assessed automatically each year.">ℹ️</span>
+            </div>
         </div>
         
         <div class="account-summary" id="marginSection" style="display: none;">
@@ -532,7 +537,24 @@
             gainLossEl.className = totalGainLoss >= 0 ? 'positive' : 'negative';
             
             document.getElementById('totalReturnPercent').textContent = totalReturn.toFixed(2);
-            document.getElementById('totalValue').textContent = (account.cash + totalPortfolioValue).toFixed(2);
+            const totalAccountValue = account.cash + totalPortfolioValue;
+            document.getElementById('totalValue').textContent = totalAccountValue.toFixed(2);
+            
+            // Calculate and display wealth tax info
+            const WEALTH_TAX_THRESHOLD = 50000;
+            const WEALTH_TAX_RATE = 0.01;
+            const netWorth = totalAccountValue - (account.marginAccount ? account.marginAccount.marginBalance : 0);
+            
+            if (netWorth > WEALTH_TAX_THRESHOLD) {
+                const taxableWealth = netWorth - WEALTH_TAX_THRESHOLD;
+                const estimatedTax = taxableWealth * WEALTH_TAX_RATE;
+                
+                document.getElementById('netWorth').textContent = netWorth.toFixed(2);
+                document.getElementById('estimatedWealthTax').textContent = estimatedTax.toFixed(2);
+                document.getElementById('wealthTaxInfo').style.display = 'block';
+            } else {
+                document.getElementById('wealthTaxInfo').style.display = 'none';
+            }
         }
         
         // Quick trade functions

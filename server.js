@@ -319,13 +319,35 @@ app.get('/api/stocks/:symbol/history', (req, res) => {
   const daysToFetch = parseInt(days) || 30;
   const history = [];
   
+  // Determine sampling interval based on time period
+  // For longer periods, sample less frequently to reduce data points
+  let sampleInterval = 1; // days
+  if (daysToFetch > 365) {
+    sampleInterval = 7; // Weekly for > 1 year
+  } else if (daysToFetch > 180) {
+    sampleInterval = 3; // Every 3 days for > 6 months
+  } else if (daysToFetch > 90) {
+    sampleInterval = 2; // Every 2 days for > 3 months
+  }
+  
   // Get historical prices for the specified number of days
-  for (let i = daysToFetch; i >= 0; i--) {
+  for (let i = daysToFetch; i >= 0; i -= sampleInterval) {
     const date = new Date(gameTime.getTime() - (i * 24 * 60 * 60 * 1000));
     const price = stocks.getStockPrice(symbol, date, timeMultiplier);
     if (price) {
       history.push({
         date: date.toISOString(),
+        price: price.price
+      });
+    }
+  }
+  
+  // Always include the most recent data point
+  if (history.length === 0 || history[history.length - 1].date !== gameTime.toISOString()) {
+    const price = stocks.getStockPrice(symbol, gameTime, timeMultiplier);
+    if (price) {
+      history.push({
+        date: gameTime.toISOString(),
         price: price.price
       });
     }
@@ -340,8 +362,18 @@ app.get('/api/market/index', (req, res) => {
   const daysToFetch = parseInt(days) || 30;
   const history = [];
   
+  // Determine sampling interval based on time period
+  let sampleInterval = 1; // days
+  if (daysToFetch > 365) {
+    sampleInterval = 7; // Weekly for > 1 year
+  } else if (daysToFetch > 180) {
+    sampleInterval = 3; // Every 3 days for > 6 months
+  } else if (daysToFetch > 90) {
+    sampleInterval = 2; // Every 2 days for > 3 months
+  }
+  
   // Calculate simple market index based on average of all stocks
-  for (let i = daysToFetch; i >= 0; i--) {
+  for (let i = daysToFetch; i >= 0; i -= sampleInterval) {
     const date = new Date(gameTime.getTime() - (i * 24 * 60 * 60 * 1000));
     const allStocks = stocks.getStockData(date, timeMultiplier);
     
@@ -349,6 +381,19 @@ app.get('/api/market/index', (req, res) => {
       const avgPrice = allStocks.reduce((sum, s) => sum + s.price, 0) / allStocks.length;
       history.push({
         date: date.toISOString(),
+        value: avgPrice,
+        count: allStocks.length
+      });
+    }
+  }
+  
+  // Always include the most recent data point
+  if (history.length === 0 || history[history.length - 1].date !== gameTime.toISOString()) {
+    const allStocks = stocks.getStockData(gameTime, timeMultiplier);
+    if (allStocks.length > 0) {
+      const avgPrice = allStocks.reduce((sum, s) => sum + s.price, 0) / allStocks.length;
+      history.push({
+        date: gameTime.toISOString(),
         value: avgPrice,
         count: allStocks.length
       });
