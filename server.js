@@ -774,8 +774,6 @@ const MAX_DIVIDEND_QUARTERS_TO_PROCESS = 40; // Safety limit: maximum quarters t
 const SHORT_TERM_TAX_RATE = constants.SHORT_TERM_TAX_RATE;
 const LONG_TERM_TAX_RATE = constants.LONG_TERM_TAX_RATE;
 const DIVIDEND_TAX_RATE = constants.DIVIDEND_TAX_RATE;
-const WEALTH_TAX_RATE = 0.01; // 1% annual wealth tax on total net worth
-const WEALTH_TAX_THRESHOLD = 50000; // Only apply wealth tax if net worth exceeds this amount
 
 // Fee structure
 const TRADING_FEE_FLAT = 9.99; // Flat fee per trade in 1970s, will decrease over time

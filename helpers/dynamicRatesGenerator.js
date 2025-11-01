@@ -280,10 +280,17 @@ function generateTaxRates(year) {
     wealthRate = Math.max(0.005, Math.min(0.02, wealthRate + variation));
   }
   
-  // Wealth tax threshold adjusts with inflation approximately
+  // Wealth tax threshold adjusts with actual cumulative inflation from 2025
   const yearsSince2024 = year - 2024;
-  const avgInflationAdjustment = Math.pow(1.025, yearsSince2024);  // Assume 2.5% avg inflation
-  wealthThreshold = Math.round(DYNAMIC_RATES_CONFIG.baseWealthTaxThreshold * avgInflationAdjustment);
+  let cumulativeInflationAdjustment = 1.0;
+  
+  // Calculate cumulative inflation from 2025 to target year using actual generated rates
+  for (let y = 2025; y <= year; y++) {
+    const yearInflationRate = generateInflationRate(y) / 100;
+    cumulativeInflationAdjustment *= (1 + yearInflationRate);
+  }
+  
+  wealthThreshold = Math.round(DYNAMIC_RATES_CONFIG.baseWealthTaxThreshold * cumulativeInflationAdjustment);
   
   return {
     shortTermTaxRate: Math.round(shortTermRate * 100) / 100,
@@ -308,6 +315,20 @@ function updateConfiguration(newConfig) {
   Object.assign(DYNAMIC_RATES_CONFIG, newConfig);
 }
 
+/**
+ * Get historical inflation data (for testing/reference)
+ */
+function getHistoricalInflation() {
+  return { ...HISTORICAL_INFLATION };
+}
+
+/**
+ * Get historical dividend data (for testing/reference)
+ */
+function getHistoricalDividends() {
+  return { ...HISTORICAL_DIVIDENDS };
+}
+
 module.exports = {
   generateInflationRate,
   getAllInflationRates,
@@ -316,8 +337,11 @@ module.exports = {
   generateTaxRates,
   getConfiguration,
   updateConfiguration,
+  getHistoricalInflation,
+  getHistoricalDividends,
   
-  // For testing
+  // Deprecated: Use getHistoricalInflation() instead
   HISTORICAL_INFLATION,
+  // Deprecated: Use getHistoricalDividends() instead
   HISTORICAL_DIVIDENDS
 };

@@ -109,7 +109,8 @@ try {
   }
   
   // Future dividend should generally be higher than base (with growth)
-  const baseAppl = dynamicRatesGenerator.HISTORICAL_DIVIDENDS['AAPL'];
+  const historicalDividends = dynamicRatesGenerator.getHistoricalDividends();
+  const baseAppl = historicalDividends['AAPL'];
   if (appl2030 < baseAppl * 0.8) {  // Allow some variation
     console.warn(`  Warning: 2030 AAPL dividend (${appl2030}) seems low compared to base (${baseAppl})`);
   }
@@ -129,8 +130,9 @@ try {
   const appl2024 = dynamicRatesGenerator.generateDividendRate('AAPL', 2024);
   const ibm2024 = dynamicRatesGenerator.generateDividendRate('IBM', 2024);
   
-  const historicalAppl = dynamicRatesGenerator.HISTORICAL_DIVIDENDS['AAPL'];
-  const historicalIbm = dynamicRatesGenerator.HISTORICAL_DIVIDENDS['IBM'];
+  const historicalDividends = dynamicRatesGenerator.getHistoricalDividends();
+  const historicalAppl = historicalDividends['AAPL'];
+  const historicalIbm = historicalDividends['IBM'];
   
   if (appl2024 !== historicalAppl) {
     throw new Error(`Expected AAPL 2024 dividend to be ${historicalAppl}, got ${appl2024}`);

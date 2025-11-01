@@ -72,7 +72,9 @@ function getTaxRates(year = null) {
     return {
       shortTermTaxRate: SHORT_TERM_TAX_RATE,
       longTermTaxRate: LONG_TERM_TAX_RATE,
-      dividendTaxRate: DIVIDEND_TAX_RATE
+      dividendTaxRate: DIVIDEND_TAX_RATE,
+      wealthTaxRate: 0.01,  // 1% base wealth tax
+      wealthTaxThreshold: 50000  // $50,000 base threshold
     };
   }
   return dynamicRatesGenerator.generateTaxRates(year);
