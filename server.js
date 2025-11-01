@@ -1543,7 +1543,6 @@ function processNegativeBalance() {
         lastInterestAccrual: new Date(gameTime),
         missedPayments: 0,
         status: 'active',
-        markedAsMissed: false,
         termDays: lender.termDays,
         automatic: true // Mark as automatic
       };
