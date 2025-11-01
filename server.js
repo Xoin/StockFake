@@ -477,6 +477,9 @@ const MAINTENANCE_MARGIN_REQUIREMENT = 0.30; // 30% maintenance margin (25% is t
 const MARGIN_CALL_GRACE_PERIOD_DAYS = 5; // Days to meet margin call before forced liquidation
 const MARGIN_INTEREST_RATE_BASE = 0.08; // 8% annual base rate on margin loans
 
+// Dividend processing constant
+const MAX_DIVIDEND_QUARTERS_TO_PROCESS = 40; // Safety limit: maximum quarters to process when catching up (prevents processing too many at once)
+
 // Tax rates
 const SHORT_TERM_TAX_RATE = 0.30; // 30% for holdings < 1 year
 const LONG_TERM_TAX_RATE = 0.15; // 15% for holdings >= 1 year
@@ -615,8 +618,8 @@ function checkAndPayDividends() {
           
           quartersToProcess.push(checkQuarterKey);
           
-          // Safety check: don't process more than 40 quarters (10 years)
-          if (quartersToProcess.length > 40) {
+          // Safety check: don't process more than MAX_DIVIDEND_QUARTERS_TO_PROCESS quarters
+          if (quartersToProcess.length > MAX_DIVIDEND_QUARTERS_TO_PROCESS) {
             console.warn(`Too many skipped quarters detected (${quartersToProcess.length}). Only processing current quarter.`);
             quartersToProcess = [quarterKey];
             break;

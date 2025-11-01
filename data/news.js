@@ -742,6 +742,9 @@ const VOLATILITY_WINDOW = 5; // Track 5 periods for volatility
 const VOLATILITY_THRESHOLD = 4.0; // Average volatility threshold (increased significantly)
 const NEWS_COOLDOWN_MS = 7 * 24 * 60 * 60 * 1000; // 7 day cooldown per stock (increased from 1 day)
 
+// Maximum quarters to process when catching up on dividends
+const MAX_DIVIDEND_QUARTERS_TO_PROCESS = 40; // Safety limit to prevent processing too many quarters at once
+
 // Cleanup thresholds to prevent memory leaks
 const MAX_PRICE_HISTORY_DAYS = 90; // Keep only last 90 days of price history
 const MAX_DYNAMIC_NEWS_ITEMS = 1000; // Maximum dynamic news items to retain

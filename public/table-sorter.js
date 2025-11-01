@@ -201,6 +201,16 @@ class TableSorter {
 
         // Re-apply current sort if exists
         if (this.currentSort) {
+            // Update header visual indicators
+            const headers = this.table.querySelectorAll('thead th');
+            headers.forEach((h, idx) => {
+                h.classList.remove('sort-asc', 'sort-desc');
+                if (idx === this.currentSort.column) {
+                    h.classList.add(`sort-${this.currentSort.direction}`);
+                }
+            });
+            
+            // Re-sort the table
             this.sortTable(this.currentSort.column, this.currentSort.direction);
         }
     }
