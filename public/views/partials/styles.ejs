@@ -175,4 +175,208 @@
             align-items: center;
             justify-content: center;
         }
+        
+        /* Checkbox Styling */
+        input[type="checkbox"] {
+            appearance: none;
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            width: 18px;
+            height: 18px;
+            border: 2px solid #00ff00;
+            background-color: #000;
+            cursor: pointer;
+            position: relative;
+            vertical-align: middle;
+            margin-right: 8px;
+            transition: all 0.2s;
+        }
+        
+        input[type="checkbox"]:hover {
+            background-color: #001100;
+            box-shadow: 0 0 5px #00ff00;
+        }
+        
+        input[type="checkbox"]:checked {
+            background-color: #003300;
+        }
+        
+        input[type="checkbox"]:checked::after {
+            content: '✓';
+            position: absolute;
+            color: #00ff00;
+            font-size: 14px;
+            font-weight: bold;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+        }
+        
+        input[type="checkbox"]:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        /* Dropdown/Select Styling */
+        select {
+            background-color: #000;
+            border: 2px solid #00ff00;
+            color: #00ff00;
+            padding: 8px 12px;
+            font-family: 'Courier New', monospace;
+            font-size: 1em;
+            cursor: pointer;
+            transition: all 0.2s;
+            min-width: 150px;
+        }
+        
+        select:hover {
+            background-color: #001100;
+            box-shadow: 0 0 5px #00ff00;
+        }
+        
+        select:focus {
+            outline: none;
+            background-color: #001100;
+            border-color: #00ff00;
+            box-shadow: 0 0 10px #00ff00;
+        }
+        
+        select option {
+            background-color: #000;
+            color: #00ff00;
+            padding: 8px;
+        }
+        
+        select option:hover {
+            background-color: #003300;
+        }
+        
+        select:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        /* Input Field Styling */
+        input[type="text"],
+        input[type="number"],
+        input[type="email"],
+        input[type="password"] {
+            background-color: #000;
+            border: 2px solid #00ff00;
+            color: #00ff00;
+            padding: 8px 12px;
+            font-family: 'Courier New', monospace;
+            font-size: 1em;
+            transition: all 0.2s;
+            width: 100%;
+        }
+        
+        input[type="text"]:focus,
+        input[type="number"]:focus,
+        input[type="email"]:focus,
+        input[type="password"]:focus {
+            outline: none;
+            background-color: #001100;
+            box-shadow: 0 0 10px #00ff00;
+        }
+        
+        input[type="text"]::placeholder,
+        input[type="number"]::placeholder,
+        input[type="email"]::placeholder,
+        input[type="password"]::placeholder {
+            color: #00aa00;
+            opacity: 0.7;
+        }
+        
+        input[type="text"]:disabled,
+        input[type="number"]:disabled,
+        input[type="email"]:disabled,
+        input[type="password"]:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        /* Button Styling - Enhanced */
+        button {
+            background-color: #003300;
+            border: 2px solid #00ff00;
+            color: #00ff00;
+            padding: 10px 20px;
+            font-family: 'Courier New', monospace;
+            font-size: 1em;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        
+        button:hover:not(:disabled) {
+            background-color: #004400;
+            box-shadow: 0 0 10px #00ff00;
+            transform: translateY(-2px);
+        }
+        
+        button:active:not(:disabled) {
+            transform: translateY(0);
+            box-shadow: 0 0 5px #00ff00;
+        }
+        
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            background-color: #001100;
+        }
+        
+        button.btn-primary {
+            background-color: #004400;
+            border-color: #00ff00;
+        }
+        
+        button.btn-danger {
+            background-color: #440000;
+            border-color: #ff0000;
+            color: #ff0000;
+        }
+        
+        button.btn-danger:hover:not(:disabled) {
+            background-color: #660000;
+            box-shadow: 0 0 10px #ff0000;
+        }
+        
+        button.btn-warning {
+            background-color: #443300;
+            border-color: #ffaa00;
+            color: #ffaa00;
+        }
+        
+        button.btn-warning:hover:not(:disabled) {
+            background-color: #664400;
+            box-shadow: 0 0 10px #ffaa00;
+        }
+        
+        button.btn-success {
+            background-color: #004400;
+            border-color: #00ff00;
+            color: #00ff00;
+        }
+        
+        button.btn-success:hover:not(:disabled) {
+            background-color: #006600;
+            box-shadow: 0 0 10px #00ff00;
+        }
+        
+        /* Label Styling */
+        label {
+            color: #00ff00;
+            font-family: 'Courier New', monospace;
+            cursor: pointer;
+            display: inline-block;
+            margin-bottom: 5px;
+        }
+        
+        label:has(input[type="checkbox"]) {
+            display: flex;
+            align-items: center;
+        }
     </style>

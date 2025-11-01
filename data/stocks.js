@@ -117,7 +117,7 @@ function getVolatilityScale(timeMultiplier) {
 }
 
 // Get interpolated price with minor fluctuations
-function getStockPrice(symbol, currentTime, timeMultiplier) {
+function getStockPrice(symbol, currentTime, timeMultiplier, isPaused) {
   const stockData = historicalData[symbol];
   if (!stockData) return null;
   
@@ -135,8 +135,8 @@ function getStockPrice(symbol, currentTime, timeMultiplier) {
   }
   lastMarketState = currentMarketState;
   
-  // If market is closed and we have a cached price, return it
-  if (!marketOpen && priceCache[symbol]) {
+  // If game is paused OR market is closed, return cached price if available
+  if ((isPaused || !marketOpen) && priceCache[symbol]) {
     return priceCache[symbol];
   }
   
@@ -202,8 +202,8 @@ function getStockPrice(symbol, currentTime, timeMultiplier) {
     sector: getStockSector(symbol)
   };
   
-  // Cache if market is closed
-  if (!marketOpen) {
+  // Cache if market is closed or game is paused
+  if (!marketOpen || isPaused) {
     priceCache[symbol] = result;
   }
   
@@ -218,16 +218,16 @@ function getStockSector(symbol) {
   return stockSectors[symbol] || 'Unknown';
 }
 
-function getStockData(currentTime, timeMultiplier) {
+function getStockData(currentTime, timeMultiplier, isPaused) {
   const symbols = Object.keys(historicalData);
   return symbols
-    .map(symbol => getStockPrice(symbol, currentTime, timeMultiplier))
+    .map(symbol => getStockPrice(symbol, currentTime, timeMultiplier, isPaused))
     .filter(stock => stock !== null); // Filter out stocks not available yet
 }
 
 // Get stocks available at a given time (for filtering)
-function getAvailableStocks(currentTime, timeMultiplier) {
-  return getStockData(currentTime, timeMultiplier);
+function getAvailableStocks(currentTime, timeMultiplier, isPaused) {
+  return getStockData(currentTime, timeMultiplier, isPaused);
 }
 
 module.exports = {

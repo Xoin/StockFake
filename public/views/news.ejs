@@ -155,12 +155,47 @@
     <script>
 let paginator;
         let allNews = [];
-        let readNewsIds = new Set(JSON.parse(localStorage.getItem('readNewsIds') || '[]'));
+        let readNewsTimestamps = JSON.parse(localStorage.getItem('readNewsTimestamps') || '{}');
+        // Migration: convert old readNewsIds to timestamped format
+        const oldReadNewsIds = JSON.parse(localStorage.getItem('readNewsIds') || '[]');
+        if (oldReadNewsIds.length > 0 && Object.keys(readNewsTimestamps).length === 0) {
+            const now = Date.now();
+            oldReadNewsIds.forEach(id => {
+                readNewsTimestamps[id] = now;
+            });
+            localStorage.setItem('readNewsTimestamps', JSON.stringify(readNewsTimestamps));
+            localStorage.removeItem('readNewsIds'); // Clean up old format
+        }
+        let readNewsIds = new Set(Object.keys(readNewsTimestamps).map(id => parseInt(id)));
         
-        // Mark news as read
+        // Auto-discard news that have been read for more than 15 real minutes
+        const AUTO_DISCARD_TIME = 15 * 60 * 1000; // 15 minutes in milliseconds
+        
+        function cleanupOldReadNews() {
+            const now = Date.now();
+            const toRemove = [];
+            
+            for (const [newsId, timestamp] of Object.entries(readNewsTimestamps)) {
+                if (now - timestamp > AUTO_DISCARD_TIME) {
+                    toRemove.push(newsId);
+                }
+            }
+            
+            if (toRemove.length > 0) {
+                toRemove.forEach(id => {
+                    delete readNewsTimestamps[id];
+                    readNewsIds.delete(parseInt(id));
+                });
+                localStorage.setItem('readNewsTimestamps', JSON.stringify(readNewsTimestamps));
+                console.log(\`Auto-discarded \${toRemove.length} read news item(s) after 15 minutes\`);
+            }
+        }
+        
+        // Mark news as read with timestamp
         function markNewsAsRead(newsId) {
+            readNewsTimestamps[newsId] = Date.now();
             readNewsIds.add(newsId);
-            localStorage.setItem('readNewsIds', JSON.stringify([...readNewsIds]));
+            localStorage.setItem('readNewsTimestamps', JSON.stringify(readNewsTimestamps));
         }
         
         // Determine if news is dynamic (market movement) or historical
@@ -200,6 +235,9 @@ let paginator;
         // Render current page of news
         function renderNewsPage() {
             if (!paginator) return;
+            
+            // Clean up old read news before rendering
+            cleanupOldReadNews();
             
             const categoryFilter = document.getElementById('categoryFilter').value;
             const unreadOnly = document.getElementById('unreadOnly').checked;
