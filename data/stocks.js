@@ -71,8 +71,41 @@ function seededRandom(symbol, time) {
   return Math.abs(Math.sin(hash) * 10000) % 1;
 }
 
+// Calculate volatility scale factor based on game speed
+// Slower speeds = less volatility, faster speeds = more volatility
+function getVolatilityScale(timeMultiplier) {
+  // Default multiplier is 3600 (1s = 1hr)
+  const defaultMultiplier = 3600;
+  
+  if (!timeMultiplier) {
+    return 1.0; // No scaling if no multiplier provided
+  }
+  
+  // Speed categories:
+  // Slow: 60 (1s = 1min) -> 25% volatility
+  // Normal: 3600 (1s = 1hr) -> 100% volatility
+  // Fast: 86400 (1s = 1day) -> 150% volatility
+  
+  if (timeMultiplier <= 60) {
+    // Very slow speeds: reduce to 25%
+    return 0.25;
+  } else if (timeMultiplier <= 600) {
+    // Slow speeds: scale between 25% and 75%
+    return 0.25 + (timeMultiplier - 60) / (600 - 60) * 0.5;
+  } else if (timeMultiplier <= 3600) {
+    // Moderate speeds: scale between 75% and 100%
+    return 0.75 + (timeMultiplier - 600) / (3600 - 600) * 0.25;
+  } else if (timeMultiplier <= 86400) {
+    // Fast speeds: scale between 100% and 150%
+    return 1.0 + (timeMultiplier - 3600) / (86400 - 3600) * 0.5;
+  } else {
+    // Very fast speeds: cap at 150%
+    return 1.5;
+  }
+}
+
 // Get interpolated price with minor fluctuations
-function getStockPrice(symbol, currentTime) {
+function getStockPrice(symbol, currentTime, timeMultiplier) {
   const stockData = historicalData[symbol];
   if (!stockData) return null;
   
@@ -139,9 +172,13 @@ function getStockPrice(symbol, currentTime) {
   
   const basePrice = before.price + (priceRange * (timePassed / timeRange));
   
-  // Add minor deterministic fluctuation (±2%) based on time and symbol
+  // Calculate volatility scale based on game speed
+  const volatilityScale = getVolatilityScale(timeMultiplier);
+  
+  // Add minor deterministic fluctuation (±2% base, scaled by game speed)
   const randomValue = seededRandom(symbol, currentTime.getTime());
-  const fluctuation = (randomValue - 0.5) * 0.04 * basePrice;
+  const baseFluctuation = (randomValue - 0.5) * 0.04 * basePrice;
+  const fluctuation = baseFluctuation * volatilityScale;
   const price = Math.max(0.01, basePrice + fluctuation);
   
   // Calculate change from previous base price
@@ -171,16 +208,16 @@ function getStockSector(symbol) {
   return stockSectors[symbol] || 'Unknown';
 }
 
-function getStockData(currentTime) {
+function getStockData(currentTime, timeMultiplier) {
   const symbols = Object.keys(historicalData);
   return symbols
-    .map(symbol => getStockPrice(symbol, currentTime))
+    .map(symbol => getStockPrice(symbol, currentTime, timeMultiplier))
     .filter(stock => stock !== null); // Filter out stocks not available yet
 }
 
 // Get stocks available at a given time (for filtering)
-function getAvailableStocks(currentTime) {
-  return getStockData(currentTime);
+function getAvailableStocks(currentTime, timeMultiplier) {
+  return getStockData(currentTime, timeMultiplier);
 }
 
 module.exports = {
