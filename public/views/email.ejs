@@ -88,8 +88,42 @@
     <script>
 let paginator;
         let allEmails = [];
-        let readEmailIds = new Set(JSON.parse(localStorage.getItem('readEmailIds') || '[]'));
+        let readEmailTimestamps = JSON.parse(localStorage.getItem('readEmailTimestamps') || '{}');
+        // Migration: convert old readEmailIds to timestamped format
+        const oldReadEmailIds = JSON.parse(localStorage.getItem('readEmailIds') || '[]');
+        if (oldReadEmailIds.length > 0 && Object.keys(readEmailTimestamps).length === 0) {
+            const now = Date.now();
+            oldReadEmailIds.forEach(id => {
+                readEmailTimestamps[id] = now;
+            });
+            localStorage.setItem('readEmailTimestamps', JSON.stringify(readEmailTimestamps));
+            localStorage.removeItem('readEmailIds'); // Clean up old format
+        }
+        let readEmailIds = new Set(Object.keys(readEmailTimestamps));
         let expandedEmails = new Set();
+        
+        // Auto-discard emails that have been read for more than 15 real minutes
+        const AUTO_DISCARD_TIME = 15 * 60 * 1000; // 15 minutes in milliseconds
+        
+        function cleanupOldReadEmails() {
+            const now = Date.now();
+            const toRemove = [];
+            
+            for (const [emailId, timestamp] of Object.entries(readEmailTimestamps)) {
+                if (now - timestamp > AUTO_DISCARD_TIME) {
+                    toRemove.push(emailId);
+                }
+            }
+            
+            if (toRemove.length > 0) {
+                toRemove.forEach(id => {
+                    delete readEmailTimestamps[id];
+                    readEmailIds.delete(id);
+                });
+                localStorage.setItem('readEmailTimestamps', JSON.stringify(readEmailTimestamps));
+                console.log(\`Auto-discarded \${toRemove.length} read email(s) after 15 minutes\`);
+            }
+        }
         
         // Pagination render function
         function renderPage() {
@@ -98,6 +132,9 @@ let paginator;
         
         async function renderEmailPage() {
             if (!paginator) return;
+            
+            // Clean up old read emails before rendering
+            cleanupOldReadEmails();
             
             const pageEmails = paginator.getCurrentPageItems();
             const container = document.getElementById('emailContainer');
@@ -138,10 +175,11 @@ let paginator;
                 expandedEmails.delete(index);
             } else {
                 expandedEmails.add(index);
-                // Mark as read when expanded
+                // Mark as read with timestamp when expanded
                 if (emailId) {
+                    readEmailTimestamps[emailId] = Date.now();
                     readEmailIds.add(emailId);
-                    localStorage.setItem('readEmailIds', JSON.stringify([...readEmailIds]));
+                    localStorage.setItem('readEmailTimestamps', JSON.stringify(readEmailTimestamps));
                 }
             }
             renderEmailPage();
