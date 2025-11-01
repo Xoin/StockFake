@@ -92,7 +92,7 @@ function processPendingOrders() {
       let errorMessage = null;
       
       if (order.order_type === 'stock') {
-        const stockPrice = stocks.getStockPrice(order.symbol, gameTime);
+        const stockPrice = stocks.getStockPrice(order.symbol, gameTime, timeMultiplier);
         if (!stockPrice) {
           errorMessage = 'Stock not found or not available';
         } else {
@@ -108,7 +108,7 @@ function processPendingOrders() {
         if (!fund) {
           errorMessage = 'Index fund not found';
         } else {
-          const fundPrice = indexFunds.calculateIndexPrice(fund, gameTime);
+          const fundPrice = indexFunds.calculateIndexPrice(fund, gameTime, timeMultiplier);
           if (!fundPrice) {
             errorMessage = 'Unable to calculate fund price';
           } else {
@@ -274,7 +274,7 @@ app.get('/', (req, res) => {
 });
 
 app.get('/api/stocks', (req, res) => {
-  const stockData = stocks.getStockData(gameTime);
+  const stockData = stocks.getStockData(gameTime, timeMultiplier);
   
   // Add share availability info to each stock
   const stocksWithAvailability = stockData.map(stock => {
@@ -291,7 +291,7 @@ app.get('/api/stocks', (req, res) => {
 
 app.get('/api/stocks/:symbol', (req, res) => {
   const { symbol } = req.params;
-  const stockPrice = stocks.getStockPrice(symbol, gameTime);
+  const stockPrice = stocks.getStockPrice(symbol, gameTime, timeMultiplier);
   
   if (!stockPrice) {
     return res.status(404).json({ error: 'Stock not found' });
@@ -321,7 +321,7 @@ app.get('/api/stocks/:symbol/history', (req, res) => {
   // Get historical prices for the specified number of days
   for (let i = daysToFetch; i >= 0; i--) {
     const date = new Date(gameTime.getTime() - (i * 24 * 60 * 60 * 1000));
-    const price = stocks.getStockPrice(symbol, date);
+    const price = stocks.getStockPrice(symbol, date, timeMultiplier);
     if (price) {
       history.push({
         date: date.toISOString(),
@@ -342,7 +342,7 @@ app.get('/api/market/index', (req, res) => {
   // Calculate simple market index based on average of all stocks
   for (let i = daysToFetch; i >= 0; i--) {
     const date = new Date(gameTime.getTime() - (i * 24 * 60 * 60 * 1000));
-    const allStocks = stocks.getStockData(date);
+    const allStocks = stocks.getStockData(date, timeMultiplier);
     
     if (allStocks.length > 0) {
       const avgPrice = allStocks.reduce((sum, s) => sum + s.price, 0) / allStocks.length;
@@ -431,6 +431,8 @@ const MARGIN_INTEREST_RATE_BASE = 0.08; // 8% annual base rate on margin loans
 const SHORT_TERM_TAX_RATE = 0.30; // 30% for holdings < 1 year
 const LONG_TERM_TAX_RATE = 0.15; // 15% for holdings >= 1 year
 const DIVIDEND_TAX_RATE = 0.15; // 15% on dividends
+const WEALTH_TAX_RATE = 0.01; // 1% annual wealth tax on total net worth
+const WEALTH_TAX_THRESHOLD = 50000; // Only apply wealth tax if net worth exceeds this amount
 
 // Fee structure
 const TRADING_FEE_FLAT = 9.99; // Flat fee per trade in 1970s, will decrease over time
@@ -453,6 +455,7 @@ const inflationRates = {
 
 let lastMonthlyFeeCheck = null;
 let lastInflationCheck = null;
+let lastWealthTaxCheck = null;
 let cumulativeInflation = 1.0; // Tracks purchasing power relative to 1970
 
 // Dividend data (quarterly payouts per share)
@@ -633,6 +636,79 @@ function trackInflation() {
   }
 }
 
+// Assess and collect yearly wealth tax
+function assessWealthTax() {
+  const currentYear = gameTime.getFullYear();
+  const yearKey = `${currentYear}`;
+  
+  // Check once per year on January 1st
+  if (lastWealthTaxCheck !== yearKey) {
+    lastWealthTaxCheck = yearKey;
+    
+    // Calculate total net worth (cash + portfolio value - debts)
+    const portfolioValue = calculatePortfolioValue();
+    const marginDebt = userAccount.marginAccount.marginBalance;
+    
+    // Calculate total loan debt
+    let totalLoanDebt = 0;
+    for (const loan of userAccount.loans) {
+      if (loan.status === 'active') {
+        totalLoanDebt += loan.balance;
+      }
+    }
+    
+    const netWorth = userAccount.cash + portfolioValue - marginDebt - totalLoanDebt;
+    
+    // Only apply wealth tax if net worth exceeds threshold
+    if (netWorth > WEALTH_TAX_THRESHOLD) {
+      const taxableWealth = netWorth - WEALTH_TAX_THRESHOLD;
+      const wealthTax = taxableWealth * WEALTH_TAX_RATE;
+      
+      // Check if user has sufficient cash to pay wealth tax
+      if (userAccount.cash >= wealthTax) {
+        // Deduct wealth tax from cash
+        userAccount.cash -= wealthTax;
+        
+        // Record tax payment
+        userAccount.taxes.push({
+          date: new Date(gameTime),
+          type: 'wealth',
+          amount: wealthTax,
+          description: `Annual wealth tax for ${currentYear} (${(WEALTH_TAX_RATE * 100).toFixed(2)}% on net worth above $${WEALTH_TAX_THRESHOLD.toLocaleString()})`
+        });
+        
+        console.log(`Wealth tax assessed for ${currentYear}: $${wealthTax.toFixed(2)} (Net worth: $${netWorth.toFixed(2)})`);
+      } else {
+        // User cannot pay - record as unpaid tax (could trigger penalties in future enhancement)
+        console.log(`⚠️ Insufficient cash to pay wealth tax for ${currentYear}: $${wealthTax.toFixed(2)} (Cash: $${userAccount.cash.toFixed(2)})`);
+        
+        // Deduct whatever cash is available
+        const partialPayment = userAccount.cash;
+        const unpaidAmount = wealthTax - partialPayment;
+        
+        if (partialPayment > 0) {
+          userAccount.cash = 0;
+          
+          userAccount.taxes.push({
+            date: new Date(gameTime),
+            type: 'wealth',
+            amount: partialPayment,
+            description: `Partial wealth tax payment for ${currentYear} (Unpaid: $${unpaidAmount.toFixed(2)})`
+          });
+        }
+        
+        // Record unpaid tax as a fee for tracking
+        userAccount.fees.push({
+          date: new Date(gameTime),
+          type: 'unpaid-wealth-tax',
+          amount: unpaidAmount,
+          description: `Unpaid wealth tax for ${currentYear} - may incur penalties`
+        });
+      }
+    }
+  }
+}
+
 // Update short positions (charge borrowing fees)
 function updateShortPositions() {
   const currentTime = new Date(gameTime);
@@ -667,6 +743,7 @@ function updateShortPositions() {
 // Call these periodically
 setInterval(checkAndChargeMonthlyFee, 10000);
 setInterval(trackInflation, 5000);
+setInterval(assessWealthTax, 5000);
 setInterval(updateShortPositions, 10000);
 
 // Margin account helper functions
@@ -688,7 +765,7 @@ function calculatePortfolioValue() {
   // Add individual stock positions
   for (const [symbol, shares] of Object.entries(userAccount.portfolio)) {
     if (shares > 0) {
-      const stockPrice = stocks.getStockPrice(symbol, gameTime);
+      const stockPrice = stocks.getStockPrice(symbol, gameTime, timeMultiplier);
       if (stockPrice) {
         totalValue += stockPrice.price * shares;
       }
@@ -770,7 +847,7 @@ function checkPositionConcentration(symbol) {
   const portfolioValue = calculatePortfolioValue();
   if (portfolioValue === 0) return { concentration: 0, warning: false, limit: false };
   
-  const stockPrice = stocks.getStockPrice(symbol, gameTime);
+  const stockPrice = stocks.getStockPrice(symbol, gameTime, timeMultiplier);
   if (!stockPrice) return { concentration: 0, warning: false, limit: false };
   
   const shares = userAccount.portfolio[symbol] || 0;
@@ -878,7 +955,7 @@ function forceLiquidation() {
   const positions = Object.entries(userAccount.portfolio)
     .filter(([symbol, shares]) => shares > 0)
     .map(([symbol, shares]) => {
-      const stockPrice = stocks.getStockPrice(symbol, gameTime);
+      const stockPrice = stocks.getStockPrice(symbol, gameTime, timeMultiplier);
       return {
         symbol,
         shares,
@@ -1657,7 +1734,7 @@ app.post('/api/trade', (req, res) => {
     }
   }
   
-  const stockPrice = stocks.getStockPrice(symbol, gameTime);
+  const stockPrice = stocks.getStockPrice(symbol, gameTime, timeMultiplier);
   if (!stockPrice) {
     return res.status(404).json({ error: 'Stock not found' });
   }
@@ -2306,7 +2383,7 @@ app.post('/api/margin/pay', (req, res) => {
 app.post('/api/margin/calculate', (req, res) => {
   const { symbol, shares } = req.body;
   
-  const stockPrice = stocks.getStockPrice(symbol, gameTime);
+  const stockPrice = stocks.getStockPrice(symbol, gameTime, timeMultiplier);
   if (!stockPrice) {
     return res.status(404).json({ error: 'Stock not found' });
   }
@@ -2353,14 +2430,14 @@ app.post('/api/margin/calculate', (req, res) => {
 
 // Get all available index funds
 app.get('/api/indexfunds', (req, res) => {
-  const availableFunds = indexFunds.getAvailableIndexFunds(gameTime);
+  const availableFunds = indexFunds.getAvailableIndexFunds(gameTime, timeMultiplier);
   res.json(availableFunds);
 });
 
 // Get specific index fund details
 app.get('/api/indexfunds/:symbol', (req, res) => {
   const { symbol } = req.params;
-  const fundDetails = indexFunds.getIndexFundDetails(symbol, gameTime);
+  const fundDetails = indexFunds.getIndexFundDetails(symbol, gameTime, timeMultiplier);
   
   if (!fundDetails) {
     return res.status(404).json({ error: 'Index fund not found or not available yet' });
@@ -2375,7 +2452,7 @@ app.get('/api/indexfunds/:symbol/history', (req, res) => {
   const { days } = req.query;
   
   const daysToFetch = parseInt(days) || 30;
-  const history = indexFunds.getIndexFundHistory(symbol, gameTime, daysToFetch);
+  const history = indexFunds.getIndexFundHistory(symbol, gameTime, daysToFetch, timeMultiplier);
   
   res.json(history);
 });
@@ -2435,7 +2512,7 @@ app.post('/api/indexfunds/trade', (req, res) => {
     return res.status(400).json({ error: 'This index fund is not available yet' });
   }
   
-  const fundPrice = indexFunds.calculateIndexPrice(fund, gameTime);
+  const fundPrice = indexFunds.calculateIndexPrice(fund, gameTime, timeMultiplier);
   if (!fundPrice) {
     return res.status(404).json({ error: 'Unable to calculate fund price' });
   }
@@ -2646,6 +2723,7 @@ app.get('/api/taxes', (req, res) => {
     capitalGains: 0,
     shortGains: 0,
     dividends: 0,
+    wealth: 0,
     total: 0
   };
   
@@ -2658,6 +2736,8 @@ app.get('/api/taxes', (req, res) => {
       taxBreakdown.shortGains += tax.amount;
     } else if (tax.type === 'dividend') {
       taxBreakdown.dividends += tax.amount;
+    } else if (tax.type === 'wealth') {
+      taxBreakdown.wealth += tax.amount;
     }
     taxBreakdown.total += tax.amount;
     
@@ -2722,7 +2802,9 @@ app.get('/api/taxes', (req, res) => {
     currentTaxRates: {
       shortTermCapitalGains: SHORT_TERM_TAX_RATE * 100,
       longTermCapitalGains: LONG_TERM_TAX_RATE * 100,
-      dividends: DIVIDEND_TAX_RATE * 100
+      dividends: DIVIDEND_TAX_RATE * 100,
+      wealth: WEALTH_TAX_RATE * 100,
+      wealthTaxThreshold: WEALTH_TAX_THRESHOLD
     }
   });
 });
@@ -3045,7 +3127,7 @@ app.post('/api/debug/addstock', (req, res) => {
   }
   
   // Check if stock exists
-  const stockPrice = stocks.getStockPrice(symbol, gameTime);
+  const stockPrice = stocks.getStockPrice(symbol, gameTime, timeMultiplier);
   if (!stockPrice) {
     return res.status(404).json({ error: 'Stock not found or not available at current time' });
   }
