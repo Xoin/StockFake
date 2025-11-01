@@ -101,7 +101,7 @@ const companies = [
   { symbol: 'COST', name: 'Costco Wholesale', sector: 'Retail', foundedYear: 1976, relevantFrom: 1983 },
   { symbol: 'KR', name: 'Kroger Company', sector: 'Retail', foundedYear: 1883, relevantFrom: 1970 },
   { symbol: 'JCP', name: 'J.C. Penney', sector: 'Retail', foundedYear: 1902, relevantFrom: 1970 },
-  { symbol: 'S', name: 'Sears Holdings', sector: 'Retail', foundedYear: 1886, relevantFrom: 1970 },
+  { symbol: 'SHLD', name: 'Sears Holdings', sector: 'Retail', foundedYear: 1886, relevantFrom: 1970 },
   { symbol: 'KSS', name: 'Kohl\'s Corporation', sector: 'Retail', foundedYear: 1962, relevantFrom: 1986 },
   
   // Consumer Goods
@@ -264,8 +264,154 @@ const marketEvents = [
   { year: 2021, name: 'Post-pandemic boom', impact: 0.25 },
 ];
 
-// Generate historical price data for a company
-function generatePriceHistory(company) {
+// Synthetic company name generator
+function generateCompanyName(sector, index) {
+  const prefixes = ['Global', 'American', 'United', 'National', 'First', 'Premier', 'Advanced', 'Universal', 'Continental', 'Pacific', 'Atlantic', 'Central', 'Eastern', 'Western', 'Northern', 'Southern', 'International', 'Apex', 'Summit', 'Elite', 'Prime'];
+  const suffixes = ['Corp', 'Inc', 'LLC', 'Group', 'Holdings', 'Industries', 'Systems', 'Solutions', 'Enterprises', 'Partners', 'Associates', 'Company', 'Technologies'];
+  
+  const sectorKeywords = {
+    'Technology': ['Tech', 'Data', 'Digital', 'Cyber', 'Cloud', 'Software', 'Systems', 'Networks'],
+    'Energy': ['Energy', 'Oil', 'Gas', 'Petroleum', 'Power', 'Resources', 'Fuel'],
+    'Financial': ['Financial', 'Capital', 'Investment', 'Banking', 'Credit', 'Finance', 'Trust'],
+    'Healthcare': ['Health', 'Medical', 'Care', 'Wellness', 'Clinical', 'Diagnostic'],
+    'Industrial': ['Industrial', 'Manufacturing', 'Engineering', 'Machinery', 'Equipment'],
+    'Retail': ['Retail', 'Stores', 'Markets', 'Shops', 'Commerce', 'Trade'],
+    'Consumer Goods': ['Consumer', 'Products', 'Brands', 'Goods', 'Household'],
+    'Telecommunications': ['Telecom', 'Communications', 'Network', 'Wireless', 'Mobile'],
+    'Utilities': ['Utilities', 'Electric', 'Power', 'Water', 'Services'],
+    'Automotive': ['Auto', 'Motors', 'Automotive', 'Vehicles', 'Transport'],
+    'Aerospace': ['Aerospace', 'Aviation', 'Defense', 'Aircraft', 'Space'],
+    'Pharmaceuticals': ['Pharma', 'Therapeutics', 'Drugs', 'Medicines', 'Biotech'],
+    'Biotechnology': ['Biotech', 'Biosciences', 'Genetics', 'Molecular', 'Life Sciences'],
+    'Insurance': ['Insurance', 'Assurance', 'Risk', 'Protection', 'Coverage'],
+    'Mining': ['Mining', 'Minerals', 'Resources', 'Extraction', 'Metals'],
+    'Chemicals': ['Chemical', 'Polymers', 'Materials', 'Compounds', 'Specialty'],
+    'Materials': ['Materials', 'Resources', 'Components', 'Supplies'],
+    'Transportation': ['Transport', 'Logistics', 'Freight', 'Shipping', 'Delivery'],
+    'Airlines': ['Airlines', 'Airways', 'Air', 'Aviation', 'Flight'],
+    'Media': ['Media', 'Broadcasting', 'Entertainment', 'Content', 'Publishing'],
+    'Entertainment': ['Entertainment', 'Studios', 'Productions', 'Gaming', 'Recreation'],
+    'Real Estate': ['Realty', 'Properties', 'Real Estate', 'Development', 'Land'],
+    'Services': ['Services', 'Professional', 'Business', 'Consulting', 'Solutions'],
+    'Food': ['Food', 'Foods', 'Nutrition', 'Culinary', 'Provisions'],
+    'Beverages': ['Beverages', 'Drinks', 'Bottling', 'Brewing', 'Distillery'],
+    'Tobacco': ['Tobacco', 'Smoking', 'Cigarettes', 'Products'],
+    'Apparel': ['Apparel', 'Fashion', 'Clothing', 'Textiles', 'Garments', 'Wear'],
+    'Restaurants': ['Restaurants', 'Dining', 'Food Services', 'Eateries', 'Cuisine'],
+    'Food Processing': ['Food Processing', 'Agriculture', 'Farming', 'Produce', 'Grains'],
+    'Paper': ['Paper', 'Pulp', 'Packaging', 'Cardboard', 'Fiber'],
+    'Forestry': ['Forestry', 'Timber', 'Wood', 'Lumber', 'Forest Products'],
+    'Steel': ['Steel', 'Iron', 'Metalworks', 'Foundry', 'Alloys'],
+    'Metals': ['Metals', 'Aluminum', 'Copper', 'Alloys', 'Metallurgy'],
+    'Packaging': ['Packaging', 'Containers', 'Wrapping', 'Box', 'Cartons'],
+    'Electronics': ['Electronics', 'Electronic', 'Components', 'Devices', 'Circuits']
+  };
+  
+  const keywords = sectorKeywords[sector] || ['Industries'];
+  const prefix = prefixes[index % prefixes.length];
+  const keywordIndex = Math.floor(index / prefixes.length) % keywords.length;
+  const keyword = keywords[keywordIndex];
+  const suffixIndex = Math.floor(index / (prefixes.length * keywords.length)) % suffixes.length;
+  const suffix = suffixes[suffixIndex];
+  
+  // Build name from available parts
+  const parts = [prefix, keyword, suffix].filter(p => p !== undefined);
+  return parts.join(' ');
+}
+
+// Generate ticker symbol from company name
+function generateTicker(name, existingTickers) {
+  // Extract uppercase letters and first letters of words
+  const words = name.split(' ');
+  let ticker = '';
+  
+  // Try using first letters of each word
+  for (const word of words) {
+    if (word.length > 0 && /^[A-Z]/.test(word[0])) {
+      ticker += word[0];
+    }
+  }
+  
+  // If too short, add more letters from first word
+  if (ticker.length < 3) {
+    const firstWord = words[0];
+    for (let i = 0; i < firstWord.length && ticker.length < 4; i++) {
+      if (/^[A-Z]/.test(firstWord[i]) && !ticker.includes(firstWord[i])) {
+        ticker += firstWord[i];
+      }
+    }
+  }
+  
+  // Truncate to 4 characters max
+  ticker = ticker.substring(0, 4);
+  
+  // Make sure it's unique
+  let suffix = 1;
+  let finalTicker = ticker;
+  while (existingTickers.has(finalTicker)) {
+    finalTicker = ticker.substring(0, 3) + suffix;
+    suffix++;
+  }
+  
+  existingTickers.add(finalTicker);
+  return finalTicker;
+}
+
+// Generate synthetic companies to meet minimum per sector
+function generateSyntheticCompanies(existingCompanies, minPerSector = 10) {
+  // Count companies per sector
+  const sectorCounts = {};
+  const existingTickers = new Set();
+  
+  existingCompanies.forEach(company => {
+    sectorCounts[company.sector] = (sectorCounts[company.sector] || 0) + 1;
+    existingTickers.add(company.symbol);
+  });
+  
+  // Determine which sectors need more companies
+  const syntheticCompanies = [];
+  const sectors = Object.keys(sectorCounts);
+  
+  sectors.forEach(sector => {
+    const needed = minPerSector - sectorCounts[sector];
+    if (needed > 0) {
+      console.log(`  Generating ${needed} synthetic companies for ${sector} sector...`);
+      
+      for (let i = 0; i < needed; i++) {
+        const name = generateCompanyName(sector, sectorCounts[sector] + i);
+        const ticker = generateTicker(name, existingTickers);
+        
+        // Determine founding year and relevance
+        // Spread synthetic companies across different eras
+        const eras = [
+          { start: 1970, end: 1979, relevantFrom: 1970 },
+          { start: 1980, end: 1989, relevantFrom: 1980 },
+          { start: 1990, end: 1999, relevantFrom: 1990 },
+          { start: 2000, end: 2009, relevantFrom: 2000 },
+          { start: 2010, end: 2020, relevantFrom: 2010 }
+        ];
+        
+        const era = eras[i % eras.length];
+        const foundedYear = era.start + Math.floor(Math.random() * (era.end - era.start + 1));
+        
+        syntheticCompanies.push({
+          symbol: ticker,
+          name: name,
+          sector: sector,
+          foundedYear: foundedYear,
+          relevantFrom: era.relevantFrom,
+          synthetic: true
+        });
+      }
+    }
+  });
+  
+  return syntheticCompanies;
+}
+
+
+// Enhanced price history with sector correlations and diverse growth profiles
+function generatePriceHistory(company, seedOffset = 0) {
   const history = [];
   const startYear = company.relevantFrom;
   const currentYear = new Date().getFullYear();
@@ -311,8 +457,35 @@ function generatePriceHistory(company) {
   
   let currentPrice = sectorBasePrices[company.sector] || 25;
   
-  // Add some randomness to starting price (±30%)
-  currentPrice *= (0.7 + Math.random() * 0.6);
+  // Create deterministic seed for this company
+  let seed = seedOffset;
+  for (let i = 0; i < company.symbol.length; i++) {
+    seed = (seed * 31 + company.symbol.charCodeAt(i)) % 1000000;
+  }
+  
+  // Seeded random generator
+  const seededRandom = () => {
+    seed = (seed * 9301 + 49297) % 233280;
+    return seed / 233280;
+  };
+  
+  // Add variety to starting prices (±40% for more diversity)
+  currentPrice *= (0.6 + seededRandom() * 0.8);
+  
+  // Determine company growth profile (blue chip, growth, volatile, etc.)
+  const profiles = ['stable', 'growth', 'volatile', 'cyclical', 'value'];
+  const profile = profiles[Math.floor(seededRandom() * profiles.length)];
+  
+  // Profile-specific parameters
+  const profileParams = {
+    'stable': { baseGrowth: 0.015, volatility: 0.05, eventSensitivity: 0.7 },
+    'growth': { baseGrowth: 0.035, volatility: 0.12, eventSensitivity: 1.2 },
+    'volatile': { baseGrowth: 0.02, volatility: 0.20, eventSensitivity: 1.5 },
+    'cyclical': { baseGrowth: 0.018, volatility: 0.15, eventSensitivity: 1.8 },
+    'value': { baseGrowth: 0.012, volatility: 0.08, eventSensitivity: 0.9 }
+  };
+  
+  const params = profileParams[profile];
   
   // Generate quarterly data points
   for (let year = startYear; year <= currentYear; year++) {
@@ -323,16 +496,16 @@ function generatePriceHistory(company) {
       // Don't generate future dates
       if (date > new Date()) break;
       
-      // Base growth rate (avg ~8% annually)
-      let growthRate = 0.02; // 2% per quarter
+      // Base growth rate
+      let growthRate = params.baseGrowth;
       
-      // Apply market events
+      // Apply market events with profile-specific sensitivity
       const event = marketEvents.find(e => e.year === year);
       if (event) {
         if (event.sectors && event.sectors[company.sector]) {
-          growthRate += event.sectors[company.sector] / 4;
+          growthRate += (event.sectors[company.sector] / 4) * params.eventSensitivity;
         } else {
-          growthRate += event.impact / 4;
+          growthRate += (event.impact / 4) * params.eventSensitivity;
         }
       }
       
@@ -343,9 +516,15 @@ function generatePriceHistory(company) {
       if (company.sector === 'Energy' && year >= 2000 && year <= 2008) {
         growthRate += 0.02; // Oil price surge
       }
+      if (company.sector === 'Financial' && year >= 2002 && year <= 2007) {
+        growthRate += 0.025; // Pre-crisis financial boom
+      }
+      if (company.sector === 'Real Estate' && year >= 2003 && year <= 2006) {
+        growthRate += 0.03; // Housing bubble
+      }
       
-      // Add random variation (±5% per quarter)
-      growthRate += (Math.random() - 0.5) * 0.1;
+      // Add random variation based on profile volatility
+      growthRate += (seededRandom() - 0.5) * params.volatility;
       
       // Update price
       currentPrice *= (1 + growthRate);
@@ -363,30 +542,44 @@ function generatePriceHistory(company) {
   return history;
 }
 
+
 // Generate all stock data
 function generateAllStockData() {
   const stockData = {};
   
-  companies.forEach(company => {
+  // First, add all real companies
+  companies.forEach((company, index) => {
     console.log(`Generating data for ${company.symbol} (${company.name})...`);
     stockData[company.symbol] = {
       name: company.name,
       sector: company.sector,
-      history: generatePriceHistory(company)
+      history: generatePriceHistory(company, index)
     };
   });
   
-  return stockData;
+  // Generate synthetic companies to ensure min 10 per sector
+  const syntheticCompanies = generateSyntheticCompanies(companies, 10);
+  
+  syntheticCompanies.forEach((company, index) => {
+    console.log(`Generating data for synthetic ${company.symbol} (${company.name})...`);
+    stockData[company.symbol] = {
+      name: company.name,
+      sector: company.sector,
+      history: generatePriceHistory(company, index + 1000)
+    };
+  });
+  
+  return { stockData, totalCompanies: companies.length + syntheticCompanies.length };
 }
 
 // Generate and save the data
-console.log('Generating historical stock data for 200 companies...');
-const stockData = generateAllStockData();
+console.log('Generating historical stock data with minimum 10 stocks per sector...');
+const { stockData, totalCompanies } = generateAllStockData();
 
 const output = {
   generated: new Date().toISOString(),
-  companies: companies.length,
-  description: 'Historical stock data from 1970 to current day for 200 major companies',
+  companies: totalCompanies,
+  description: 'Historical stock data from 1970 to current day with minimum 10 stocks per sector',
   data: stockData
 };
 
@@ -395,5 +588,19 @@ fs.writeFileSync(
   JSON.stringify(output, null, 2)
 );
 
-console.log(`✓ Generated data for ${companies.length} companies`);
-console.log('✓ Saved to data/historical-stock-data.json');
+console.log(`✓ Generated data for ${totalCompanies} companies`);
+
+// Count and display stocks per sector
+const sectorCounts = {};
+Object.values(stockData).forEach(stock => {
+  sectorCounts[stock.sector] = (sectorCounts[stock.sector] || 0) + 1;
+});
+
+console.log('\nStocks per sector:');
+Object.entries(sectorCounts)
+  .sort((a, b) => a[0].localeCompare(b[0]))
+  .forEach(([sector, count]) => {
+    console.log(`  ${sector}: ${count}`);
+  });
+
+console.log('\n✓ Saved to data/historical-stock-data.json');
