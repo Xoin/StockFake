@@ -1,6 +1,70 @@
 <%- include('partials/header', { 
     title: 'Taxes',
-    pageTitle: '📑 TAXES'
+    pageTitle: '📑 TAXES',
+    pageStyles: `
+        .year-selector {
+            background-color: #000;
+            border: 2px solid #00ff00;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+        .year-selector select {
+            background-color: #001100;
+            border: 1px solid #00ff00;
+            color: #00ff00;
+            padding: 8px;
+            font-family: 'Courier New', monospace;
+        }
+        .tax-summary {
+            background-color: #000;
+            border: 2px solid #00ff00;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        .tax-breakdown {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+        .tax-card {
+            background-color: #001100;
+            border: 2px solid #003300;
+            padding: 20px;
+            text-align: center;
+        }
+        .tax-amount {
+            font-size: 2em;
+            font-weight: bold;
+            color: #00ff00;
+            margin: 10px 0;
+        }
+        .tax-details {
+            background-color: #000;
+            border: 2px solid #00ff00;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        .tax-details table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+        }
+        .tax-details th {
+            background-color: #001100;
+            color: #00ff00;
+            padding: 10px;
+            text-align: left;
+            border: 1px solid #003300;
+        }
+        .tax-details td {
+            padding: 8px 10px;
+            border: 1px solid #003300;
+        }
+        .tax-details tr:hover {
+            background-color: #002200;
+        }
+    `
 }) %>
 
 <div class="year-selector">

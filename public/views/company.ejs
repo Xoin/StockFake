@@ -1,6 +1,124 @@
 <%- include('partials/header', { 
     title: 'Company Info',
-    pageTitle: 'COMPANY INFORMATION'
+    pageTitle: 'COMPANY INFORMATION',
+    pageStyles: `
+        .loading {
+            text-align: center;
+            padding: 50px;
+            font-size: 1.2em;
+        }
+        .error {
+            background-color: #110000;
+            border: 2px solid #ff0000;
+            color: #ff0000;
+            padding: 30px;
+            text-align: center;
+        }
+        .company-header {
+            background-color: #000;
+            border: 2px solid #00ff00;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        .company-meta {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+        .meta-item {
+            padding: 10px;
+            background-color: #001100;
+            border: 1px solid #003300;
+        }
+        .meta-label {
+            color: #00aa00;
+            font-size: 0.9em;
+            margin-bottom: 5px;
+        }
+        .meta-value {
+            color: #00ff00;
+            font-weight: bold;
+        }
+        .section {
+            background-color: #000;
+            border: 2px solid #00ff00;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        .stock-metrics {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+        .metric-card {
+            padding: 15px;
+            background-color: #001100;
+            border: 1px solid #003300;
+            text-align: center;
+        }
+        .metric-label {
+            color: #00aa00;
+            font-size: 0.9em;
+            margin-bottom: 5px;
+        }
+        .metric-value {
+            color: #00ff00;
+            font-weight: bold;
+            font-size: 1.3em;
+        }
+        .timeframe-buttons {
+            display: flex;
+            gap: 10px;
+            margin: 20px 0;
+            flex-wrap: wrap;
+        }
+        .timeframe-btn {
+            background-color: #003300;
+            border: 1px solid #00ff00;
+            color: #00ff00;
+            padding: 8px 16px;
+            cursor: pointer;
+            font-family: 'Courier New', monospace;
+        }
+        .timeframe-btn:hover {
+            background-color: #004400;
+        }
+        .timeframe-btn.active {
+            background-color: #00ff00;
+            color: #000;
+        }
+        .stock-chart-container {
+            margin-top: 20px;
+        }
+        .chart-canvas {
+            width: 100% !important;
+            height: 400px !important;
+        }
+        .financial-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+        .financial-card {
+            padding: 15px;
+            background-color: #001100;
+            border: 1px solid #003300;
+        }
+        .stock-link {
+            color: #00ff00;
+            text-decoration: none;
+            border: 1px solid #00ff00;
+            padding: 10px 20px;
+            display: inline-block;
+            margin-top: 20px;
+        }
+        .stock-link:hover {
+            background-color: #003300;
+        }
+    `
 }) %>
 
 <div id="content">

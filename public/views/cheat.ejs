@@ -1,6 +1,108 @@
 <%- include('partials/header', { 
     title: 'Debug Panel',
-    pageTitle: '🎮 DEBUG PANEL'
+    pageTitle: '🎮 DEBUG PANEL',
+    pageStyles: `
+        .warning {
+            background-color: #331100;
+            border: 2px solid #ff8800;
+            color: #ffaa00;
+            padding: 20px;
+            margin-bottom: 20px;
+            text-align: center;
+            font-weight: bold;
+            font-size: 1.1em;
+        }
+        .panel {
+            background-color: #000;
+            border: 2px solid #00ff00;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        .panel h2 {
+            color: #00ff00;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #003300;
+        }
+        .info-display {
+            background-color: #001100;
+            border: 1px solid #003300;
+            padding: 15px;
+            margin-bottom: 15px;
+            font-family: 'Courier New', monospace;
+        }
+        .info-display div {
+            margin: 5px 0;
+        }
+        .control-group {
+            margin: 15px 0;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        .control-group label {
+            color: #00aa00;
+            min-width: 120px;
+        }
+        .control-group input[type="number"],
+        .control-group input[type="text"],
+        .control-group input[type="datetime-local"] {
+            background-color: #001100;
+            border: 1px solid #00ff00;
+            color: #00ff00;
+            padding: 8px;
+            font-family: 'Courier New', monospace;
+            flex: 1;
+            min-width: 150px;
+        }
+        .control-group button,
+        .button-group button {
+            background-color: #003300;
+            border: 2px solid #00ff00;
+            color: #00ff00;
+            padding: 8px 16px;
+            cursor: pointer;
+            font-family: 'Courier New', monospace;
+            transition: background-color 0.2s;
+        }
+        .control-group button:hover,
+        .button-group button:hover {
+            background-color: #004400;
+        }
+        .button-group {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin: 15px 0;
+        }
+        .debug-json {
+            background-color: #001100;
+            border: 1px solid #003300;
+            padding: 15px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+            overflow-x: auto;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+        .message {
+            padding: 15px;
+            margin: 15px 0;
+            border: 2px solid;
+            font-weight: bold;
+        }
+        .message.success {
+            background-color: #001100;
+            border-color: #00ff00;
+            color: #00ff00;
+        }
+        .message.error {
+            background-color: #110000;
+            border-color: #ff0000;
+            color: #ff0000;
+        }
+    `
 }) %>
 
 <div class="warning">

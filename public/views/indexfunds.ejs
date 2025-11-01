@@ -1,10 +1,159 @@
 <%- include('partials/header', { 
     title: 'Index Funds',
-    pageTitle: '📊 INDEX FUNDS'
+    pageTitle: '📊 INDEX FUNDS',
+    pageStyles: `
+        .content-wrapper {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        #filterSidebar {
+            flex: 0 0 250px;
+        }
+        .funds-container {
+            flex: 1;
+            background-color: #000;
+            border: 2px solid #00ff00;
+            padding: 15px;
+        }
+        .funds-container table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 15px 0;
+        }
+        .funds-container th {
+            background-color: #001100;
+            color: #00ff00;
+            padding: 10px;
+            text-align: left;
+            border: 1px solid #003300;
+        }
+        .funds-container td {
+            padding: 8px 10px;
+            border: 1px solid #003300;
+        }
+        .funds-container tr:hover {
+            background-color: #002200;
+        }
+        .positive {
+            color: #00ff00;
+        }
+        .negative {
+            color: #ff0000;
+        }
+        .trade-form {
+            background-color: #000;
+            border: 2px solid #00ff00;
+            padding: 20px;
+            margin-top: 20px;
+        }
+        .trade-form h3 {
+            margin-bottom: 15px;
+        }
+        .fund-info {
+            background-color: #001100;
+            border: 1px solid #003300;
+            padding: 10px;
+            margin-bottom: 15px;
+        }
+        .fund-info p {
+            margin: 5px 0;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            color: #00aa00;
+        }
+        .form-group select, .form-group input {
+            width: 100%;
+            padding: 10px;
+            background-color: #001100;
+            border: 1px solid #00ff00;
+            color: #00ff00;
+            font-family: 'Courier New', monospace;
+        }
+        .buy-btn, .sell-btn {
+            background-color: #003300;
+            border: 2px solid #00ff00;
+            color: #00ff00;
+            padding: 10px 20px;
+            margin: 5px;
+            cursor: pointer;
+            font-family: 'Courier New', monospace;
+        }
+        .sell-btn {
+            background-color: #330000;
+            border-color: #ff0000;
+            color: #ff0000;
+        }
+        .buy-btn:hover {
+            background-color: #004400;
+        }
+        .sell-btn:hover {
+            background-color: #440000;
+        }
+        .trade-form button {
+            background-color: #003300;
+            border: 2px solid #00ff00;
+            color: #00ff00;
+            padding: 10px 20px;
+            margin: 5px;
+            cursor: pointer;
+            font-family: 'Courier New', monospace;
+        }
+        .trade-form button:hover {
+            background-color: #004400;
+        }
+        .cost-calculator {
+            background-color: #001100;
+            border: 1px solid #003300;
+            padding: 10px;
+            margin: 10px 0;
+        }
+        .calc-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 5px 0;
+        }
+        .calc-total {
+            border-top: 1px solid #00ff00;
+            margin-top: 5px;
+            padding-top: 10px;
+            font-weight: bold;
+        }
+        .affordability-info {
+            padding: 10px;
+            margin: 10px 0;
+            border: 1px solid #00ff00;
+        }
+        .can-afford {
+            background-color: #001100;
+            color: #00ff00;
+        }
+        .cannot-afford {
+            background-color: #110000;
+            color: #ff0000;
+        }
+        .message {
+            padding: 10px;
+            margin: 10px 0;
+            border: 1px solid;
+        }
+        .message.success {
+            background-color: #001100;
+            border-color: #00ff00;
+            color: #00ff00;
+        }
+        .message.error {
+            background-color: #110000;
+            border-color: #ff0000;
+            color: #ff0000;
+        }
+    `
 }) %>
-
-<!-- Shared header component -->
-        <div id="shared-header" data-title="📊 INDEX FUNDS"></div>
         
         <!-- Sidebar and Content Layout -->
         <div class="content-wrapper">
@@ -80,6 +229,7 @@
 
 <%- include('partials/footer', {
     pageScripts: `
+    <script src="/asset-filter.js"></script>
     <script>
 let selectedFund = null;
         let currentAccountData = null;
@@ -131,6 +281,23 @@ let selectedFund = null;
             // Apply asset filter if it exists - map category to sector for filtering
             if (assetFilter) {
                 filteredFunds = allFunds.filter(f => assetFilter.matchesFilter({...f, sector: f.category}));
+                
+                // Calculate counts for display
+                const counts = {
+                    types: {},
+                    sectors: {}
+                };
+                
+                allFunds.forEach(fund => {
+                    if (fund.type) {
+                        counts.types[fund.type] = (counts.types[fund.type] || 0) + 1;
+                    }
+                    if (fund.category) {
+                        counts.sectors[fund.category] = (counts.sectors[fund.category] || 0) + 1;
+                    }
+                });
+                
+                assetFilter.updateCounts(counts);
             }
             
             const tbody = document.getElementById('fundsBody');

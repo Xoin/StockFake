@@ -1,3 +1,10 @@
+        <!-- Game Status Display -->
+        <div class="time-display">
+            <div id="gameTime">Loading...</div>
+            <span id="marketStatus" class="market-status">...</span>
+            <span id="gameSpeed" style="margin-left: 15px; font-size: 0.9em;">...</span>
+        </div>
+        
         <div class="nav">
             <a href="/">🏠 Portal</a> |
             <a href="/bank">🏦 Bank</a> |
@@ -6,6 +13,107 @@
             <a href="/graphs">📉 Charts</a> |
             <a href="/loans">💰 Loans</a> |
             <a href="/taxes">📑 Taxes</a> |
-            <a href="/news">📰 News</a> |
-            <a href="/email">📧 Email</a>
+            <a href="/news" id="newsNavLink">📰 News<span id="newsBadgeNav" class="nav-badge" style="display: none;"></span></a> |
+            <a href="/email" id="emailNavLink">📧 Email<span id="emailBadgeNav" class="nav-badge" style="display: none;"></span></a>
         </div>
+        
+        <script>
+        // Update game time, market status, and speed on all pages
+        async function updateGameStatus() {
+            try {
+                const response = await fetch('/api/time');
+                const data = await response.json();
+                const date = new Date(data.currentTime);
+                
+                const timeEl = document.getElementById('gameTime');
+                if (timeEl) {
+                    const dayOfWeek = date.toLocaleDateString('en-US', { weekday: 'long' });
+                    const dateString = date.toLocaleDateString();
+                    const timeString = date.toLocaleTimeString();
+                    timeEl.textContent = `${dayOfWeek}, ${dateString}, ${timeString}`;
+                }
+                
+                const statusEl = document.getElementById('marketStatus');
+                if (statusEl) {
+                    if (data.isMarketOpen) {
+                        statusEl.textContent = '🟢 MARKET OPEN';
+                        statusEl.className = 'market-status market-open';
+                    } else {
+                        statusEl.textContent = '🔴 MARKET CLOSED';
+                        statusEl.className = 'market-status market-closed';
+                    }
+                }
+                
+                const speedEl = document.getElementById('gameSpeed');
+                if (speedEl) {
+                    let speedText = '';
+                    if (data.isPaused) {
+                        speedText = '⏸ PAUSED';
+                    } else if (data.timeMultiplier === 60) {
+                        speedText = '🐌 Speed: Slow (1s = 1min)';
+                    } else if (data.timeMultiplier === 3600) {
+                        speedText = '⚡ Speed: Normal (1s = 1hr)';
+                    } else if (data.timeMultiplier === 86400) {
+                        speedText = '🚀 Speed: Fast (1s = 1day)';
+                    } else {
+                        speedText = `⏱ Speed: Custom (1s = ${data.timeMultiplier}s)`;
+                    }
+                    speedEl.textContent = speedText;
+                }
+            } catch (error) {
+                console.error('Error updating game status:', error);
+            }
+        }
+        
+        // Update notification badges
+        async function updateNavNotifications() {
+            try {
+                // Get unread counts from localStorage
+                const readNewsIds = new Set(JSON.parse(localStorage.getItem('readNewsIds') || '[]'));
+                const readEmailIds = new Set(JSON.parse(localStorage.getItem('readEmailIds') || '[]'));
+                
+                // Fetch current news and emails
+                const [newsResponse, emailResponse] = await Promise.all([
+                    fetch('/api/news'),
+                    fetch('/api/emails')
+                ]);
+                
+                const newsData = await newsResponse.json();
+                const emailData = await emailResponse.json();
+                
+                // Calculate unread counts
+                const unreadNewsCount = newsData.filter(item => !readNewsIds.has(item.id)).length;
+                const unreadEmailCount = emailData.filter(item => !readEmailIds.has(item.id)).length;
+                
+                // Update news badge
+                const newsBadge = document.getElementById('newsBadgeNav');
+                if (newsBadge) {
+                    if (unreadNewsCount > 0) {
+                        newsBadge.textContent = unreadNewsCount > 99 ? '99+' : unreadNewsCount;
+                        newsBadge.style.display = 'inline-block';
+                    } else {
+                        newsBadge.style.display = 'none';
+                    }
+                }
+                
+                // Update email badge
+                const emailBadge = document.getElementById('emailBadgeNav');
+                if (emailBadge) {
+                    if (unreadEmailCount > 0) {
+                        emailBadge.textContent = unreadEmailCount > 99 ? '99+' : unreadEmailCount;
+                        emailBadge.style.display = 'inline-block';
+                    } else {
+                        emailBadge.style.display = 'none';
+                    }
+                }
+            } catch (error) {
+                console.error('Error updating nav notifications:', error);
+            }
+        }
+        
+        // Initialize and update
+        updateGameStatus();
+        updateNavNotifications();
+        setInterval(updateGameStatus, 1000);
+        setInterval(updateNavNotifications, 3000); // Update badges every 3 seconds
+        </script>

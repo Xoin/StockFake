@@ -1,10 +1,69 @@
 <%- include('partials/header', { 
     title: 'News',
-    pageTitle: '📰 FINANCIAL NEWS'
+    pageTitle: '📰 FINANCIAL NEWS',
+    pageStyles: `
+        .news-container {
+            background-color: #000;
+            border: 2px solid #00ff00;
+            padding: 15px;
+        }
+        .news-item {
+            background-color: #001100;
+            border: 1px solid #003300;
+            margin-bottom: 15px;
+            padding: 15px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .news-item:hover {
+            background-color: #002200;
+        }
+        .news-item.unread {
+            border-color: #00ff00;
+            border-width: 2px;
+        }
+        .news-item.expanded {
+            background-color: #002200;
+        }
+        .news-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        .news-source {
+            color: #00aa00;
+            font-weight: bold;
+        }
+        .news-date {
+            color: #00aa00;
+            font-size: 0.9em;
+        }
+        .news-title {
+            color: #00ff00;
+            font-size: 1.1em;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+        .news-body {
+            color: #00cc00;
+            display: none;
+            margin-top: 10px;
+            line-height: 1.6;
+        }
+        .news-item.expanded .news-body {
+            display: block;
+        }
+        .no-news {
+            text-align: center;
+            padding: 30px;
+            color: #00aa00;
+        }
+        .pagination-controls-container {
+            margin: 15px 0;
+        }
+    `
 }) %>
-
-<!-- Shared header component - auto-loads via header.js -->
-        <div id="shared-header" data-title="📰 HISTORICAL NEWS"></div>
         
         <div class="pagination-controls-container"></div>
         <div class="news-container" id="newsContainer">
@@ -42,7 +101,7 @@ let paginator;
         // Format market update body as a table
         function formatMarketUpdateTable(bodyText) {
             // Parse numbered list format: "1. Company (SYMBOL) text... 2. Company text..."
-            const items = bodyText.split(/\d+\.\s+/).filter(item => item.trim());
+            const items = bodyText.split(/\\d+\\.\\s+/).filter(item => item.trim());
             
             if (items.length === 0) {
                 return \`<div class="news-body">\${escapeHtml(bodyText)}</div>\`;
@@ -51,8 +110,8 @@ let paginator;
             // Parse each item to extract stock info and movement
             const movements = items.map(item => {
                 // Try to extract company name, symbol, and change percentage
-                const symbolMatch = item.match(/\(([A-Z]+)\)/);
-                const changeMatch = item.match(/(gained|advanced|declined|lost|moved|up|down)\s+([\d.]+)%/i);
+                const symbolMatch = item.match(/\\(([A-Z]+)\\)/);
+                const changeMatch = item.match(/(gained|advanced|declined|lost|moved|up|down)\\s+([\\d.]+)%/i);
                 const upMatch = item.match(/(surges|surged|jump|jumped|rally|rallied|gains|gained|advanced)/i);
                 const downMatch = item.match(/(plunges|plunged|drop|dropped|decline|declined|losses|lost|tumbled)/i);
                 
@@ -61,11 +120,11 @@ let paginator;
                 
                 // Determine direction from text if not in change match
                 if (upMatch && change === 0) {
-                    const percentMatch = item.match(/([\d.]+)%/);
+                    const percentMatch = item.match(/([\\d.]+)%/);
                     if (percentMatch) change = parseFloat(percentMatch[1]);
                 }
                 if (downMatch && change === 0) {
-                    const percentMatch = item.match(/([\d.]+)%/);
+                    const percentMatch = item.match(/([\\d.]+)%/);
                     if (percentMatch) change = -parseFloat(percentMatch[1]);
                 }
                 
@@ -74,11 +133,11 @@ let paginator;
                 if (symbolMatch) {
                     company = item.substring(0, item.indexOf('(')).trim();
                 } else {
-                    company = item.split(/\s+/).slice(0, 3).join(' ');
+                    company = item.split(/\\s+/).slice(0, 3).join(' ');
                 }
                 
                 // Clean up company name
-                company = company.replace(/^(Shares of|Investors|Market)\s+/i, '').trim();
+                company = company.replace(/^(Shares of|Investors|Market)\\s+/i, '').trim();
                 
                 return { company, symbol, change, text: item.trim() };
             });
@@ -199,7 +258,7 @@ let paginator;
                         id: items[0].id, // Use first ID
                         date: items[0].date,
                         headline: 'Market Update: Multiple Stock Movements',
-                        body: items.map((item, idx) => \`\${idx + 1}. \${item.body}\`).join('\n')
+                        body: items.map((item, idx) => \\\`\\\${idx + 1}. \\\${item.body}\\\`).join('\\n')
                     };
                     newsById.set(mergedItem.id, mergedItem);
                 } else {

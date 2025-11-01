@@ -1,6 +1,49 @@
 <%- include('partials/header', { 
     title: 'Charts',
-    pageTitle: '📊 MARKET GRAPHS'
+    pageTitle: '📊 MARKET GRAPHS',
+    pageStyles: `
+        .controls {
+            background-color: #000;
+            border: 2px solid #00ff00;
+            padding: 15px;
+            margin-bottom: 20px;
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        .controls label {
+            color: #00ff00;
+        }
+        .controls select {
+            background-color: #001100;
+            border: 1px solid #00ff00;
+            color: #00ff00;
+            padding: 8px;
+            font-family: 'Courier New', monospace;
+        }
+        .controls button {
+            background-color: #003300;
+            border: 2px solid #00ff00;
+            color: #00ff00;
+            padding: 8px 16px;
+            cursor: pointer;
+            font-family: 'Courier New', monospace;
+        }
+        .controls button:hover {
+            background-color: #004400;
+        }
+        .chart-container {
+            background-color: #000;
+            border: 2px solid #00ff00;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        .chart-container canvas {
+            width: 100% !important;
+            height: 400px !important;
+        }
+    `
 }) %>
 
 <div class="controls">
@@ -31,6 +74,7 @@
 
 <%- include('partials/footer', {
     pageScripts: `
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <script>
 let marketChart = null;
         let stockChart = null;
