@@ -71,33 +71,45 @@ const historicalCrashes = [
     type: CRASH_TYPES.SECTOR_CRASH,
     severity: SEVERITY_LEVELS.CATASTROPHIC,
     startDate: new Date('2000-03-10T09:30:00'),
-    endDate: new Date('2002-10-09T16:00:00'),
-    description: 'Technology sector bubble collapse',
+    // No endDate - let recovery pattern determine full duration
+    description: 'Technology sector bubble collapse - decade-long impact',
     trigger: TRIGGER_TYPES.HISTORICAL,
     impact: {
-      market: -0.15,
-      volatilityMultiplier: 3.0,
-      liquidityReduction: 0.4,
-      sentimentShift: -0.7,
+      market: -0.40,  // Increased from -0.15 to reflect broader market impact
+      volatilityMultiplier: 4.0,  // Increased from 3.0
+      liquidityReduction: 0.5,  // Increased from 0.4
+      sentimentShift: -0.8,  // Increased from -0.7
       sectors: {
-        'Technology': -0.78,  // Tech lost 78% of value
-        'Financial': -0.10,
-        'Industrials': -0.08,
-        'Consumer': -0.05,
-        'Energy': -0.03
+        'Technology': -0.78,  // Tech lost 78% of value - kept accurate
+        'Financial': -0.15,  // Increased from -0.10
+        'Industrials': -0.12,  // Increased from -0.08
+        'Consumer': -0.10,  // Increased from -0.05
+        'Energy': -0.08  // Increased from -0.03
       }
     },
     cascadingEffects: [
-      { delay: 0, multiplier: 1.0 },
-      { delay: 30, multiplier: 0.5 },
-      { delay: 90, multiplier: 0.3 },
-      { delay: 180, multiplier: 0.2 },
-      { delay: 365, multiplier: 0.1 }
+      { delay: 0, multiplier: 1.0 },       // Initial crash
+      { delay: 30, multiplier: 0.9 },      // Month 1 - continued decline
+      { delay: 90, multiplier: 0.8 },      // Month 3 - ongoing weakness
+      { delay: 180, multiplier: 0.7 },     // Month 6 - sustained downturn
+      { delay: 365, multiplier: 0.6 },     // Year 1 - still depressed
+      { delay: 730, multiplier: 0.5 },     // Year 2 - bottom reached
+      { delay: 1095, multiplier: 0.4 },    // Year 3 - slow recovery begins
+      { delay: 1460, multiplier: 0.35 },   // Year 4 - gradual improvement
+      { delay: 1825, multiplier: 0.3 },    // Year 5 - continued recovery
+      { delay: 2190, multiplier: 0.25 },   // Year 6 - recovery continues
+      { delay: 2555, multiplier: 0.2 },    // Year 7 - approaching normal
+      { delay: 2920, multiplier: 0.15 },   // Year 8 - getting closer
+      { delay: 3285, multiplier: 0.12 },   // Year 9 - almost recovered
+      { delay: 3650, multiplier: 0.10 },   // Year 10 - nearing full recovery
+      { delay: 4380, multiplier: 0.07 },   // Year 12 - final stages
+      { delay: 5110, multiplier: 0.05 },   // Year 14 - nearly complete
+      { delay: 5475, multiplier: 0.02 }    // Year 15 - full recovery
     ],
     recoveryPattern: {
-      type: 'prolonged',
-      durationDays: 730,
-      volatilityDecay: 0.98
+      type: 'decade-long',  // New recovery type for 15-year recovery
+      durationDays: 5475,  // 15 years (actual historical recovery period)
+      volatilityDecay: 0.9995  // Very slow volatility decay over 15 years
     }
   },
   {
@@ -106,35 +118,45 @@ const historicalCrashes = [
     type: CRASH_TYPES.MARKET_CRASH,
     severity: SEVERITY_LEVELS.CATASTROPHIC,
     startDate: new Date('2008-09-15T09:30:00'),
-    endDate: new Date('2009-03-09T16:00:00'),
-    description: 'Global financial crisis triggered by subprime mortgage collapse',
+    // No endDate - let recovery pattern determine full duration
+    description: 'Global financial crisis - 6.5 year recovery to pre-crisis levels',
     trigger: TRIGGER_TYPES.HISTORICAL,
     impact: {
       market: -0.57,  // 57% peak-to-trough decline
-      volatilityMultiplier: 4.5,
-      liquidityReduction: 0.7,
-      sentimentShift: -0.9,
+      volatilityMultiplier: 5.5,  // Increased from 4.5
+      liquidityReduction: 0.75,  // Increased from 0.7
+      sentimentShift: -0.95,  // Increased from -0.9
       sectors: {
         'Financial': -0.83,  // Financials devastated
         'Technology': -0.42,
         'Industrials': -0.54,
         'Consumer': -0.48,
-        'Energy': -0.60
+        'Energy': -0.60,
+        'Healthcare': -0.35
       }
     },
     cascadingEffects: [
-      { delay: 0, multiplier: 1.0 },
-      { delay: 7, multiplier: 0.4 },
-      { delay: 14, multiplier: 0.3 },
-      { delay: 30, multiplier: 0.25 },
-      { delay: 60, multiplier: 0.15 },
-      { delay: 90, multiplier: 0.1 },
-      { delay: 120, multiplier: 0.05 }
+      { delay: 0, multiplier: 1.0 },       // Initial crash Sept 2008
+      { delay: 7, multiplier: 0.95 },      // Week 1 - continued selling
+      { delay: 14, multiplier: 0.90 },     // Week 2 - panic continues
+      { delay: 30, multiplier: 0.85 },     // Month 1 - sustained decline
+      { delay: 60, multiplier: 0.80 },     // Month 2 - deepening crisis
+      { delay: 90, multiplier: 0.75 },     // Month 3 - still falling
+      { delay: 120, multiplier: 0.70 },    // Month 4 - crisis persists
+      { delay: 180, multiplier: 0.65 },    // Month 6 - March 2009 bottom
+      { delay: 365, multiplier: 0.60 },    // Year 1 - slow recovery starts
+      { delay: 547, multiplier: 0.55 },    // Year 1.5 - gradual improvement
+      { delay: 730, multiplier: 0.50 },    // Year 2 - recovery underway
+      { delay: 1095, multiplier: 0.40 },   // Year 3 - continued recovery
+      { delay: 1460, multiplier: 0.30 },   // Year 4 - gaining momentum
+      { delay: 1825, multiplier: 0.20 },   // Year 5 - approaching normal
+      { delay: 2190, multiplier: 0.10 },   // Year 6 - nearly recovered
+      { delay: 2375, multiplier: 0.05 }    // Year 6.5 - full recovery (March 2013)
     ],
     recoveryPattern: {
-      type: 'slow',
-      durationDays: 545,  // Took ~18 months to bottom
-      volatilityDecay: 0.97
+      type: 'decade-long',  // Changed from 'slow' to new decade-long type
+      durationDays: 2375,  // 6.5 years (actual time to recover to pre-crisis peak)
+      volatilityDecay: 0.9997  // Very slow decay over 6.5 years
     }
   },
   {
