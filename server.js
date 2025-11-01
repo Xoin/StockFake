@@ -3953,6 +3953,28 @@ app.get('/api/emails', (req, res) => {
     });
   });
   
+  // Add stock split notification emails from database
+  try {
+    const splitEmails = dbModule.db.prepare(`
+      SELECT * FROM emails 
+      WHERE category = 'stock_split' 
+      ORDER BY date DESC
+    `).all();
+    
+    splitEmails.forEach((email, index) => {
+      emails.push({
+        id: 2000 + index,
+        from: email.from_address,
+        subject: email.subject,
+        body: email.body,
+        date: new Date(email.date),
+        spam: email.spam === 1
+      });
+    });
+  } catch (error) {
+    console.error('Error fetching split emails:', error);
+  }
+  
   res.json(emails.filter(email => email.date <= gameTime).sort((a, b) => b.date - a.date));
 });
 

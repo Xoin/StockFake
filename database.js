@@ -323,6 +323,21 @@ function initializeDatabase() {
     )
   `);
 
+  // Create emails table for storing notifications
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS emails (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      from_address TEXT NOT NULL,
+      subject TEXT NOT NULL,
+      body TEXT NOT NULL,
+      date TEXT NOT NULL,
+      is_read INTEGER NOT NULL DEFAULT 0,
+      spam INTEGER NOT NULL DEFAULT 0,
+      category TEXT,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+
   // Insert default market state if not exists
   const marketStateCount = db.prepare('SELECT COUNT(*) as count FROM market_state').get();
   if (marketStateCount.count === 0) {

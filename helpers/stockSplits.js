@@ -59,7 +59,7 @@ function checkForSplit(symbol, currentPrice, currentDate) {
 }
 
 // Apply a stock split to the database
-function applySplit(symbol, splitDate, splitRatio, priceBeforeSplit, priceAfterSplit) {
+function applySplit(symbol, splitDate, splitRatio, priceBeforeSplit, priceAfterSplit, stockName = null) {
   const db = require('../database').db;
   
   try {
@@ -83,8 +83,10 @@ function applySplit(symbol, splitDate, splitRatio, priceBeforeSplit, priceAfterS
     
     // Apply to user's portfolio if they own this stock
     const portfolio = db.prepare('SELECT shares FROM portfolio WHERE symbol = ?').get(symbol);
+    let portfolioAffected = false;
     
     if (portfolio && portfolio.shares > 0) {
+      portfolioAffected = true;
       const newShares = portfolio.shares * splitRatio;
       
       // Update portfolio shares
@@ -122,8 +124,10 @@ function applySplit(symbol, splitDate, splitRatio, priceBeforeSplit, priceAfterS
     
     // Apply to short positions if they exist
     const shortPosition = db.prepare('SELECT shares FROM short_positions WHERE symbol = ?').get(symbol);
+    let shortPositionAffected = false;
     
     if (shortPosition && shortPosition.shares > 0) {
+      shortPositionAffected = true;
       const newShortShares = shortPosition.shares * splitRatio;
       const oldBorrowPrice = db.prepare('SELECT borrow_price FROM short_positions WHERE symbol = ?').get(symbol).borrow_price;
       const newBorrowPrice = oldBorrowPrice / splitRatio;
@@ -136,11 +140,27 @@ function applySplit(symbol, splitDate, splitRatio, priceBeforeSplit, priceAfterS
       `).run(newShortShares, newBorrowPrice, symbol);
     }
     
+    // Create email notification
+    const email = generateSplitEmail(
+      symbol, 
+      stockName || symbol, 
+      splitRatio, 
+      priceBeforeSplit, 
+      priceAfterSplit, 
+      splitDate, 
+      portfolioAffected || shortPositionAffected
+    );
+    
+    db.prepare(`
+      INSERT INTO emails (from_address, subject, body, date, is_read, spam, category)
+      VALUES (?, ?, ?, ?, 0, 0, ?)
+    `).run(email.from, email.subject, email.body, email.date.toISOString(), email.category);
+    
     return { 
       success: true, 
       splitId: splitId,
-      portfolioAffected: portfolio && portfolio.shares > 0,
-      shortPositionAffected: shortPosition && shortPosition.shares > 0
+      portfolioAffected: portfolioAffected,
+      shortPositionAffected: shortPositionAffected
     };
     
   } catch (error) {
@@ -176,7 +196,8 @@ function checkAndApplySplits(currentDate, stockPrices) {
         currentDate,
         splitCheck.splitRatio,
         splitCheck.priceBeforeSplit,
-        splitCheck.priceAfterSplit
+        splitCheck.priceAfterSplit,
+        stock.name
       );
       
       if (result.success) {
@@ -232,6 +253,43 @@ function getRecentSplits(limit = 10) {
   return splits;
 }
 
+// Generate email notification for a stock split
+function generateSplitEmail(symbol, name, splitRatio, priceBeforeSplit, priceAfterSplit, splitDate, portfolioAffected) {
+  const formattedDate = new Date(splitDate).toLocaleDateString('en-US', { 
+    year: 'numeric', 
+    month: 'long', 
+    day: 'numeric' 
+  });
+  
+  let body = `Dear Investor,\n\n`;
+  body += `We are writing to inform you that ${name} (${symbol}) has executed a ${splitRatio}-for-1 stock split effective ${formattedDate}.\n\n`;
+  body += `Split Details:\n`;
+  body += `- Split Ratio: ${splitRatio}:1\n`;
+  body += `- Price Before Split: $${priceBeforeSplit.toFixed(2)}\n`;
+  body += `- Price After Split: $${priceAfterSplit.toFixed(2)}\n\n`;
+  
+  if (portfolioAffected) {
+    body += `Impact on Your Holdings:\n`;
+    body += `Your ${symbol} shares have been automatically adjusted. For every 1 share you owned, you now own ${splitRatio} shares at the new price.\n\n`;
+    body += `Important: The total value of your position remains the same. Stock splits do not change the total value of your investment, only the number of shares and price per share.\n\n`;
+  } else {
+    body += `This split does not affect your portfolio as you do not currently hold ${symbol}.\n\n`;
+  }
+  
+  body += `What is a Stock Split?\n`;
+  body += `A stock split divides existing shares into multiple shares to make the stock more affordable and increase liquidity. While the number of shares increases, the proportional ownership remains the same.\n\n`;
+  body += `Best regards,\nStockFake Trading Platform`;
+  
+  return {
+    from: 'notifications@stockfake.com',
+    subject: `Stock Split Notification: ${symbol} ${splitRatio}:1 Split`,
+    body: body,
+    date: new Date(splitDate),
+    spam: false,
+    category: 'stock_split'
+  };
+}
+
 module.exports = {
   getSplitThreshold,
   determineSplitRatio,
@@ -239,5 +297,6 @@ module.exports = {
   applySplit,
   checkAndApplySplits,
   getSplitsForSymbol,
-  getRecentSplits
+  getRecentSplits,
+  generateSplitEmail
 };
