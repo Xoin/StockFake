@@ -25,6 +25,16 @@ app.set('views', path.join(__dirname, 'public', 'views'));
 
 // Middleware
 app.use(express.json());
+
+// Middleware to handle legacy .html URLs (must be before static middleware)
+app.use((req, res, next) => {
+  if (req.path.endsWith('.html')) {
+    const newPath = req.path.replace('.html', '');
+    return res.redirect(301, newPath);
+  }
+  next();
+});
+
 app.use(express.static('public'));
 
 // Game state
@@ -244,11 +254,6 @@ app.get('/indexfund', (req, res) => {
 
 app.get('/indexfunds', (req, res) => {
   res.render('indexfunds');
-});
-
-app.get('/indexfunds.html', (req, res) => {
-  // Support legacy .html extension
-  res.redirect('/indexfunds');
 });
 
 app.get('/cheat', (req, res) => {

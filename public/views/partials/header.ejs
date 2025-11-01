@@ -7,7 +7,8 @@
 <%- include('styles') %>
 <% if (typeof pageStyles !== 'undefined') { %>
     <style>
-        <%= pageStyles %>
+        <%# Note: pageStyles is server-controlled content from EJS templates, not user input %>
+        <%- pageStyles %>
     </style>
 <% } %>
 </head>

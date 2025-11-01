@@ -1,6 +1,7 @@
     </div>
     <script src="/common.js"></script>
 <% if (typeof pageScripts !== 'undefined') { %>
+<%# Note: pageScripts is server-controlled content from EJS templates, not user input %>
 <%- pageScripts %>
 <% } %>
 </body>
