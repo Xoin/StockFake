@@ -30,7 +30,7 @@ app.use(express.json());
 // Whitelist of known pages to prevent open redirects
 const validPages = new Set([
   '/index', '/bank', '/trading', '/news', '/email', '/graphs', 
-  '/loans', '/taxes', '/cheat', '/indexfunds', '/indexfund', '/company', '/pendingorders'
+  '/loans', '/taxes', '/cheat', '/indexfunds', '/indexfund', '/company', '/pendingorders', '/status'
 ]);
 
 app.use((req, res, next) => {
@@ -321,6 +321,10 @@ app.get('/pendingorders', (req, res) => {
   res.render('pendingorders');
 });
 
+app.get('/status', (req, res) => {
+  res.render('status');
+});
+
 app.get('/', (req, res) => {
   res.render('index');
 });
@@ -378,7 +382,7 @@ function addHourlySamplingIfNeeded(history, daysToFetch, dataFetcher) {
 }
 
 // Constants for historical data fetching
-const USE_REAL_HISTORICAL_PRICES = false; // Always use real prices for historical data, not cached prices
+const BYPASS_CACHE_FOR_HISTORICAL = true; // Always bypass cache for historical chart data
 
 // Stock history API for charts
 app.get('/api/stocks/:symbol/history', (req, res) => {
@@ -402,7 +406,7 @@ app.get('/api/stocks/:symbol/history', (req, res) => {
   // Get historical prices for the specified number of days
   for (let i = daysToFetch; i >= 0; i -= sampleInterval) {
     const date = new Date(gameTime.getTime() - (i * 24 * 60 * 60 * 1000));
-    const price = stocks.getStockPrice(symbol, date, timeMultiplier, USE_REAL_HISTORICAL_PRICES);
+    const price = stocks.getStockPrice(symbol, date, timeMultiplier, false, BYPASS_CACHE_FOR_HISTORICAL);
     if (price) {
       history.push({
         date: date.toISOString(),
@@ -413,7 +417,7 @@ app.get('/api/stocks/:symbol/history', (req, res) => {
   
   // Always include the most recent data point
   if (history.length === 0 || history[history.length - 1].date !== gameTime.toISOString()) {
-    const price = stocks.getStockPrice(symbol, gameTime, timeMultiplier, USE_REAL_HISTORICAL_PRICES);
+    const price = stocks.getStockPrice(symbol, gameTime, timeMultiplier, false, BYPASS_CACHE_FOR_HISTORICAL);
     if (price) {
       history.push({
         date: gameTime.toISOString(),
@@ -424,7 +428,7 @@ app.get('/api/stocks/:symbol/history', (req, res) => {
   
   // If insufficient data, use hourly intervals for recent data
   addHourlySamplingIfNeeded(history, daysToFetch, (date) => {
-    const price = stocks.getStockPrice(symbol, date, timeMultiplier, USE_REAL_HISTORICAL_PRICES);
+    const price = stocks.getStockPrice(symbol, date, timeMultiplier, false, BYPASS_CACHE_FOR_HISTORICAL);
     return price ? { date: date.toISOString(), price: price.price } : null;
   });
   
@@ -450,7 +454,7 @@ app.get('/api/market/index', (req, res) => {
   // Calculate simple market index based on average of all stocks
   for (let i = daysToFetch; i >= 0; i -= sampleInterval) {
     const date = new Date(gameTime.getTime() - (i * 24 * 60 * 60 * 1000));
-    const allStocks = stocks.getStockData(date, timeMultiplier, USE_REAL_HISTORICAL_PRICES);
+    const allStocks = stocks.getStockData(date, timeMultiplier, false, BYPASS_CACHE_FOR_HISTORICAL);
     
     if (allStocks.length > 0) {
       const avgPrice = allStocks.reduce((sum, s) => sum + s.price, 0) / allStocks.length;
@@ -464,7 +468,7 @@ app.get('/api/market/index', (req, res) => {
   
   // Always include the most recent data point
   if (history.length === 0 || history[history.length - 1].date !== gameTime.toISOString()) {
-    const allStocks = stocks.getStockData(gameTime, timeMultiplier, USE_REAL_HISTORICAL_PRICES);
+    const allStocks = stocks.getStockData(gameTime, timeMultiplier, false, BYPASS_CACHE_FOR_HISTORICAL);
     if (allStocks.length > 0) {
       const avgPrice = allStocks.reduce((sum, s) => sum + s.price, 0) / allStocks.length;
       history.push({
@@ -477,7 +481,7 @@ app.get('/api/market/index', (req, res) => {
   
   // If insufficient data, use hourly intervals for recent data
   addHourlySamplingIfNeeded(history, daysToFetch, (date) => {
-    const allStocks = stocks.getStockData(date, timeMultiplier, USE_REAL_HISTORICAL_PRICES);
+    const allStocks = stocks.getStockData(date, timeMultiplier, false, BYPASS_CACHE_FOR_HISTORICAL);
     if (allStocks.length > 0) {
       const avgPrice = allStocks.reduce((sum, s) => sum + s.price, 0) / allStocks.length;
       return {
@@ -1294,53 +1298,59 @@ function processNegativeBalance() {
     console.log(`Negative balance penalty: Credit score reduced by ${penalty} points to ${userAccount.creditScore}`);
   }
   
-  // If negative for more than 7 days, try to get an emergency loan
+  // If negative for more than EMERGENCY_ACTION_DAYS, try to get an emergency loan or sell stocks
   const daysNegative = userAccount.daysWithNegativeBalance || 0;
   userAccount.daysWithNegativeBalance = daysNegative + 1;
   
-  if (daysNegative >= 7 && daysNegative % 7 === 0) {
+  // Take action after configured days of negative balance
+  if (daysNegative >= EMERGENCY_ACTION_DAYS && daysNegative % EMERGENCY_ACTION_DAYS === 0) {
     // Try to get an emergency loan to cover the negative balance
-    const loanAmount = Math.ceil(negativeAmount * 1.2); // 20% buffer
+    const loanAmount = Math.ceil(negativeAmount * EMERGENCY_LOAN_BUFFER);
     
     // Find available lenders based on credit score
-    const availableLenders = loanCompanies.getLenders(userAccount.creditScore, gameTime);
+    const availableLenders = loanCompanies.getAvailableCompanies(gameTime, userAccount.creditScore);
     
     if (availableLenders.length > 0) {
-      // Take loan from the first available lender (likely higher interest)
+      // Take loan from the first available lender
       const lender = availableLenders[0];
-      const interestRate = loanCompanies.calculateInterestRate(lender, userAccount.creditScore);
-      const originationFee = loanAmount * 0.02; // 2% fee
+      const interestRate = loanCompanies.getAdjustedInterestRate(lender, userAccount.creditScore);
+      const originationFee = loanAmount * lender.originationFee;
       const netAmount = loanAmount - originationFee;
       
       // Create loan
       const loan = {
-        id: Date.now(),
-        lender: lender.name,
-        amount: loanAmount,
+        id: loanIdCounter++,
+        companyId: lender.id,
+        companyName: lender.name,
+        principal: loanAmount,
+        balance: loanAmount,
         interestRate: interestRate,
-        termDays: 90, // Short term emergency loan
-        originationFee: originationFee,
-        dateTaken: gameTime.toISOString(),
-        dueDate: new Date(gameTime.getTime() + (90 * 24 * 60 * 60 * 1000)).toISOString(),
-        amountPaid: 0,
+        startDate: new Date(gameTime),
+        dueDate: new Date(gameTime.getTime() + (lender.termDays * 24 * 60 * 60 * 1000)),
+        lastPaymentDate: null,
+        lastInterestAccrual: new Date(gameTime),
+        missedPayments: 0,
         status: 'active',
+        markedAsMissed: false,
+        termDays: lender.termDays,
         automatic: true // Mark as automatic
       };
       
       userAccount.loans.push(loan);
       userAccount.cash += netAmount;
       
-      console.log(`Automatic emergency loan taken: $${loanAmount} from ${lender.name} (net: $${netAmount})`);
+      console.log(`Automatic emergency loan taken: $${loanAmount.toFixed(2)} from ${lender.name} (net: $${netAmount.toFixed(2)})`);
       
       // Log loan history
       userAccount.loanHistory.push({
+        date: new Date(gameTime),
         type: 'taken',
         loanId: loan.id,
+        companyId: lender.id,
         amount: loanAmount,
         netAmount: netAmount,
         interestRate: interestRate,
         originationFee: originationFee,
-        date: gameTime.toISOString(),
         automatic: true
       });
     } else {
@@ -1351,45 +1361,105 @@ function processNegativeBalance() {
   }
 }
 
+// Constants for automated trading
+const EMERGENCY_LOAN_BUFFER = 1.5; // 50% buffer for emergency loans
+const EMERGENCY_ACTION_DAYS = 3; // Days of negative balance before taking action
+const LIQUIDATION_BUFFER_MULTIPLIER = 1.3; // 30% buffer to account for fees and taxes
+
 // Account manager sells stocks to recover negative balance
 function sellStocksToRecoverBalance(targetAmount) {
-  let amountToRaise = targetAmount * 1.1; // 10% buffer
+  let amountToRaise = targetAmount * LIQUIDATION_BUFFER_MULTIPLIER;
   let amountRaised = 0;
   
-  // Sort portfolio by position size (sell largest positions first)
+  // Sort portfolio by position size (sell largest positions first to minimize transactions)
   const sortedPositions = Object.entries(userAccount.portfolio)
     .filter(([symbol, shares]) => shares > 0)
-    .sort((a, b) => b[1] - a[1]);
+    .map(([symbol, shares]) => {
+      const stockPrice = stocks.getStockPrice(symbol, gameTime, timeMultiplier, isPaused);
+      return {
+        symbol,
+        shares,
+        price: stockPrice ? stockPrice.price : 0,
+        value: stockPrice ? stockPrice.price * shares : 0
+      };
+    })
+    .filter(p => p.price > 0)
+    .sort((a, b) => b.value - a.value);
   
-  for (const [symbol, shares] of sortedPositions) {
+  for (const position of sortedPositions) {
     if (amountRaised >= amountToRaise) break;
     
-    const stockPrice = stocks.getStockPrice(symbol, gameTime, timeMultiplier, isPaused);
-    if (!stockPrice) continue;
+    const saleValue = position.value;
+    const tradingFee = getTradingFee(saleValue, gameTime);
     
-    const saleValue = shares * stockPrice.price;
+    // Calculate approximate tax (use short-term rate as worst case)
+    let estimatedTax = 0;
+    if (userAccount.purchaseHistory[position.symbol] && userAccount.purchaseHistory[position.symbol].length > 0) {
+      // Calculate weighted average cost basis
+      const totalCost = userAccount.purchaseHistory[position.symbol].reduce((sum, p) => 
+        sum + (p.pricePerShare * p.shares), 0);
+      const totalShares = userAccount.purchaseHistory[position.symbol].reduce((sum, p) => 
+        sum + p.shares, 0);
+      
+      // Prevent division by zero
+      if (totalShares > 0) {
+        const avgCostBasis = totalCost / totalShares;
+        const estimatedGain = Math.max(0, (position.price - avgCostBasis) * position.shares);
+        estimatedTax = estimatedGain * SHORT_TERM_TAX_RATE;
+      }
+    }
+    
+    const netProceeds = saleValue - tradingFee - estimatedTax;
     
     // Sell this position
-    userAccount.portfolio[symbol] = 0;
-    userAccount.cash += saleValue;
-    amountRaised += saleValue;
+    userAccount.portfolio[position.symbol] = 0;
+    userAccount.cash += netProceeds;
+    amountRaised += netProceeds;
+    
+    // Clear purchase history for this symbol
+    if (userAccount.purchaseHistory[position.symbol]) {
+      delete userAccount.purchaseHistory[position.symbol];
+    }
     
     // Record transaction
     userAccount.transactions.push({
+      date: new Date(gameTime),
       type: 'sell',
-      symbol: symbol,
-      shares: shares,
-      price: stockPrice.price,
+      symbol: position.symbol,
+      shares: position.shares,
+      pricePerShare: position.price,
       total: saleValue,
-      date: gameTime.toISOString(),
+      tradingFee: tradingFee,
+      tax: estimatedTax,
+      netProceeds: netProceeds,
       automatic: true,
       reason: 'Account manager liquidation due to negative balance'
     });
     
-    console.log(`Account manager sold ${shares} shares of ${symbol} at $${stockPrice.price} (total: $${saleValue})`);
+    // Record fee
+    if (tradingFee > 0) {
+      userAccount.fees.push({
+        date: new Date(gameTime),
+        type: 'trading',
+        amount: tradingFee,
+        description: `Trading fee for automatic sale of ${position.shares} shares of ${position.symbol}`
+      });
+    }
+    
+    // Record tax
+    if (estimatedTax > 0) {
+      userAccount.taxes.push({
+        date: new Date(gameTime),
+        type: 'capital-gains',
+        amount: estimatedTax,
+        description: `Capital gains tax on automatic sale of ${position.shares} shares of ${position.symbol}`
+      });
+    }
+    
+    console.log(`Account manager sold ${position.shares} shares of ${position.symbol} at $${position.price.toFixed(2)} (net: $${netProceeds.toFixed(2)})`);
   }
   
-  console.log(`Account manager raised $${amountRaised} from stock sales`);
+  console.log(`Account manager raised $${amountRaised.toFixed(2)} from stock sales (target was $${amountToRaise.toFixed(2)})`);
 }
 
 setInterval(processNegativeBalance, 10000);
@@ -2441,11 +2511,13 @@ app.post('/api/trade', (req, res) => {
 // Loan API endpoints
 app.get('/api/loans/companies', (req, res) => {
   const availableCompanies = loanCompanies.getAvailableCompanies(gameTime, userAccount.creditScore);
+  const portfolioValue = calculatePortfolioValue();
   
-  // Add adjusted interest rates for each company
+  // Add adjusted interest rates and max loan amounts for each company
   const companiesWithRates = availableCompanies.map(company => ({
     ...company,
     adjustedInterestRate: loanCompanies.getAdjustedInterestRate(company, userAccount.creditScore),
+    effectiveMaxLoan: loanCompanies.getMaxLoanAmount(company, portfolioValue),
     availableFrom: company.availableFrom.toISOString()
   }));
   
@@ -2488,10 +2560,14 @@ app.post('/api/loans/take', (req, res) => {
     });
   }
   
-  // Validate loan amount
-  if (amount < company.minLoan || amount > company.maxLoan) {
+  // Calculate effective max loan (considering portfolio value for portfolio-based loans)
+  const portfolioValue = calculatePortfolioValue();
+  const effectiveMaxLoan = loanCompanies.getMaxLoanAmount(company, portfolioValue);
+  
+  // Validate loan amount against effective max
+  if (amount < company.minLoan || amount > effectiveMaxLoan) {
     return res.status(400).json({ 
-      error: `Loan amount must be between $${company.minLoan} and $${company.maxLoan}` 
+      error: `Loan amount must be between $${company.minLoan.toLocaleString()} and $${effectiveMaxLoan.toLocaleString()}` 
     });
   }
   
@@ -2767,7 +2843,7 @@ app.get('/api/indexfunds/:symbol/history', (req, res) => {
   const { days } = req.query;
   
   const daysToFetch = parseInt(days) || 30;
-  const history = indexFunds.getIndexFundHistory(symbol, gameTime, daysToFetch, timeMultiplier, USE_REAL_HISTORICAL_PRICES);
+  const history = indexFunds.getIndexFundHistory(symbol, gameTime, daysToFetch, timeMultiplier, BYPASS_CACHE_FOR_HISTORICAL);
   
   res.json(history);
 });

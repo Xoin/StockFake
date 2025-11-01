@@ -181,6 +181,29 @@ const loanCompanies = [
     maxLoan: 500000,
     termDays: 3650, // 10 years
     originationFee: 0.005
+  },
+  
+  // Late game / high net worth lending (scaled to portfolio value)
+  {
+    id: 'portfolio-credit',
+    name: 'Portfolio Credit Line',
+    trustLevel: 9,
+    description: 'Flexible credit line based on your portfolio value (up to 50% of holdings)',
+    minCreditScore: 750,
+    baseInterestRate: 0.04, // 4% annual
+    latePaymentPenalty: 0.02,
+    creditScoreImpact: {
+      onTime: 10,
+      late: -5,
+      default: -15
+    },
+    availableFrom: new Date('2005-01-01'),
+    minLoan: 50000,
+    maxLoan: 10000000, // Up to $10M but actual max is based on portfolio value
+    termDays: 1825, // 5 years
+    originationFee: 0.01,
+    portfolioBased: true, // Special flag to indicate portfolio-based lending
+    maxLoanToValueRatio: 0.5 // Can borrow up to 50% of portfolio value
   }
 ];
 
@@ -227,9 +250,24 @@ function getAdjustedInterestRate(company, creditScore) {
   return baseRate * (1 - discount);
 }
 
+// Calculate maximum loan amount for portfolio-based lending
+// portfolioValue: total value of user's stock/fund holdings
+function getMaxLoanAmount(company, portfolioValue) {
+  if (!company.portfolioBased) {
+    return company.maxLoan;
+  }
+  
+  // For portfolio-based lending, max loan is the lesser of:
+  // 1. The company's absolute maxLoan limit
+  // 2. The maxLoanToValueRatio percentage of portfolio value
+  const portfolioBasedMax = portfolioValue * company.maxLoanToValueRatio;
+  return Math.min(company.maxLoan, portfolioBasedMax);
+}
+
 module.exports = {
   loanCompanies,
   getAvailableCompanies,
   getCompany,
-  getAdjustedInterestRate
+  getAdjustedInterestRate,
+  getMaxLoanAmount
 };
