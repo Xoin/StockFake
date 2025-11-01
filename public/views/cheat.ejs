@@ -192,6 +192,20 @@
                 <button class="danger" onclick="resetGame()">Reset Game (Careful!)</button>
                 <button onclick="refreshAll()">Refresh Data</button>
             </div>
+            
+            <div class="control-group">
+                <label>Force Era Theme:</label>
+                <select id="forceEraSelect">
+                    <option value="">Auto (based on game year)</option>
+                    <option value="1970s">1970s - Terminal Green</option>
+                    <option value="1980s">1980s - Amber/Cyan CRT</option>
+                    <option value="1990s">1990s - Web 1.0</option>
+                    <option value="2000s">2000s - Web 2.0</option>
+                    <option value="2010s">2010s - Flat Design</option>
+                    <option value="2020s">2020s - Modern</option>
+                </select>
+                <button onclick="forceEraTheme()">Apply Theme</button>
+            </div>
         </div>
 
         <!-- Information Display -->
@@ -523,11 +537,40 @@
             updateDebugInfo();
             showMessage('Data refreshed');
         }
+        
+        function forceEraTheme() {
+            const selectedEra = document.getElementById('forceEraSelect').value;
+            const body = document.body;
+            
+            // Remove all era classes
+            body.className = body.className.replace(/era-\w+/g, '').trim();
+            
+            if (selectedEra) {
+                // Apply forced era
+                body.classList.add(\`era-\${selectedEra}\`);
+                localStorage.setItem('forcedEra', selectedEra);
+                showMessage(\`Theme forced to \${selectedEra}\`);
+            } else {
+                // Remove forced era, return to auto
+                localStorage.removeItem('forcedEra');
+                showMessage('Theme reset to auto mode');
+                // Re-apply based on game year
+                updateEraTheme();
+            }
+        }
 
         // Initialize
         updateTimeDisplay();
         updateAccountDisplay();
         updateDebugInfo();
+        
+        // Check if there's a forced era theme
+        const forcedEra = localStorage.getItem('forcedEra');
+        if (forcedEra) {
+            document.getElementById('forceEraSelect').value = forcedEra;
+            document.body.classList.add(\`era-\${forcedEra}\`);
+        }
+        
         setInterval(updateTimeDisplay, 2000);
         setInterval(updateAccountDisplay, 5000);
     </script>

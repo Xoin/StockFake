@@ -119,6 +119,15 @@ function getEraFromYear(year) {
 }
 
 function applyEraTheme(year) {
+    // Check if there's a forced era theme in debug mode
+    const forcedEra = localStorage.getItem('forcedEra');
+    if (forcedEra) {
+        const body = document.body;
+        body.className = body.className.replace(/era-\w+/g, '').trim();
+        body.classList.add(`era-${forcedEra}`);
+        return forcedEra;
+    }
+    
     const era = getEraFromYear(year);
     const body = document.body;
     

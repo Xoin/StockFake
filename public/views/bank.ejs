@@ -114,17 +114,24 @@
         
         <div class="portfolio">
             <h2>📈 Combined Portfolio (Stocks & Index Funds)</h2>
-            <div style="margin-bottom: 15px; display: flex; gap: 10px;">
+            <div style="margin-bottom: 15px; display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
                 <button class="quick-sell-btn" onclick="sellAllPositions()" style="padding: 8px 16px; font-size: 1em;">
                     🔴 Sell All Positions
                 </button>
                 <button class="quick-sell-btn" onclick="sellToZeroGains()" style="padding: 8px 16px; font-size: 1em;">
                     ⚖️ Sell to Zero Gains
                 </button>
+                <button class="quick-sell-btn" onclick="sellSelectedPositions()" style="padding: 8px 16px; font-size: 1em;">
+                    📋 Sell Selected
+                </button>
+                <label style="color: #00aa00; margin-left: 15px;">
+                    <input type="checkbox" id="selectAllPositions" onchange="toggleAllPositions()"> Select All
+                </label>
             </div>
             <table id="combinedPortfolioTable">
                 <thead>
                     <tr>
+                        <th style="width: 40px;">Select</th>
                         <th>Symbol</th>
                         <th>Type</th>
                         <th>Shares</th>
@@ -138,7 +145,7 @@
                     </tr>
                 </thead>
                 <tbody id="combinedPortfolioList">
-                    <tr><td colspan="10">Loading...</td></tr>
+                    <tr><td colspan="11">Loading...</td></tr>
                 </tbody>
             </table>
             <div class="total-value">
@@ -486,7 +493,7 @@
             
             // Render combined portfolio
             if (positions.length === 0) {
-                combinedList.innerHTML = '<tr><td colspan="10">No positions</td></tr>';
+                combinedList.innerHTML = '<tr><td colspan="11">No positions</td></tr>';
             } else {
                 combinedList.innerHTML = positions.map(pos => {
                     const gainLossClass = pos.gainLoss >= 0 ? 'positive' : 'negative';
@@ -498,6 +505,7 @@
                     
                     return \`
                         <tr>
+                            <td><input type="checkbox" class="position-checkbox" data-symbol="\${escapeHtml(pos.symbol)}" data-shares="\${pos.shares}" data-isstock="\${isStock}"></td>
                             <td><strong>\${pos.symbol}</strong></td>
                             <td>\${pos.type}</td>
                             <td>\${pos.shares.toFixed(2)}</td>
@@ -518,7 +526,7 @@
                 // Initialize or refresh sorter
                 if (!portfolioSorter) {
                     portfolioSorter = makeSortable('combinedPortfolioTable', {
-                        defaultSort: { column: 5, direction: 'desc' } // Sort by Total Value descending
+                        defaultSort: { column: 6, direction: 'desc' } // Sort by Total Value descending (adjusted for checkbox column)
                     });
                 } else {
                     portfolioSorter.refresh();
@@ -823,6 +831,68 @@
             } else {
                 alert('No losing positions to sell.');
             }
+            
+            updateAccount();
+        }
+        
+        // Toggle selection of all positions
+        function toggleAllPositions() {
+            const selectAll = document.getElementById('selectAllPositions');
+            const checkboxes = document.querySelectorAll('.position-checkbox');
+            checkboxes.forEach(cb => cb.checked = selectAll.checked);
+        }
+        
+        // Sell selected positions
+        async function sellSelectedPositions() {
+            const selectedCheckboxes = Array.from(document.querySelectorAll('.position-checkbox:checked'));
+            
+            if (selectedCheckboxes.length === 0) {
+                alert('Please select at least one position to sell.');
+                return;
+            }
+            
+            if (!confirm(\`Are you sure you want to sell \${selectedCheckboxes.length} selected position(s)?\`)) {
+                return;
+            }
+            
+            let successCount = 0;
+            let failCount = 0;
+            
+            for (const checkbox of selectedCheckboxes) {
+                const symbol = checkbox.dataset.symbol;
+                const shares = parseFloat(checkbox.dataset.shares);
+                const isStock = checkbox.dataset.isstock === 'true';
+                
+                try {
+                    const endpoint = isStock ? '/api/trade' : '/api/indexfunds/trade';
+                    const response = await fetch(endpoint, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            symbol: symbol,
+                            shares: shares,
+                            action: 'sell'
+                        })
+                    });
+                    
+                    if (response.ok) {
+                        successCount++;
+                    } else {
+                        failCount++;
+                    }
+                } catch (error) {
+                    failCount++;
+                }
+            }
+            
+            if (successCount > 0) {
+                alert(\`✓ Sold \${successCount} position(s).\${failCount > 0 ? ' Failed to sell ' + failCount + ' position(s).' : ''}\`);
+            } else {
+                alert('✗ Failed to sell positions.');
+            }
+            
+            // Uncheck the select all checkbox
+            document.getElementById('selectAllPositions').checked = false;
             
             updateAccount();
         }
