@@ -427,9 +427,38 @@ function generateSyntheticCompanies(existingCompanies, minPerSector = 10) {
 }
 
 
+// Determine stock split threshold based on year
+function getSplitThreshold(year) {
+  if (year < 1991) return 150;      // 1970-1990: Split at $150
+  if (year < 2011) return 200;      // 1991-2010: Split at $200
+  if (year <= 2024) return 300;     // 2011-2024: Split at $300
+  return 450;                       // 2025+: Split at $450
+}
+
+// Determine split ratio based on how far over threshold the price is
+function determineSplitRatio(price, threshold, randomValue) {
+  const overageRatio = price / threshold;
+  
+  // More aggressive splits for higher prices
+  if (overageRatio > 4) {
+    // Very high price, consider larger splits
+    const splitOptions = [5, 7, 10];
+    return splitOptions[Math.floor(randomValue * splitOptions.length)];
+  } else if (overageRatio > 2.5) {
+    // High price, larger splits
+    const splitOptions = [3, 4, 5];
+    return splitOptions[Math.floor(randomValue * splitOptions.length)];
+  } else {
+    // Moderately over threshold, standard splits
+    const splitOptions = [2, 3];
+    return splitOptions[Math.floor(randomValue * splitOptions.length)];
+  }
+}
+
 // Enhanced price history with sector correlations and diverse growth profiles
 function generatePriceHistory(company, seedOffset = 0) {
   const history = [];
+  const splits = [];  // Track when splits occur
   const startYear = company.relevantFrom;
   const currentYear = new Date().getFullYear();
   
@@ -549,6 +578,23 @@ function generatePriceHistory(company, seedOffset = 0) {
       // Ensure price doesn't go below $1
       currentPrice = Math.max(1, currentPrice);
       
+      // Check if stock split is needed
+      const splitThreshold = getSplitThreshold(year);
+      if (currentPrice > splitThreshold) {
+        const splitRatio = determineSplitRatio(currentPrice, splitThreshold, seededRandom());
+        
+        // Record the split
+        splits.push({
+          date: date.toISOString().split('T')[0],
+          ratio: splitRatio,
+          priceBeforeSplit: currentPrice,
+          priceAfterSplit: currentPrice / splitRatio
+        });
+        
+        // Apply split to current price
+        currentPrice = currentPrice / splitRatio;
+      }
+      
       history.push({
         date: date.toISOString().split('T')[0],
         price: parseFloat(currentPrice.toFixed(2))
@@ -556,22 +602,27 @@ function generatePriceHistory(company, seedOffset = 0) {
     }
   }
   
-  return history;
+  return { history, splits };
 }
 
 
 // Generate all stock data
 function generateAllStockData() {
   const stockData = {};
+  const allSplits = {};
   
   // First, add all real companies
   companies.forEach((company, index) => {
     console.log(`Generating data for ${company.symbol} (${company.name})...`);
+    const { history, splits } = generatePriceHistory(company, index);
     stockData[company.symbol] = {
       name: company.name,
       sector: company.sector,
-      history: generatePriceHistory(company, index)
+      history: history
     };
+    if (splits.length > 0) {
+      allSplits[company.symbol] = splits;
+    }
   });
   
   // Generate synthetic companies to ensure min 10 per sector
@@ -579,25 +630,30 @@ function generateAllStockData() {
   
   syntheticCompanies.forEach((company, index) => {
     console.log(`Generating data for synthetic ${company.symbol} (${company.name})...`);
+    const { history, splits } = generatePriceHistory(company, index + 1000);
     stockData[company.symbol] = {
       name: company.name,
       sector: company.sector,
-      history: generatePriceHistory(company, index + 1000)
+      history: history
     };
+    if (splits.length > 0) {
+      allSplits[company.symbol] = splits;
+    }
   });
   
-  return { stockData, totalCompanies: companies.length + syntheticCompanies.length };
+  return { stockData, allSplits, totalCompanies: companies.length + syntheticCompanies.length };
 }
 
 // Generate and save the data
 console.log('Generating historical stock data with minimum 10 stocks per sector...');
-const { stockData, totalCompanies } = generateAllStockData();
+const { stockData, allSplits, totalCompanies } = generateAllStockData();
 
 const output = {
   generated: new Date().toISOString(),
   companies: totalCompanies,
   description: 'Historical stock data from 1970 to current day with minimum 10 stocks per sector',
-  data: stockData
+  data: stockData,
+  splits: allSplits
 };
 
 fs.writeFileSync(
@@ -619,5 +675,9 @@ Object.entries(sectorCounts)
   .forEach(([sector, count]) => {
     console.log(`  ${sector}: ${count}`);
   });
+
+// Display split statistics
+const totalSplits = Object.values(allSplits).reduce((sum, splits) => sum + splits.length, 0);
+console.log(`\n✓ Applied ${totalSplits} stock splits across ${Object.keys(allSplits).length} companies`);
 
 console.log('\n✓ Saved to data/historical-stock-data.json');
