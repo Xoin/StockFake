@@ -451,11 +451,11 @@ let stocks = [];
                     <div style="margin-bottom: 8px; color: #00aa00; font-weight: bold;">Current Holdings:</div>
                     \${concentrationEntries.map(([symbol, data]) => {
                         const percent = data.currentPercent || 0;
-                        let statusClass = '';
+                        let statusClass = 'ok';
                         let statusText = 'OK';
                         
                         if (data.limit) {
-                            statusClass = 'limit';
+                            statusClass = 'danger';
                             statusText = 'AT LIMIT';
                         } else if (data.warning) {
                             statusClass = 'warning';
