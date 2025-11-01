@@ -30,7 +30,7 @@ app.use(express.json());
 // Whitelist of known pages to prevent open redirects
 const validPages = new Set([
   '/index', '/bank', '/trading', '/news', '/email', '/graphs', 
-  '/loans', '/taxes', '/cheat', '/indexfunds', '/indexfund', '/company', '/pendingorders'
+  '/loans', '/taxes', '/cheat', '/indexfunds', '/indexfund', '/company', '/pendingorders', '/status'
 ]);
 
 app.use((req, res, next) => {
@@ -319,6 +319,10 @@ app.get('/cheat', (req, res) => {
 
 app.get('/pendingorders', (req, res) => {
   res.render('pendingorders');
+});
+
+app.get('/status', (req, res) => {
+  res.render('status');
 });
 
 app.get('/', (req, res) => {
@@ -1294,14 +1298,14 @@ function processNegativeBalance() {
     console.log(`Negative balance penalty: Credit score reduced by ${penalty} points to ${userAccount.creditScore}`);
   }
   
-  // If negative for more than 3 days, try to get an emergency loan or sell stocks
+  // If negative for more than EMERGENCY_ACTION_DAYS, try to get an emergency loan or sell stocks
   const daysNegative = userAccount.daysWithNegativeBalance || 0;
   userAccount.daysWithNegativeBalance = daysNegative + 1;
   
-  // Take action after 3 days of negative balance (reduced from 7)
-  if (daysNegative >= 3 && daysNegative % 3 === 0) {
+  // Take action after configured days of negative balance
+  if (daysNegative >= EMERGENCY_ACTION_DAYS && daysNegative % EMERGENCY_ACTION_DAYS === 0) {
     // Try to get an emergency loan to cover the negative balance
-    const loanAmount = Math.ceil(negativeAmount * 1.5); // 50% buffer for safety
+    const loanAmount = Math.ceil(negativeAmount * EMERGENCY_LOAN_BUFFER);
     
     // Find available lenders based on credit score
     const availableLenders = loanCompanies.getAvailableCompanies(gameTime, userAccount.creditScore);
@@ -1357,9 +1361,14 @@ function processNegativeBalance() {
   }
 }
 
+// Constants for automated trading
+const EMERGENCY_LOAN_BUFFER = 1.5; // 50% buffer for emergency loans
+const EMERGENCY_ACTION_DAYS = 3; // Days of negative balance before taking action
+const LIQUIDATION_BUFFER_MULTIPLIER = 1.3; // 30% buffer to account for fees and taxes
+
 // Account manager sells stocks to recover negative balance
 function sellStocksToRecoverBalance(targetAmount) {
-  let amountToRaise = targetAmount * 1.3; // 30% buffer to account for fees and taxes
+  let amountToRaise = targetAmount * LIQUIDATION_BUFFER_MULTIPLIER;
   let amountRaised = 0;
   
   // Sort portfolio by position size (sell largest positions first to minimize transactions)
@@ -1385,11 +1394,19 @@ function sellStocksToRecoverBalance(targetAmount) {
     
     // Calculate approximate tax (use short-term rate as worst case)
     let estimatedTax = 0;
-    if (userAccount.purchaseHistory[position.symbol]) {
-      const avgCostBasis = userAccount.purchaseHistory[position.symbol].reduce((sum, p) => 
-        sum + (p.pricePerShare * p.shares), 0) / position.shares;
-      const estimatedGain = Math.max(0, (position.price - avgCostBasis) * position.shares);
-      estimatedTax = estimatedGain * SHORT_TERM_TAX_RATE;
+    if (userAccount.purchaseHistory[position.symbol] && userAccount.purchaseHistory[position.symbol].length > 0) {
+      // Calculate weighted average cost basis
+      const totalCost = userAccount.purchaseHistory[position.symbol].reduce((sum, p) => 
+        sum + (p.pricePerShare * p.shares), 0);
+      const totalShares = userAccount.purchaseHistory[position.symbol].reduce((sum, p) => 
+        sum + p.shares, 0);
+      
+      // Prevent division by zero
+      if (totalShares > 0) {
+        const avgCostBasis = totalCost / totalShares;
+        const estimatedGain = Math.max(0, (position.price - avgCostBasis) * position.shares);
+        estimatedTax = estimatedGain * SHORT_TERM_TAX_RATE;
+      }
     }
     
     const netProceeds = saleValue - tradingFee - estimatedTax;
