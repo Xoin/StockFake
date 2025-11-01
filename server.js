@@ -315,6 +315,21 @@ app.get('/api/stocks/:symbol', (req, res) => {
   res.json(result);
 });
 
+// Helper function to add hourly sampling when insufficient data
+function addHourlySamplingIfNeeded(history, daysToFetch, dataFetcher) {
+  if (history.length < 3 && daysToFetch <= 7) {
+    history.length = 0; // Clear and rebuild with hourly data
+    const hoursToFetch = Math.min(daysToFetch * 24, 168); // Max 7 days of hourly data
+    for (let i = hoursToFetch; i >= 0; i -= 1) {
+      const date = new Date(gameTime.getTime() - (i * 60 * 60 * 1000));
+      const data = dataFetcher(date);
+      if (data) {
+        history.push(data);
+      }
+    }
+  }
+}
+
 // Stock history API for charts
 app.get('/api/stocks/:symbol/history', (req, res) => {
   const { symbol } = req.params;
@@ -358,20 +373,10 @@ app.get('/api/stocks/:symbol/history', (req, res) => {
   }
   
   // If insufficient data, use hourly intervals for recent data
-  if (history.length < 3 && daysToFetch <= 7) {
-    history.length = 0; // Clear and rebuild with hourly data
-    const hoursToFetch = Math.min(daysToFetch * 24, 168); // Max 7 days of hourly data
-    for (let i = hoursToFetch; i >= 0; i -= 1) {
-      const date = new Date(gameTime.getTime() - (i * 60 * 60 * 1000));
-      const price = stocks.getStockPrice(symbol, date, timeMultiplier);
-      if (price) {
-        history.push({
-          date: date.toISOString(),
-          price: price.price
-        });
-      }
-    }
-  }
+  addHourlySamplingIfNeeded(history, daysToFetch, (date) => {
+    const price = stocks.getStockPrice(symbol, date, timeMultiplier);
+    return price ? { date: date.toISOString(), price: price.price } : null;
+  });
   
   res.json(history);
 });
@@ -421,23 +426,18 @@ app.get('/api/market/index', (req, res) => {
   }
   
   // If insufficient data, use hourly intervals for recent data
-  if (history.length < 3 && daysToFetch <= 7) {
-    history.length = 0; // Clear and rebuild with hourly data
-    const hoursToFetch = Math.min(daysToFetch * 24, 168); // Max 7 days of hourly data
-    for (let i = hoursToFetch; i >= 0; i -= 1) {
-      const date = new Date(gameTime.getTime() - (i * 60 * 60 * 1000));
-      const allStocks = stocks.getStockData(date, timeMultiplier);
-      
-      if (allStocks.length > 0) {
-        const avgPrice = allStocks.reduce((sum, s) => sum + s.price, 0) / allStocks.length;
-        history.push({
-          date: date.toISOString(),
-          value: avgPrice,
-          count: allStocks.length
-        });
-      }
+  addHourlySamplingIfNeeded(history, daysToFetch, (date) => {
+    const allStocks = stocks.getStockData(date, timeMultiplier);
+    if (allStocks.length > 0) {
+      const avgPrice = allStocks.reduce((sum, s) => sum + s.price, 0) / allStocks.length;
+      return {
+        date: date.toISOString(),
+        value: avgPrice,
+        count: allStocks.length
+      };
     }
-  }
+    return null;
+  });
   
   res.json(history);
 });
@@ -1303,7 +1303,6 @@ function processNegativeBalance() {
 
 // Account manager sells stocks to recover negative balance
 function sellStocksToRecoverBalance(targetAmount) {
-  const stocks = require('./data/stocks');
   let amountToRaise = targetAmount * 1.1; // 10% buffer
   let amountRaised = 0;
   
