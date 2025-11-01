@@ -378,7 +378,7 @@ function addHourlySamplingIfNeeded(history, daysToFetch, dataFetcher) {
 }
 
 // Constants for historical data fetching
-const USE_REAL_HISTORICAL_PRICES = false; // Always use real prices for historical data, not cached prices
+const BYPASS_CACHE_FOR_HISTORICAL = true; // Always bypass cache for historical chart data
 
 // Stock history API for charts
 app.get('/api/stocks/:symbol/history', (req, res) => {
@@ -402,7 +402,7 @@ app.get('/api/stocks/:symbol/history', (req, res) => {
   // Get historical prices for the specified number of days
   for (let i = daysToFetch; i >= 0; i -= sampleInterval) {
     const date = new Date(gameTime.getTime() - (i * 24 * 60 * 60 * 1000));
-    const price = stocks.getStockPrice(symbol, date, timeMultiplier, USE_REAL_HISTORICAL_PRICES);
+    const price = stocks.getStockPrice(symbol, date, timeMultiplier, false, BYPASS_CACHE_FOR_HISTORICAL);
     if (price) {
       history.push({
         date: date.toISOString(),
@@ -413,7 +413,7 @@ app.get('/api/stocks/:symbol/history', (req, res) => {
   
   // Always include the most recent data point
   if (history.length === 0 || history[history.length - 1].date !== gameTime.toISOString()) {
-    const price = stocks.getStockPrice(symbol, gameTime, timeMultiplier, USE_REAL_HISTORICAL_PRICES);
+    const price = stocks.getStockPrice(symbol, gameTime, timeMultiplier, false, BYPASS_CACHE_FOR_HISTORICAL);
     if (price) {
       history.push({
         date: gameTime.toISOString(),
@@ -424,7 +424,7 @@ app.get('/api/stocks/:symbol/history', (req, res) => {
   
   // If insufficient data, use hourly intervals for recent data
   addHourlySamplingIfNeeded(history, daysToFetch, (date) => {
-    const price = stocks.getStockPrice(symbol, date, timeMultiplier, USE_REAL_HISTORICAL_PRICES);
+    const price = stocks.getStockPrice(symbol, date, timeMultiplier, false, BYPASS_CACHE_FOR_HISTORICAL);
     return price ? { date: date.toISOString(), price: price.price } : null;
   });
   
@@ -450,7 +450,7 @@ app.get('/api/market/index', (req, res) => {
   // Calculate simple market index based on average of all stocks
   for (let i = daysToFetch; i >= 0; i -= sampleInterval) {
     const date = new Date(gameTime.getTime() - (i * 24 * 60 * 60 * 1000));
-    const allStocks = stocks.getStockData(date, timeMultiplier, USE_REAL_HISTORICAL_PRICES);
+    const allStocks = stocks.getStockData(date, timeMultiplier, false, BYPASS_CACHE_FOR_HISTORICAL);
     
     if (allStocks.length > 0) {
       const avgPrice = allStocks.reduce((sum, s) => sum + s.price, 0) / allStocks.length;
@@ -464,7 +464,7 @@ app.get('/api/market/index', (req, res) => {
   
   // Always include the most recent data point
   if (history.length === 0 || history[history.length - 1].date !== gameTime.toISOString()) {
-    const allStocks = stocks.getStockData(gameTime, timeMultiplier, USE_REAL_HISTORICAL_PRICES);
+    const allStocks = stocks.getStockData(gameTime, timeMultiplier, false, BYPASS_CACHE_FOR_HISTORICAL);
     if (allStocks.length > 0) {
       const avgPrice = allStocks.reduce((sum, s) => sum + s.price, 0) / allStocks.length;
       history.push({
@@ -477,7 +477,7 @@ app.get('/api/market/index', (req, res) => {
   
   // If insufficient data, use hourly intervals for recent data
   addHourlySamplingIfNeeded(history, daysToFetch, (date) => {
-    const allStocks = stocks.getStockData(date, timeMultiplier, USE_REAL_HISTORICAL_PRICES);
+    const allStocks = stocks.getStockData(date, timeMultiplier, false, BYPASS_CACHE_FOR_HISTORICAL);
     if (allStocks.length > 0) {
       const avgPrice = allStocks.reduce((sum, s) => sum + s.price, 0) / allStocks.length;
       return {
@@ -2767,7 +2767,7 @@ app.get('/api/indexfunds/:symbol/history', (req, res) => {
   const { days } = req.query;
   
   const daysToFetch = parseInt(days) || 30;
-  const history = indexFunds.getIndexFundHistory(symbol, gameTime, daysToFetch, timeMultiplier, USE_REAL_HISTORICAL_PRICES);
+  const history = indexFunds.getIndexFundHistory(symbol, gameTime, daysToFetch, timeMultiplier, BYPASS_CACHE_FOR_HISTORICAL);
   
   res.json(history);
 });

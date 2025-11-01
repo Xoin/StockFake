@@ -133,13 +133,13 @@ const indexFunds = [
 ];
 
 // Calculate index fund price based on constituent stocks
-function calculateIndexPrice(fund, currentTime, timeMultiplier, isPaused) {
+function calculateIndexPrice(fund, currentTime, timeMultiplier, isPaused, bypassCache = false) {
   const stocks = require('./stocks');
   let totalValue = 0;
   let validStocks = 0;
   
   for (const symbol of fund.constituents) {
-    const stockData = stocks.getStockPrice(symbol, currentTime, timeMultiplier, isPaused);
+    const stockData = stocks.getStockPrice(symbol, currentTime, timeMultiplier, isPaused, bypassCache);
     if (stockData && stockData.price > 0) {
       totalValue += stockData.price;
       validStocks++;
@@ -156,13 +156,13 @@ function calculateIndexPrice(fund, currentTime, timeMultiplier, isPaused) {
 }
 
 // Calculate percentage change for an index fund from previous day
-function calculatePercentageChange(fund, currentTime, timeMultiplier, isPaused) {
-  const price = calculateIndexPrice(fund, currentTime, timeMultiplier, isPaused);
+function calculatePercentageChange(fund, currentTime, timeMultiplier, isPaused, bypassCache = false) {
+  const price = calculateIndexPrice(fund, currentTime, timeMultiplier, isPaused, bypassCache);
   if (!price) return 0;
   
   // Calculate previous day's price for change percentage
   const previousDay = new Date(currentTime.getTime() - (24 * 60 * 60 * 1000));
-  const previousPrice = calculateIndexPrice(fund, previousDay, timeMultiplier, isPaused);
+  const previousPrice = calculateIndexPrice(fund, previousDay, timeMultiplier, isPaused, bypassCache);
   
   // Calculate percentage change
   if (previousPrice && previousPrice > 0) {
@@ -236,7 +236,7 @@ function getIndexFundDetails(symbol, currentTime, timeMultiplier, isPaused) {
 }
 
 // Get historical prices for an index fund
-function getIndexFundHistory(symbol, currentTime, days = 30, timeMultiplier, isPaused) {
+function getIndexFundHistory(symbol, currentTime, days = 30, timeMultiplier, bypassCache = false) {
   const fund = indexFunds.find(f => f.symbol === symbol);
   if (!fund) return [];
   
@@ -248,8 +248,8 @@ function getIndexFundHistory(symbol, currentTime, days = 30, timeMultiplier, isP
     // Skip if before inception
     if (date < fund.inceptionDate) continue;
     
-    // Always use false for historical data to get real prices
-    const price = calculateIndexPrice(fund, date, timeMultiplier, false);
+    // Use bypassCache parameter for historical data
+    const price = calculateIndexPrice(fund, date, timeMultiplier, false, bypassCache);
     if (price) {
       history.push({
         date: date.toISOString(),

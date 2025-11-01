@@ -117,7 +117,7 @@ function getVolatilityScale(timeMultiplier) {
 }
 
 // Get interpolated price with minor fluctuations
-function getStockPrice(symbol, currentTime, timeMultiplier, isPaused) {
+function getStockPrice(symbol, currentTime, timeMultiplier, isPaused, bypassCache = false) {
   const stockData = historicalData[symbol];
   if (!stockData) return null;
   
@@ -135,8 +135,8 @@ function getStockPrice(symbol, currentTime, timeMultiplier, isPaused) {
   }
   lastMarketState = currentMarketState;
   
-  // If game is paused OR market is closed, return cached price if available
-  if ((isPaused || !marketOpen) && priceCache[symbol]) {
+  // If game is paused OR market is closed, return cached price if available (unless bypassCache is true)
+  if (!bypassCache && (isPaused || !marketOpen) && priceCache[symbol]) {
     return priceCache[symbol];
   }
   
@@ -167,8 +167,8 @@ function getStockPrice(symbol, currentTime, timeMultiplier, isPaused) {
       sector: getStockSector(symbol)
     };
     
-    // Cache if market is closed
-    if (!marketOpen) {
+    // Cache if market is closed (and not bypassing cache)
+    if (!bypassCache && !marketOpen) {
       priceCache[symbol] = result;
     }
     
@@ -202,8 +202,8 @@ function getStockPrice(symbol, currentTime, timeMultiplier, isPaused) {
     sector: getStockSector(symbol)
   };
   
-  // Cache if market is closed or game is paused
-  if (!marketOpen || isPaused) {
+  // Cache if market is closed or game is paused (and not bypassing cache)
+  if (!bypassCache && (!marketOpen || isPaused)) {
     priceCache[symbol] = result;
   }
   
@@ -218,16 +218,16 @@ function getStockSector(symbol) {
   return stockSectors[symbol] || 'Unknown';
 }
 
-function getStockData(currentTime, timeMultiplier, isPaused) {
+function getStockData(currentTime, timeMultiplier, isPaused, bypassCache = false) {
   const symbols = Object.keys(historicalData);
   return symbols
-    .map(symbol => getStockPrice(symbol, currentTime, timeMultiplier, isPaused))
+    .map(symbol => getStockPrice(symbol, currentTime, timeMultiplier, isPaused, bypassCache))
     .filter(stock => stock !== null); // Filter out stocks not available yet
 }
 
 // Get stocks available at a given time (for filtering)
-function getAvailableStocks(currentTime, timeMultiplier, isPaused) {
-  return getStockData(currentTime, timeMultiplier, isPaused);
+function getAvailableStocks(currentTime, timeMultiplier, isPaused, bypassCache = false) {
+  return getStockData(currentTime, timeMultiplier, isPaused, bypassCache);
 }
 
 module.exports = {
