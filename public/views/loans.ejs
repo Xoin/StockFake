@@ -1,42 +1,21 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>StockFake - Loans</title>
-    <link rel="stylesheet" href="era-themes.css">
-    <style>
-        * {
-            margin: 0;
+<%- include('partials/header', { 
+    title: 'Loans',
+    pageTitle: '💰 LOANS',
+    pageStyles: `margin: 0;
             padding: 0;
             box-sizing: border-box;
         }
-        body {
-            font-family: 'Courier New', monospace;
-            background-color: #1a1a1a;
-            color: #00ff00;
-            padding: 20px;
-        }
-        .container {
             max-width: 1400px;
             margin: 0 auto;
-        }
-        h1 {
-            text-align: center;
-            margin-bottom: 20px;
-            color: #00ff00;
-            text-shadow: 0 0 10px #00ff00;
         }
         .nav {
             text-align: center;
             margin-bottom: 20px;
         }
-        .nav a {
             color: #00ff00;
             margin: 0 10px;
             text-decoration: none;
         }
-        .nav a:hover {
             text-decoration: underline;
         }
         .credit-score {
@@ -55,7 +34,6 @@
         .score-fair { color: #ffff00; }
         .score-poor { color: #ff8800; }
         .score-bad { color: #ff0000; }
-        
         .active-loans {
             background-color: #000;
             border: 2px solid #00ff00;
@@ -95,7 +73,6 @@
             border: 1px solid #00ff00;
             color: #00ff00;
             padding: 8px;
-            font-family: 'Courier New', monospace;
             flex: 1;
         }
         button {
@@ -104,7 +81,6 @@
             border: 2px solid #00ff00;
             padding: 8px 20px;
             cursor: pointer;
-            font-family: 'Courier New', monospace;
         }
         button:hover {
             background-color: #00ff00;
@@ -141,7 +117,6 @@
         .trust-high { background-color: #004400; color: #00ff00; }
         .trust-medium { background-color: #444400; color: #ffff00; }
         .trust-low { background-color: #440000; color: #ff8800; }
-        
         .company-details {
             font-size: 0.9em;
             color: #00aa00;
@@ -169,20 +144,10 @@
             background-color: #440000;
             border: 1px solid #ff0000;
             color: #ff0000;
-        }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <h1>💰 LOANS</h1>
-        <div class="nav">
-            <a href="/">← Back to Portal</a> |
-            <a href="/bank">Bank</a> |
-            <a href="/trading">Trading</a> |
-            <a href="/news">News</a>
-        </div>
-        
-        <div class="credit-score">
+        }`
+}) %>
+
+<div class="credit-score">
             <h2>Your Credit Score</h2>
             <div id="creditScore" class="score-display">---</div>
             <div id="creditRating">Loading...</div>
@@ -202,10 +167,11 @@
                 Loading...
             </div>
         </div>
-    </div>
 
+<%- include('partials/footer', {
+    pageScripts: `
     <script>
-        let accountData = null;
+let accountData = null;
 
         function getCreditRating(score) {
             if (score >= 800) return { text: 'Excellent', class: 'score-excellent' };
@@ -230,7 +196,7 @@
             const rating = getCreditRating(score);
             
             document.getElementById('creditScore').textContent = score;
-            document.getElementById('creditScore').className = `score-display ${rating.class}`;
+            document.getElementById('creditScore').className = \`score-display \${rating.class}\`;
             document.getElementById('creditRating').textContent = rating.text;
         }
 
@@ -250,26 +216,26 @@
                 const startDate = new Date(loan.startDate);
                 const daysRemaining = Math.ceil((dueDate - new Date()) / (1000 * 60 * 60 * 24));
                 
-                return `
+                return \`
                     <div class="loan-card">
                         <div class="loan-header">
-                            <strong>Loan #${loan.id} - ${loan.companyName}</strong>
-                            <span>Balance: $${loan.balance.toFixed(2)}</span>
+                            <strong>Loan #\${loan.id} - \${loan.companyName}</strong>
+                            <span>Balance: $\${loan.balance.toFixed(2)}</span>
                         </div>
                         <div class="loan-details">
-                            <div class="loan-detail">Principal: $${loan.principal.toFixed(2)}</div>
-                            <div class="loan-detail">Interest Rate: ${(loan.interestRate * 100).toFixed(2)}%</div>
-                            <div class="loan-detail">Started: ${startDate.toLocaleDateString()}</div>
-                            <div class="loan-detail">Due: ${dueDate.toLocaleDateString()} (${daysRemaining} days)</div>
-                            <div class="loan-detail">Missed Payments: ${loan.missedPayments}</div>
+                            <div class="loan-detail">Principal: $\${loan.principal.toFixed(2)}</div>
+                            <div class="loan-detail">Interest Rate: \${(loan.interestRate * 100).toFixed(2)}%</div>
+                            <div class="loan-detail">Started: \${startDate.toLocaleDateString()}</div>
+                            <div class="loan-detail">Due: \${dueDate.toLocaleDateString()} (\${daysRemaining} days)</div>
+                            <div class="loan-detail">Missed Payments: \${loan.missedPayments}</div>
                         </div>
                         <div class="payment-form">
-                            <input type="number" id="payment-${loan.id}" placeholder="Payment amount" min="1" step="0.01">
-                            <button onclick="makePayment(${loan.id})">Make Payment</button>
-                            <button onclick="payOffLoan(${loan.id}, ${loan.balance})">Pay Off</button>
+                            <input type="number" id="payment-\${loan.id}" placeholder="Payment amount" min="1" step="0.01">
+                            <button onclick="makePayment(\${loan.id})">Make Payment</button>
+                            <button onclick="payOffLoan(\${loan.id}, \${loan.balance})">Pay Off</button>
                         </div>
                     </div>
-                `;
+                \`;
             }).join('');
         }
 
@@ -283,32 +249,32 @@
                 const trustClass = getTrustClass(company.trustLevel);
                 const rate = (company.adjustedInterestRate * 100).toFixed(2);
                 
-                return `
+                return \`
                     <div class="company-card">
                         <div class="company-header">
-                            <strong>${company.name}</strong>
-                            <span class="trust-level ${trustClass}">Trust: ${company.trustLevel}/10</span>
+                            <strong>\${company.name}</strong>
+                            <span class="trust-level \${trustClass}">Trust: \${company.trustLevel}/10</span>
                         </div>
                         <div class="company-details">
-                            <div>${company.description}</div>
-                            <div><strong>Interest Rate:</strong> ${rate}% APR</div>
-                            <div><strong>Loan Range:</strong> $${company.minLoan.toLocaleString()} - $${company.maxLoan.toLocaleString()}</div>
-                            <div><strong>Term:</strong> ${company.termDays} days (${Math.floor(company.termDays / 365)} years)</div>
-                            <div><strong>Origination Fee:</strong> ${(company.originationFee * 100).toFixed(1)}%</div>
-                            <div><strong>Late Penalty:</strong> ${(company.latePaymentPenalty * 100).toFixed(0)}%</div>
-                            <div><strong>Min Credit Score:</strong> ${company.minCreditScore}</div>
+                            <div>\${company.description}</div>
+                            <div><strong>Interest Rate:</strong> \${rate}% APR</div>
+                            <div><strong>Loan Range:</strong> $\${company.minLoan.toLocaleString()} - $\${company.maxLoan.toLocaleString()}</div>
+                            <div><strong>Term:</strong> \${company.termDays} days (\${Math.floor(company.termDays / 365)} years)</div>
+                            <div><strong>Origination Fee:</strong> \${(company.originationFee * 100).toFixed(1)}%</div>
+                            <div><strong>Late Penalty:</strong> \${(company.latePaymentPenalty * 100).toFixed(0)}%</div>
+                            <div><strong>Min Credit Score:</strong> \${company.minCreditScore}</div>
                         </div>
                         <div class="loan-form">
-                            <input type="number" id="amount-${company.id}" placeholder="Amount" min="${company.minLoan}" max="${company.maxLoan}" step="100">
-                            <button onclick="takeLoan('${company.id}')">Apply</button>
+                            <input type="number" id="amount-\${company.id}" placeholder="Amount" min="\${company.minLoan}" max="\${company.maxLoan}" step="100">
+                            <button onclick="takeLoan('\${company.id}')">Apply</button>
                         </div>
                     </div>
-                `;
+                \`;
             }).join('');
         }
 
         async function takeLoan(companyId) {
-            const amountInput = document.getElementById(`amount-${companyId}`);
+            const amountInput = document.getElementById(\`amount-\${companyId}\`);
             const amount = parseFloat(amountInput.value);
             
             if (!amount || amount <= 0) {
@@ -335,7 +301,7 @@
         }
 
         async function makePayment(loanId) {
-            const amountInput = document.getElementById(`payment-${loanId}`);
+            const amountInput = document.getElementById(\`payment-\${loanId}\`);
             const amount = parseFloat(amountInput.value);
             
             if (!amount || amount <= 0) {
@@ -381,7 +347,7 @@
 
         function showMessage(text, type) {
             const messageDiv = document.getElementById('message');
-            messageDiv.innerHTML = `<div class="message ${type}">${text}</div>`;
+            messageDiv.innerHTML = \`<div class="message \${type}">\${text}</div>\`;
             setTimeout(() => {
                 messageDiv.innerHTML = '';
             }, 5000);
@@ -398,9 +364,8 @@
             loadActiveLoans();
         }, 10000);
     </script>
-    <script src="common.js"></script>
     <script>
-        async function updateEraTheme() {
+async function updateEraTheme() {
             const response = await fetch('/api/time');
             const data = await response.json();
             const gameDate = new Date(data.currentTime);
@@ -411,5 +376,5 @@
         updateEraTheme();
         setInterval(updateEraTheme, 10000);
     </script>
-</body>
-</html>
+    `
+}) %>

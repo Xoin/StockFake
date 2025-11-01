@@ -1,24 +1,10 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>StockFake - Index Fund Details</title>
-    <link rel="stylesheet" href="era-themes.css">
-    <script src="header.js"></script>
-    <style>
-        * {
-            margin: 0;
+<%- include('partials/header', { 
+    title: 'Index Fund',
+    pageTitle: 'INDEX FUND',
+    pageStyles: `margin: 0;
             padding: 0;
             box-sizing: border-box;
         }
-        body {
-            font-family: 'Courier New', monospace;
-            background-color: #1a1a1a;
-            color: #00ff00;
-            padding: 20px;
-        }
-        .container {
             max-width: 1200px;
             margin: 0 auto;
         }
@@ -106,7 +92,6 @@
             padding: 10px 20px;
             margin: 5px;
             cursor: pointer;
-            font-family: 'Courier New', monospace;
         }
         button:hover {
             background-color: #00ff00;
@@ -134,7 +119,6 @@
             border: 1px solid #00ff00;
             padding: 8px;
             margin: 5px 0;
-            font-family: 'Courier New', monospace;
             width: 100%;
             max-width: 300px;
         }
@@ -163,12 +147,10 @@
         .time-range-selector button.active {
             background-color: #00ff00;
             color: #000;
-        }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <!-- Shared header component -->
+        }`
+}) %>
+
+<!-- Shared header component -->
         <div id="shared-header" data-title="📊 INDEX FUND"></div>
         
         <div class="fund-header" id="fundHeader">
@@ -245,12 +227,12 @@
                 </tbody>
             </table>
         </div>
-    </div>
-    
-    <script src="common.js"></script>
+
+<%- include('partials/footer', {
+    pageScripts: `
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <script>
-        let fundSymbol = null;
+let fundSymbol = null;
         let fundDetails = null;
         let priceChart = null;
         let currentDays = 30;
@@ -268,7 +250,7 @@
             if (!fundSymbol) return;
             
             try {
-                const response = await fetch(`/api/indexfunds/${fundSymbol}`);
+                const response = await fetch(\`/api/indexfunds/\${fundSymbol}\`);
                 if (!response.ok) {
                     throw new Error('Fund not found or not available yet');
                 }
@@ -281,37 +263,37 @@
                 document.getElementById('fundDescription').textContent = fundDetails.description;
                 
                 // Update info cards
-                document.getElementById('currentPrice').textContent = `$${fundDetails.price.toFixed(2)}`;
+                document.getElementById('currentPrice').textContent = \`$\${fundDetails.price.toFixed(2)}\`;
                 
                 const changeEl = document.getElementById('priceChange');
                 const change = fundDetails.change || 0;
-                changeEl.textContent = `${change >= 0 ? '+' : ''}${change.toFixed(2)}%`;
-                changeEl.className = `info-value ${change >= 0 ? 'positive' : 'negative'}`;
+                changeEl.textContent = \`\${change >= 0 ? '+' : ''}\${change.toFixed(2)}%\`;
+                changeEl.className = \`info-value \${change >= 0 ? 'positive' : 'negative'}\`;
                 
-                document.getElementById('expenseRatio').textContent = `${(fundDetails.expenseRatio * 100).toFixed(2)}%`;
-                document.getElementById('numConstituents').textContent = `${fundDetails.numConstituents} stocks`;
+                document.getElementById('expenseRatio').textContent = \`\${(fundDetails.expenseRatio * 100).toFixed(2)}%\`;
+                document.getElementById('numConstituents').textContent = \`\${fundDetails.numConstituents} stocks\`;
                 
                 // Update constituents list
                 const constituentsList = document.getElementById('constituentsList');
                 if (fundDetails.constituents && fundDetails.constituents.length > 0) {
                     // Show top 20 holdings
                     const topHoldings = fundDetails.constituents.slice(0, 20);
-                    constituentsList.innerHTML = topHoldings.map(stock => `
+                    constituentsList.innerHTML = topHoldings.map(stock => \`
                         <tr>
-                            <td><a href="/company/${escapeHtml(stock.symbol)}" style="color: #00ff00; text-decoration: none;">${escapeHtml(stock.symbol)}</a></td>
-                            <td>$${stock.price.toFixed(2)}</td>
-                            <td class="${stock.change >= 0 ? 'positive' : 'negative'}">
-                                ${stock.change >= 0 ? '+' : ''}${stock.change.toFixed(2)}%
+                            <td><a href="/company/\${escapeHtml(stock.symbol)}" style="color: #00ff00; text-decoration: none;">\${escapeHtml(stock.symbol)}</a></td>
+                            <td>$\${stock.price.toFixed(2)}</td>
+                            <td class="\${stock.change >= 0 ? 'positive' : 'negative'}">
+                                \${stock.change >= 0 ? '+' : ''}\${stock.change.toFixed(2)}%
                             </td>
                         </tr>
-                    `).join('');
+                    \`).join('');
                 } else {
                     constituentsList.innerHTML = '<tr><td colspan="3">No holdings data available</td></tr>';
                 }
             } catch (error) {
                 console.error('Error loading fund details:', error);
                 document.getElementById('fundHeader').innerHTML = 
-                    `<div class="message error">Error: ${escapeHtml(error.message)}. <a href="/indexfunds.html" style="color: #ff0000;">Go back to index funds</a></div>`;
+                    \`<div class="message error">Error: \${escapeHtml(error.message)}. <a href="/indexfunds.html" style="color: #ff0000;">Go back to index funds</a></div>\`;
             }
         }
         
@@ -324,10 +306,10 @@
             document.querySelectorAll('.time-range-selector button').forEach(btn => {
                 btn.classList.remove('active');
             });
-            document.getElementById(`btn-${days}d`).classList.add('active');
+            document.getElementById(\`btn-\${days}d\`).classList.add('active');
             
             try {
-                const response = await fetch(`/api/indexfunds/${fundSymbol}/history?days=${days}`);
+                const response = await fetch(\`/api/indexfunds/\${fundSymbol}/history?days=\${days}\`);
                 const history = await response.json();
                 
                 if (!history || history.length === 0) {
@@ -379,7 +361,7 @@
                                 titleColor: '#00ff00',
                                 bodyColor: '#00ff00',
                                 callbacks: {
-                                    label: (context) => `Price: $${context.parsed.y.toFixed(2)}`
+                                    label: (context) => \`Price: $\${context.parsed.y.toFixed(2)}\`
                                 }
                             }
                         }
@@ -414,15 +396,15 @@
                 const result = await response.json();
                 
                 if (response.ok) {
-                    messageDiv.innerHTML = `<div class="message success">${result.message || 'Trade executed successfully!'}</div>`;
+                    messageDiv.innerHTML = \`<div class="message success">\${result.message || 'Trade executed successfully!'}</div>\`;
                     setTimeout(() => {
                         messageDiv.innerHTML = '';
                     }, 3000);
                 } else {
-                    messageDiv.innerHTML = `<div class="message error">${escapeHtml(result.error)}</div>`;
+                    messageDiv.innerHTML = \`<div class="message error">\${escapeHtml(result.error)}</div>\`;
                 }
             } catch (error) {
-                messageDiv.innerHTML = `<div class="message error">Error: ${escapeHtml(error.message)}</div>`;
+                messageDiv.innerHTML = \`<div class="message error">Error: \${escapeHtml(error.message)}</div>\`;
             }
         }
         
@@ -432,5 +414,5 @@
             loadChart(30);
         }
     </script>
-</body>
-</html>
+    `
+}) %>

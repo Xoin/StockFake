@@ -1,31 +1,12 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>StockFake - Portal</title>
-    <link rel="stylesheet" href="era-themes.css">
-    <style>
-        * {
-            margin: 0;
+<%- include('partials/header', { 
+    title: 'Portal',
+    pageTitle: '⚡ STOCKFAKE ⚡',
+    pageStyles: `margin: 0;
             padding: 0;
             box-sizing: border-box;
         }
-        body {
-            font-family: 'Courier New', monospace;
-            background-color: #1a1a1a;
-            color: #00ff00;
-            padding: 20px;
-        }
-        .container {
             max-width: 1200px;
             margin: 0 auto;
-        }
-        h1 {
-            text-align: center;
-            margin-bottom: 30px;
-            font-size: 2.5em;
-            text-shadow: 0 0 10px #00ff00;
         }
         .time-display {
             background-color: #000;
@@ -96,7 +77,6 @@
             padding: 8px 15px;
             margin: 3px;
             cursor: pointer;
-            font-family: 'Courier New', monospace;
             font-size: 0.9em;
         }
         button:hover {
@@ -151,13 +131,10 @@
         @keyframes pulse {
             0%, 100% { opacity: 1; transform: scale(1); }
             50% { opacity: 0.8; transform: scale(1.1); }
-        }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <h1>⚡ STOCKFAKE ⚡</h1>
-        <div class="time-display">
+        }`
+}) %>
+
+<div class="time-display">
             <div id="gameTime">Loading...</div>
             <span id="marketStatus" class="market-status">...</span>
         </div>
@@ -211,9 +188,11 @@
                 <p style="color: #ff00ff;">Cheat & testing tools</p>
             </a>
         </div>
-    </div>
+
+<%- include('partials/footer', {
+    pageScripts: `
     <script>
-        async function updateTime() {
+async function updateTime() {
             const response = await fetch('/api/time');
             const data = await response.json();
             const date = new Date(data.currentTime);
@@ -248,7 +227,7 @@
             } else if (data.timeMultiplier === 86400) {
                 speedText = '🚀 FAST (1s = 1day)';
             } else {
-                speedText = `⏱ CUSTOM (1s = ${data.timeMultiplier}s)`;
+                speedText = \`⏱ CUSTOM (1s = \${data.timeMultiplier}s)\`;
             }
             speedStatusEl.textContent = speedText;
         }
@@ -314,9 +293,8 @@
         setInterval(updateTime, 1000);
         setInterval(updateNotifications, 3000); // Check every 3 seconds
     </script>
-    <script src="common.js"></script>
     <script>
-        async function updateEraTheme() {
+async function updateEraTheme() {
             const response = await fetch('/api/time');
             const data = await response.json();
             const gameDate = new Date(data.currentTime);
@@ -327,5 +305,5 @@
         updateEraTheme();
         setInterval(updateEraTheme, 10000);
     </script>
-</body>
-</html>
+    `
+}) %>

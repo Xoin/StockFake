@@ -1,43 +1,21 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>StockFake - News</title>
-    <link rel="stylesheet" href="era-themes.css">
-    <script src="header.js"></script>
-    <style>
-        * {
-            margin: 0;
+<%- include('partials/header', { 
+    title: 'News',
+    pageTitle: '📰 FINANCIAL NEWS',
+    pageStyles: `margin: 0;
             padding: 0;
             box-sizing: border-box;
         }
-        body {
-            font-family: 'Courier New', monospace;
-            background-color: #1a1a1a;
-            color: #00ff00;
-            padding: 20px;
-        }
-        .container {
             max-width: 1200px;
             margin: 0 auto;
-        }
-        h1 {
-            text-align: center;
-            margin-bottom: 20px;
-            color: #00ff00;
-            text-shadow: 0 0 10px #00ff00;
         }
         .nav {
             text-align: center;
             margin-bottom: 20px;
         }
-        .nav a {
             color: #00ff00;
             margin: 0 10px;
             text-decoration: none;
         }
-        .nav a:hover {
             text-decoration: underline;
         }
         .time-display {
@@ -130,12 +108,10 @@
             text-align: center;
             padding: 40px;
             color: #00aa00;
-        }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <!-- Shared header component - auto-loads via header.js -->
+        }`
+}) %>
+
+<!-- Shared header component - auto-loads via header.js -->
         <div id="shared-header" data-title="📰 HISTORICAL NEWS"></div>
         
         <div class="pagination-controls-container"></div>
@@ -143,11 +119,11 @@
             <div class="no-news">Loading news...</div>
         </div>
         <div class="pagination-controls-container"></div>
-    </div>
-    
-    <script src="common.js"></script>
+
+<%- include('partials/footer', {
+    pageScripts: `
     <script>
-        let paginator;
+let paginator;
         let allNews = [];
         let readNewsIds = new Set(JSON.parse(localStorage.getItem('readNewsIds') || '[]'));
         let expandedNewsIds = new Set();
@@ -177,7 +153,7 @@
             const items = bodyText.split(/\d+\.\s+/).filter(item => item.trim());
             
             if (items.length === 0) {
-                return `<div class="news-body">${escapeHtml(bodyText)}</div>`;
+                return \`<div class="news-body">\${escapeHtml(bodyText)}</div>\`;
             }
             
             // Parse each item to extract stock info and movement
@@ -215,7 +191,7 @@
                 return { company, symbol, change, text: item.trim() };
             });
             
-            let tableHtml = `
+            let tableHtml = \`
                 <div class="news-body">
                     <table class="market-update-table">
                         <thead>
@@ -227,28 +203,28 @@
                             </tr>
                         </thead>
                         <tbody>
-            `;
+            \`;
             
             movements.forEach(m => {
                 const changeClass = m.change >= 0 ? 'positive-change' : 'negative-change';
                 const changeSymbol = m.change >= 0 ? '▲' : '▼';
-                const changeText = m.change !== 0 ? `${escapeHtml(changeSymbol)} ${Math.abs(m.change).toFixed(1)}%` : 'N/A';
+                const changeText = m.change !== 0 ? \`\${escapeHtml(changeSymbol)} \${Math.abs(m.change).toFixed(1)}%\` : 'N/A';
                 
-                tableHtml += `
+                tableHtml += \`
                     <tr>
-                        <td>${escapeHtml(m.company)}</td>
-                        <td>${escapeHtml(m.symbol)}</td>
-                        <td class="${changeClass}">${changeText}</td>
-                        <td>${escapeHtml(m.text.substring(0, 100))}${m.text.length > 100 ? '...' : ''}</td>
+                        <td>\${escapeHtml(m.company)}</td>
+                        <td>\${escapeHtml(m.symbol)}</td>
+                        <td class="\${changeClass}">\${changeText}</td>
+                        <td>\${escapeHtml(m.text.substring(0, 100))}\${m.text.length > 100 ? '...' : ''}</td>
                     </tr>
-                `;
+                \`;
             });
             
-            tableHtml += `
+            tableHtml += \`
                         </tbody>
                     </table>
                 </div>
-            `;
+            \`;
             
             return tableHtml;
         }
@@ -282,16 +258,16 @@
                     if (isMarketUpdate && item.body) {
                         bodyHtml = formatMarketUpdateTable(item.body);
                     } else {
-                        bodyHtml = `<div class="news-body">${escapeHtml(item.body)}</div>`;
+                        bodyHtml = \`<div class="news-body">\${escapeHtml(item.body)}</div>\`;
                     }
                     
-                    return `
-                        <div class="news-item ${unreadClass} ${expandedClass} ${marketUpdateClass}" onclick="toggleNews(${item.id})">
-                            <div class="news-date">${new Date(item.date).toLocaleDateString()}</div>
-                            <div class="news-headline">${escapeHtml(item.headline)}</div>
-                            ${bodyHtml}
+                    return \`
+                        <div class="news-item \${unreadClass} \${expandedClass} \${marketUpdateClass}" onclick="toggleNews(\${item.id})">
+                            <div class="news-date">\${new Date(item.date).toLocaleDateString()}</div>
+                            <div class="news-headline">\${escapeHtml(item.headline)}</div>
+                            \${bodyHtml}
                         </div>
-                    `;
+                    \`;
                 }).join('');
             }
             
@@ -331,7 +307,7 @@
                         id: items[0].id, // Use first ID
                         date: items[0].date,
                         headline: 'Market Update: Multiple Stock Movements',
-                        body: items.map((item, idx) => `${idx + 1}. ${item.body}`).join('\n')
+                        body: items.map((item, idx) => \`\${idx + 1}. \${item.body}\`).join('\n')
                     };
                     newsById.set(mergedItem.id, mergedItem);
                 } else {
@@ -351,5 +327,5 @@
         updateNews();
         setInterval(updateNews, 5000);
     </script>
-</body>
-</html>
+    `
+}) %>

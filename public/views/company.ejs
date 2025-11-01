@@ -1,42 +1,21 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>StockFake - Company Information</title>
-    <link rel="stylesheet" href="era-themes.css">
-    <style>
-        * {
-            margin: 0;
+<%- include('partials/header', { 
+    title: 'Company Info',
+    pageTitle: 'COMPANY INFORMATION',
+    pageStyles: `margin: 0;
             padding: 0;
             box-sizing: border-box;
         }
-        body {
-            font-family: 'Courier New', monospace;
-            background-color: #1a1a1a;
-            color: #00ff00;
-            padding: 20px;
-        }
-        .container {
             max-width: 1200px;
             margin: 0 auto;
-        }
-        h1 {
-            text-align: center;
-            margin-bottom: 20px;
-            color: #00ff00;
-            text-shadow: 0 0 10px #00ff00;
         }
         .nav {
             text-align: center;
             margin-bottom: 20px;
         }
-        .nav a {
             color: #00ff00;
             margin: 0 10px;
             text-decoration: none;
         }
-        .nav a:hover {
             text-decoration: underline;
         }
         .company-header {
@@ -216,7 +195,6 @@
             border: 1px solid #00ff00;
             padding: 8px 15px;
             cursor: pointer;
-            font-family: 'Courier New', monospace;
         }
         .timeframe-btn:hover {
             background-color: #00ff00;
@@ -267,28 +245,17 @@
         .stock-link:hover {
             background-color: #00ff00;
             color: #000;
-        }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <h1>📊 Company Information</h1>
-        <div class="nav">
-            <a href="/">🏠 Portal</a>
-            <a href="/trading">📈 Trading</a>
-            <a href="/bank">🏦 Bank</a>
-            <a href="/graphs">📊 Graphs</a>
-            <a href="/news">📰 News</a>
-            <a href="/email">📧 Email</a>
-        </div>
-        
-        <div id="content">
+        }`
+}) %>
+
+<div id="content">
             <div class="loading">Loading company information...</div>
         </div>
-    </div>
-    
+
+<%- include('partials/footer', {
+    pageScripts: `
     <script>
-        // Get symbol from URL
+// Get symbol from URL
         const urlPath = window.location.pathname;
         const symbol = urlPath.split('/company/')[1];
         
@@ -301,7 +268,7 @@
         
         async function loadCompanyInfo() {
             try {
-                const response = await fetch(`/api/companies/${encodeURIComponent(symbol)}`);
+                const response = await fetch(\`/api/companies/\${encodeURIComponent(symbol)}\`);
                 
                 if (!response.ok) {
                     throw new Error('Company not found');
@@ -310,21 +277,21 @@
                 const company = await response.json();
                 displayCompanyInfo(company);
             } catch (error) {
-                document.getElementById('content').innerHTML = `
+                document.getElementById('content').innerHTML = \`
                     <div class="error">
                         <h2>Error</h2>
-                        <p>Company information not available: ${escapeHtml(error.message)}</p>
+                        <p>Company information not available: \${escapeHtml(error.message)}</p>
                         <a href="/trading" class="stock-link">← Back to Trading</a>
                     </div>
-                `;
+                \`;
             }
         }
         
         function formatCurrency(value) {
             if (value >= 1000) {
-                return `$${(value / 1000).toFixed(2)}B`;
+                return \`$\${(value / 1000).toFixed(2)}B\`;
             }
-            return `$${value.toFixed(2)}M`;
+            return \`$\${value.toFixed(2)}M\`;
         }
         
         function formatNumber(value) {
@@ -334,27 +301,27 @@
         function displayCompanyInfo(company) {
             const content = document.getElementById('content');
             
-            const html = `
+            const html = \`
                 <div class="company-header">
-                    <h2>${escapeHtml(company.name)} (${escapeHtml(symbol)})</h2>
-                    <p>${escapeHtml(company.description)}</p>
-                    ${company.isDynamic ? '<p style="color: #00aa00; font-size: 0.9em; margin-top: 10px;">Note: Limited company information available. Data shown is estimated.</p>' : ''}
+                    <h2>\${escapeHtml(company.name)} (\${escapeHtml(symbol)})</h2>
+                    <p>\${escapeHtml(company.description)}</p>
+                    \${company.isDynamic ? '<p style="color: #00aa00; font-size: 0.9em; margin-top: 10px;">Note: Limited company information available. Data shown is estimated.</p>' : ''}
                     <div class="company-meta">
                         <div class="meta-item">
                             <div class="meta-label">Sector</div>
-                            <div class="meta-value">${escapeHtml(company.sector)}</div>
+                            <div class="meta-value">\${escapeHtml(company.sector)}</div>
                         </div>
                         <div class="meta-item">
                             <div class="meta-label">Founded</div>
-                            <div class="meta-value">${escapeHtml(String(company.founded))}</div>
+                            <div class="meta-value">\${escapeHtml(String(company.founded))}</div>
                         </div>
                         <div class="meta-item">
                             <div class="meta-label">Headquarters</div>
-                            <div class="meta-value">${escapeHtml(company.headquarters)}</div>
+                            <div class="meta-value">\${escapeHtml(company.headquarters)}</div>
                         </div>
                         <div class="meta-item">
                             <div class="meta-label">Employees</div>
-                            <div class="meta-value">${formatNumber(company.employees)} <span style="font-size: 0.8em; color: #00aa00;">(${escapeHtml(String(company.employeeYear))})</span></div>
+                            <div class="meta-value">\${formatNumber(company.employees)} <span style="font-size: 0.8em; color: #00aa00;">(\${escapeHtml(String(company.employeeYear))})</span></div>
                         </div>
                     </div>
                     <a href="/trading" class="stock-link">View Stock Price & Trade</a>
@@ -409,15 +376,15 @@
                 <div class="section">
                     <h3>💼 Products & Services</h3>
                     <div class="products-grid">
-                        ${company.products.map(product => `
+                        \${company.products.map(product => \`
                             <div class="product-card">
-                                <div class="product-name">${escapeHtml(product.name)}</div>
-                                <div class="product-category">${escapeHtml(product.category)}</div>
-                                <div class="product-year">Introduced: ${escapeHtml(String(product.yearIntroduced))}</div>
+                                <div class="product-name">\${escapeHtml(product.name)}</div>
+                                <div class="product-category">\${escapeHtml(product.category)}</div>
+                                <div class="product-year">Introduced: \${escapeHtml(String(product.yearIntroduced))}</div>
                             </div>
-                        `).join('')}
+                        \`).join('')}
                     </div>
-                    ${company.products.length === 0 ? '<p>No products available at this time.</p>' : ''}
+                    \${company.products.length === 0 ? '<p>No products available at this time.</p>' : ''}
                 </div>
                 
                 <div class="section">
@@ -425,14 +392,14 @@
                     <div class="ip-info">
                         <div class="ip-stat">
                             <div class="ip-label">Patents Held</div>
-                            <div class="ip-value">${formatNumber(company.intellectualProperty.patents)}</div>
+                            <div class="ip-value">\${formatNumber(company.intellectualProperty.patents)}</div>
                         </div>
                         <div class="ip-stat">
                             <div class="ip-label">Registered Trademarks</div>
                             <div class="trademarks">
-                                ${company.intellectualProperty.trademarks.map(tm => `
-                                    <span class="trademark-badge">®️ ${escapeHtml(tm)}</span>
-                                `).join('')}
+                                \${company.intellectualProperty.trademarks.map(tm => \`
+                                    <span class="trademark-badge">®️ \${escapeHtml(tm)}</span>
+                                \`).join('')}
                             </div>
                         </div>
                     </div>
@@ -440,26 +407,26 @@
                 
                 <div class="section">
                     <h3>💰 Financial Information</h3>
-                    <p style="color: #00aa00; margin-bottom: 10px;">Data as of year ${escapeHtml(String(company.financials.year))}</p>
+                    <p style="color: #00aa00; margin-bottom: 10px;">Data as of year \${escapeHtml(String(company.financials.year))}</p>
                     <div class="financials-grid">
                         <div class="financial-card">
                             <div class="financial-label">Revenue</div>
-                            <div class="financial-value">${formatCurrency(company.financials.revenue)}</div>
+                            <div class="financial-value">\${formatCurrency(company.financials.revenue)}</div>
                             <div class="financial-unit">Million USD</div>
                         </div>
                         <div class="financial-card">
                             <div class="financial-label">Net Income</div>
-                            <div class="financial-value ${company.financials.netIncome >= 0 ? '' : 'negative'}">${formatCurrency(company.financials.netIncome)}</div>
+                            <div class="financial-value \${company.financials.netIncome >= 0 ? '' : 'negative'}">\${formatCurrency(company.financials.netIncome)}</div>
                             <div class="financial-unit">Million USD</div>
                         </div>
                         <div class="financial-card">
                             <div class="financial-label">Total Assets</div>
-                            <div class="financial-value">${formatCurrency(company.financials.assets)}</div>
+                            <div class="financial-value">\${formatCurrency(company.financials.assets)}</div>
                             <div class="financial-unit">Million USD</div>
                         </div>
                     </div>
                 </div>
-            `;
+            \`;
             
             content.innerHTML = html;
         }
@@ -479,7 +446,7 @@
             if (button) button.classList.add('active');
             
             try {
-                const response = await fetch(`/api/stocks/${encodeURIComponent(symbol)}/history?days=${days}`);
+                const response = await fetch(\`/api/stocks/\${encodeURIComponent(symbol)}/history?days=\${days}\`);
                 stockHistory = await response.json();
                 
                 drawStockChart();
@@ -491,19 +458,19 @@
         
         async function loadStockInfo() {
             try {
-                const response = await fetch(`/api/stocks/${encodeURIComponent(symbol)}`);
+                const response = await fetch(\`/api/stocks/\${encodeURIComponent(symbol)}\`);
                 const stock = await response.json();
                 
-                document.getElementById('currentPrice').textContent = `$${stock.price.toFixed(2)}`;
+                document.getElementById('currentPrice').textContent = \`$\${stock.price.toFixed(2)}\`;
                 
                 const changeEl = document.getElementById('priceChange');
                 const change = stock.change || 0;
-                changeEl.textContent = `${change >= 0 ? '+' : ''}${change.toFixed(2)}%`;
+                changeEl.textContent = \`\${change >= 0 ? '+' : ''}\${change.toFixed(2)}%\`;
                 changeEl.style.color = change >= 0 ? '#00ff00' : '#ff0000';
                 
                 const sharesAvailable = stock.sharesAvailable || 0;
                 const sharesDisplay = sharesAvailable > 1000000 
-                    ? `${(sharesAvailable / 1000000).toFixed(1)}M`
+                    ? \`\${(sharesAvailable / 1000000).toFixed(1)}M\`
                     : sharesAvailable.toLocaleString();
                 document.getElementById('availableShares').textContent = sharesDisplay;
             } catch (error) {
@@ -559,7 +526,7 @@
                 ctx.fillStyle = '#00aa00';
                 ctx.font = '12px Courier New';
                 ctx.textAlign = 'right';
-                ctx.fillText(`$${price.toFixed(2)}`, padding - 5, y + 4);
+                ctx.fillText(\`$\${price.toFixed(2)}\`, padding - 5, y + 4);
             }
             
             // Draw price line
@@ -617,17 +584,17 @@
                 const prevPoint = index < recentHistory.length - 1 ? recentHistory[index + 1] : point;
                 const change = ((point.price - prevPoint.price) / prevPoint.price) * 100;
                 const changeStr = index < recentHistory.length - 1 
-                    ? `${change >= 0 ? '+' : ''}${change.toFixed(2)}%`
+                    ? \`\${change >= 0 ? '+' : ''}\${change.toFixed(2)}%\`
                     : '-';
                 const changeClass = change >= 0 ? 'positive' : 'negative';
                 
-                return `
+                return \`
                     <tr>
-                        <td>${date.toLocaleDateString()}</td>
-                        <td>$${point.price.toFixed(2)}</td>
-                        <td class="${changeClass}">${changeStr}</td>
+                        <td>\${date.toLocaleDateString()}</td>
+                        <td>$\${point.price.toFixed(2)}</td>
+                        <td class="\${changeClass}">\${changeStr}</td>
                     </tr>
-                `;
+                \`;
             }).join('');
         }
         
@@ -636,9 +603,8 @@
         loadStockHistory(7);
         setInterval(loadStockInfo, 5000);
     </script>
-    <script src="common.js"></script>
     <script>
-        async function updateEraTheme() {
+async function updateEraTheme() {
             const response = await fetch('/api/time');
             const data = await response.json();
             const gameDate = new Date(data.currentTime);
@@ -649,5 +615,5 @@
         updateEraTheme();
         setInterval(updateEraTheme, 10000);
     </script>
-</body>
-</html>
+    `
+}) %>

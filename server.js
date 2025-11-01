@@ -211,39 +211,52 @@ app.get('/bank', (req, res) => {
 });
 
 app.get('/news', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'news.html'));
+  res.render('news');
 });
 
 app.get('/email', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'email.html'));
+  res.render('email');
 });
 
 app.get('/trading', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'trading.html'));
+  res.render('trading');
 });
 
 app.get('/graphs', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'graphs.html'));
+  res.render('graphs');
 });
 
 app.get('/loans', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'loans.html'));
+  res.render('loans');
 });
 
 app.get('/taxes', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'taxes.html'));
+  res.render('taxes');
 });
 
 app.get('/company/:symbol', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'company.html'));
+  res.render('company');
 });
 
 app.get('/indexfund', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'indexfund.html'));
+  res.render('indexfund');
+});
+
+app.get('/indexfunds', (req, res) => {
+  res.render('indexfunds');
+});
+
+app.get('/indexfunds.html', (req, res) => {
+  // Support legacy .html extension
+  res.redirect('/indexfunds');
+});
+
+app.get('/cheat', (req, res) => {
+  res.render('cheat');
 });
 
 app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+  res.render('index');
 });
 
 app.get('/api/stocks', (req, res) => {

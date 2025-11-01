@@ -1,43 +1,21 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>StockFake - Email</title>
-    <link rel="stylesheet" href="era-themes.css">
-    <script src="header.js"></script>
-    <style>
-        * {
-            margin: 0;
+<%- include('partials/header', { 
+    title: 'Email',
+    pageTitle: '📧 EMAIL',
+    pageStyles: `margin: 0;
             padding: 0;
             box-sizing: border-box;
         }
-        body {
-            font-family: 'Courier New', monospace;
-            background-color: #1a1a1a;
-            color: #00ff00;
-            padding: 20px;
-        }
-        .container {
             max-width: 1200px;
             margin: 0 auto;
-        }
-        h1 {
-            text-align: center;
-            margin-bottom: 20px;
-            color: #00ff00;
-            text-shadow: 0 0 10px #00ff00;
         }
         .nav {
             text-align: center;
             margin-bottom: 20px;
         }
-        .nav a {
             color: #00ff00;
             margin: 0 10px;
             text-decoration: none;
         }
-        .nav a:hover {
             text-decoration: underline;
         }
         .email-container {
@@ -115,29 +93,19 @@
         }
         .email-item.spam:hover {
             background-color: #330000;
-        }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <h1>📧 EMAIL</h1>
-        <div class="nav">
-            <a href="/">← Back to Portal</a> |
-            <a href="/trading">Trading</a> |
-            <a href="/bank">Bank</a> |
-            <a href="/news">News</a>
-        </div>
-        
-        <div class="pagination-controls-container"></div>
+        }`
+}) %>
+
+<div class="pagination-controls-container"></div>
         <div class="email-container" id="emailContainer">
             <div class="no-emails">Loading emails...</div>
         </div>
         <div class="pagination-controls-container"></div>
-    </div>
-    
-    <script src="common.js"></script>
+
+<%- include('partials/footer', {
+    pageScripts: `
     <script>
-        let paginator;
+let paginator;
         let allEmails = [];
         let readEmailIds = new Set(JSON.parse(localStorage.getItem('readEmailIds') || '[]'));
         let expandedEmails = new Set();
@@ -164,16 +132,16 @@
                     const isExpanded = expandedEmails.has(index);
                     const isUnread = email.id && !readEmailIds.has(email.id);
                     const unreadClass = isUnread ? 'unread' : '';
-                    return `
-                        <div class="email-item ${email.spam ? 'spam' : ''} ${unreadClass} ${isExpanded ? 'expanded' : ''}" onclick="toggleEmail(${index}, ${email.id || 0})">
+                    return \`
+                        <div class="email-item \${email.spam ? 'spam' : ''} \${unreadClass} \${isExpanded ? 'expanded' : ''}" onclick="toggleEmail(\${index}, \${email.id || 0})">
                             <div class="email-header">
-                                <div class="email-from">From: ${escapeHtml(email.from)}${email.spam ? '<span class="spam-badge">SPAM</span>' : ''}</div>
-                                <div class="email-date">${new Date(email.date).toLocaleString()}</div>
+                                <div class="email-from">From: \${escapeHtml(email.from)}\${email.spam ? '<span class="spam-badge">SPAM</span>' : ''}</div>
+                                <div class="email-date">\${new Date(email.date).toLocaleString()}</div>
                             </div>
-                            <div class="email-subject">${escapeHtml(email.subject)}</div>
-                            <div class="email-body">${escapeHtml(email.body)}</div>
+                            <div class="email-subject">\${escapeHtml(email.subject)}</div>
+                            <div class="email-body">\${escapeHtml(email.body)}</div>
                         </div>
-                    `;
+                    \`;
                 }).join('');
             }
             
@@ -205,7 +173,7 @@
             // Add IDs if missing (use index as fallback)
             newEmails.forEach((email, idx) => {
                 if (!email.id) {
-                    email.id = `email-${idx}-${new Date(email.date).getTime()}`;
+                    email.id = \`email-\${idx}-\${new Date(email.date).getTime()}\`;
                 }
             });
             
@@ -226,5 +194,5 @@
         updateEmails();
         setInterval(updateEmails, 5000);
     </script>
-</body>
-</html>
+    `
+}) %>

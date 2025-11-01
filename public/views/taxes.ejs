@@ -1,31 +1,12 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>StockFake - Tax Center</title>
-    <link rel="stylesheet" href="era-themes.css">
-    <style>
-        * {
-            margin: 0;
+<%- include('partials/header', { 
+    title: 'Taxes',
+    pageTitle: '📑 TAXES',
+    pageStyles: `margin: 0;
             padding: 0;
             box-sizing: border-box;
         }
-        body {
-            font-family: 'Courier New', monospace;
-            background-color: #1a1a1a;
-            color: #00ff00;
-            padding: 20px;
-        }
-        .container {
             max-width: 1200px;
             margin: 0 auto;
-        }
-        h1 {
-            text-align: center;
-            margin-bottom: 20px;
-            color: #00ff00;
-            text-shadow: 0 0 10px #00ff00;
         }
         h2, h3 {
             color: #00ff00;
@@ -35,12 +16,10 @@
             text-align: center;
             margin-bottom: 20px;
         }
-        .nav a {
             color: #00ff00;
             margin: 0 10px;
             text-decoration: none;
         }
-        .nav a:hover {
             text-decoration: underline;
         }
         .tax-summary {
@@ -62,7 +41,6 @@
             border: 1px solid #00ff00;
             padding: 8px;
             margin: 0 10px;
-            font-family: 'Courier New', monospace;
             font-size: 1em;
         }
         .tax-breakdown {
@@ -123,20 +101,10 @@
             margin-top: 10px;
             font-size: 1.2em;
             text-align: center;
-        }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <h1>📊 TAX CENTER</h1>
-        <div class="nav">
-            <a href="/">← Back to Portal</a> |
-            <a href="/bank">Bank</a> |
-            <a href="/trading">Trading</a> |
-            <a href="/loans">Loans</a>
-        </div>
-        
-        <div class="year-selector">
+        }`
+}) %>
+
+<div class="year-selector">
             <label for="taxYear">Tax Year:</label>
             <select id="taxYear">
                 <option value="">Loading...</option>
@@ -249,10 +217,11 @@
                 </tbody>
             </table>
         </div>
-    </div>
 
+<%- include('partials/footer', {
+    pageScripts: `
     <script>
-        let availableYears = [];
+let availableYears = [];
         let currentGameYear = new Date().getFullYear();
 
         async function loadGameTime() {
@@ -301,7 +270,7 @@
             const year = document.getElementById('taxYear').value;
             
             try {
-                const response = await fetch(`/api/taxes?year=${year}`);
+                const response = await fetch(\`/api/taxes?year=\${year}\`);
                 const data = await response.json();
                 
                 // Update year display
@@ -340,12 +309,12 @@
                         const row = document.createElement('tr');
                         const date = new Date(tax.date);
                         
-                        row.innerHTML = `
-                            <td>${date.toLocaleDateString()}</td>
-                            <td>${formatTaxType(tax.type)}</td>
-                            <td class="negative">-$${tax.amount.toFixed(2)}</td>
-                            <td>${tax.description}</td>
-                        `;
+                        row.innerHTML = \`
+                            <td>\${date.toLocaleDateString()}</td>
+                            <td>\${formatTaxType(tax.type)}</td>
+                            <td class="negative">-$\${tax.amount.toFixed(2)}</td>
+                            <td>\${tax.description}</td>
+                        \`;
                         tbody.appendChild(row);
                     });
                 }
@@ -369,9 +338,8 @@
         // Refresh every 5 seconds
         setInterval(loadTaxData, 5000);
     </script>
-    <script src="common.js"></script>
     <script>
-        async function updateEraTheme() {
+async function updateEraTheme() {
             const response = await fetch('/api/time');
             const data = await response.json();
             const gameDate = new Date(data.currentTime);
@@ -382,5 +350,5 @@
         updateEraTheme();
         setInterval(updateEraTheme, 10000);
     </script>
-</body>
-</html>
+    `
+}) %>

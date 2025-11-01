@@ -1,43 +1,21 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>StockFake - Trading Platform</title>
-    <link rel="stylesheet" href="era-themes.css">
-    <script src="header.js"></script>
-    <style>
-        * {
-            margin: 0;
+<%- include('partials/header', { 
+    title: 'Trading',
+    pageTitle: '📈 STOCK TRADING',
+    pageStyles: `margin: 0;
             padding: 0;
             box-sizing: border-box;
         }
-        body {
-            font-family: 'Courier New', monospace;
-            background-color: #1a1a1a;
-            color: #00ff00;
-            padding: 20px;
-        }
-        .container {
             max-width: 1200px;
             margin: 0 auto;
-        }
-        h1 {
-            text-align: center;
-            margin-bottom: 20px;
-            color: #00ff00;
-            text-shadow: 0 0 10px #00ff00;
         }
         .nav {
             text-align: center;
             margin-bottom: 20px;
         }
-        .nav a {
             color: #00ff00;
             margin: 0 10px;
             text-decoration: none;
         }
-        .nav a:hover {
             text-decoration: underline;
         }
         .halt-warning {
@@ -124,7 +102,6 @@
             border: 1px solid #00ff00;
             padding: 8px;
             margin: 5px;
-            font-family: 'Courier New', monospace;
         }
         button {
             background-color: #003300;
@@ -133,7 +110,6 @@
             padding: 10px 20px;
             margin: 5px;
             cursor: pointer;
-            font-family: 'Courier New', monospace;
         }
         button:hover {
             background-color: #00ff00;
@@ -253,13 +229,10 @@
             .content-wrapper {
                 grid-template-columns: 1fr;
             }
-        }
-    </style>
-    <script src="asset-filter.js"></script>
-</head>
-<body>
-    <div class="container">
-        <!-- Shared header component -->
+        }`
+}) %>
+
+<!-- Shared header component -->
         <div id="shared-header" data-title="📈 TRADING PLATFORM"></div>
         
         <div id="haltWarning" class="halt-warning" style="display: none;"></div>
@@ -350,11 +323,12 @@
                 <p>COVER: Buy back shares to close short position</p>
             </div>
         </div>
-    </div>
-    
+
+<%- include('partials/footer', {
+    pageScripts: `
     <script src="header.js"></script>
     <script>
-        let stocks = [];
+let stocks = [];
         let paginator;
         let currentAccountData = null;
         let tradingFee = 0;
@@ -392,9 +366,9 @@
             const warningThreshold = (currentAccountData.riskControls?.concentrationWarningThreshold || 0.20) * 100;
             
             // Update header info
-            document.getElementById('maxConcentration').textContent = `${maxConcentration.toFixed(0)}%`;
+            document.getElementById('maxConcentration').textContent = \`\${maxConcentration.toFixed(0)}%\`;
             document.getElementById('currentPortfolioValue').textContent = 
-                `$${(portfolioMetrics.portfolioValue || 0).toFixed(2)}`;
+                \`$\${(portfolioMetrics.portfolioValue || 0).toFixed(2)}\`;
             
             // Display current concentrations
             const concentrationEntries = Object.entries(positionConcentrations);
@@ -402,9 +376,9 @@
             if (concentrationEntries.length > 0) {
                 panel.style.display = 'block';
                 
-                concentrationsDiv.innerHTML = `
+                concentrationsDiv.innerHTML = \`
                     <div style="margin-bottom: 8px; color: #00aa00; font-weight: bold;">Current Holdings:</div>
-                    ${concentrationEntries.map(([symbol, data]) => {
+                    \${concentrationEntries.map(([symbol, data]) => {
                         const percent = data.currentPercent || 0;
                         let statusClass = '';
                         let statusText = 'OK';
@@ -417,32 +391,32 @@
                             statusText = 'WARNING';
                         }
                         
-                        return `
-                            <div class="concentration-stock ${statusClass}">
-                                <span style="min-width: 80px; font-weight: bold;">${symbol}</span>
+                        return \`
+                            <div class="concentration-stock \${statusClass}">
+                                <span style="min-width: 80px; font-weight: bold;">\${symbol}</span>
                                 <div class="concentration-bar">
-                                    <div class="concentration-fill ${statusClass}" style="width: ${Math.min(percent, 100)}%">
-                                        <span class="concentration-percentage">${percent.toFixed(1)}%</span>
+                                    <div class="concentration-fill \${statusClass}" style="width: \${Math.min(percent, 100)}%">
+                                        <span class="concentration-percentage">\${percent.toFixed(1)}%</span>
                                     </div>
                                 </div>
-                                <span style="min-width: 80px; text-align: right;">${statusText}</span>
+                                <span style="min-width: 80px; text-align: right;">\${statusText}</span>
                             </div>
-                        `;
+                        \`;
                     }).join('')}
                     <div style="margin-top: 12px; padding: 8px; background-color: #001100; border: 1px solid #003300; font-size: 0.9em;">
                         <div style="color: #00aa00;">💡 Concentration Rules:</div>
-                        <div style="color: #00cc00; margin-top: 4px;">• Maximum ${maxConcentration.toFixed(0)}% of portfolio in any single stock</div>
-                        <div style="color: #ffaa00; margin-top: 4px;">• Warning at ${warningThreshold.toFixed(0)}% concentration</div>
+                        <div style="color: #00cc00; margin-top: 4px;">• Maximum \${maxConcentration.toFixed(0)}% of portfolio in any single stock</div>
+                        <div style="color: #ffaa00; margin-top: 4px;">• Warning at \${warningThreshold.toFixed(0)}% concentration</div>
                         <div style="color: #00cc00; margin-top: 4px;">• Helps diversify risk across multiple investments</div>
                     </div>
-                `;
+                \`;
             } else if (portfolioMetrics.portfolioValue > 0) {
                 panel.style.display = 'block';
-                concentrationsDiv.innerHTML = `
+                concentrationsDiv.innerHTML = \`
                     <div style="padding: 12px; background-color: #001100; border: 1px solid #003300; color: #00aa00;">
-                        No stock positions yet. You can invest up to ${maxConcentration.toFixed(0)}% of your portfolio in any single stock.
+                        No stock positions yet. You can invest up to \${maxConcentration.toFixed(0)}% of your portfolio in any single stock.
                     </div>
-                `;
+                \`;
             } else {
                 panel.style.display = 'none';
             }
@@ -499,10 +473,10 @@
             const totalCost = subtotal + tradingFee;
             
             // Update calculator display
-            document.getElementById('calcPrice').textContent = `$${price.toFixed(2)}`;
+            document.getElementById('calcPrice').textContent = \`$\${price.toFixed(2)}\`;
             document.getElementById('calcShares').textContent = shares.toLocaleString();
-            document.getElementById('calcFee').textContent = `$${tradingFee.toFixed(2)}`;
-            document.getElementById('calcTotal').textContent = `$${totalCost.toFixed(2)}`;
+            document.getElementById('calcFee').textContent = \`$\${tradingFee.toFixed(2)}\`;
+            document.getElementById('calcTotal').textContent = \`$\${totalCost.toFixed(2)}\`;
             document.getElementById('costCalculator').style.display = 'block';
             
             // Check affordability and concentration
@@ -531,36 +505,36 @@
                 
                 // Check concentration limit
                 if (futureConcentration > maxConcentration && futurePortfolioValue > 0) {
-                    messages.push(`✗ Exceeds concentration limit: ${futureConcentration.toFixed(1)}% > ${maxConcentration.toFixed(0)}%`);
-                    messages.push(`Maximum allowed: ${maxConcentration.toFixed(0)}% of portfolio in single stock`);
+                    messages.push(\`✗ Exceeds concentration limit: \${futureConcentration.toFixed(1)}% > \${maxConcentration.toFixed(0)}%\`);
+                    messages.push(\`Maximum allowed: \${maxConcentration.toFixed(0)}% of portfolio in single stock\`);
                     isError = true;
                 } else if (futureConcentration > warningConcentration && futurePortfolioValue > 0) {
-                    messages.push(`⚠ High concentration: ${futureConcentration.toFixed(1)}% of portfolio`);
-                    messages.push(`Warning threshold: ${warningConcentration.toFixed(0)}%`);
+                    messages.push(\`⚠ High concentration: \${futureConcentration.toFixed(1)}% of portfolio\`);
+                    messages.push(\`Warning threshold: \${warningConcentration.toFixed(0)}%\`);
                 }
                 
                 // Check affordability
                 if (canAfford && shares <= sharesAvailable) {
                     if (!isError) {
-                        messages.unshift(`✓ You can afford this purchase`);
+                        messages.unshift(\`✓ You can afford this purchase\`);
                     }
-                    messages.push(`Available Cash: $${cash.toFixed(2)}`);
-                    messages.push(`Max Shares: ${actualMaxShares.toLocaleString()} shares`);
+                    messages.push(\`Available Cash: $\${cash.toFixed(2)}\`);
+                    messages.push(\`Max Shares: \${actualMaxShares.toLocaleString()} shares\`);
                     if (futurePortfolioValue > 0) {
-                        messages.push(`Concentration after purchase: ${futureConcentration.toFixed(1)}%`);
+                        messages.push(\`Concentration after purchase: \${futureConcentration.toFixed(1)}%\`);
                     }
                 } else if (!canAfford) {
-                    messages.unshift(`✗ Insufficient funds`);
-                    messages.push(`Available Cash: $${cash.toFixed(2)}`);
-                    messages.push(`Needed: $${totalCost.toFixed(2)}`);
-                    messages.push(`Short by: $${(totalCost - cash).toFixed(2)}`);
-                    messages.push(`Max you can buy: ${maxShares.toLocaleString()} shares`);
+                    messages.unshift(\`✗ Insufficient funds\`);
+                    messages.push(\`Available Cash: $\${cash.toFixed(2)}\`);
+                    messages.push(\`Needed: $\${totalCost.toFixed(2)}\`);
+                    messages.push(\`Short by: $\${(totalCost - cash).toFixed(2)}\`);
+                    messages.push(\`Max you can buy: \${maxShares.toLocaleString()} shares\`);
                     isError = true;
                 } else {
-                    messages.unshift(`✗ Not enough shares available`);
-                    messages.push(`You requested: ${shares.toLocaleString()} shares`);
-                    messages.push(`Available: ${sharesAvailable.toLocaleString()} shares`);
-                    messages.push(`Reduce your order by: ${(shares - sharesAvailable).toLocaleString()} shares`);
+                    messages.unshift(\`✗ Not enough shares available\`);
+                    messages.push(\`You requested: \${shares.toLocaleString()} shares\`);
+                    messages.push(\`Available: \${sharesAvailable.toLocaleString()} shares\`);
+                    messages.push(\`Reduce your order by: \${(shares - sharesAvailable).toLocaleString()} shares\`);
                     isError = true;
                 }
                 
@@ -578,7 +552,7 @@
             if (data.tradeHalt && data.tradeHalt.status === 'current') {
                 const halt = data.tradeHalt.halt;
                 const endDate = new Date(halt.endDate);
-                haltWarning.textContent = `⚠️ TRADING HALTED: ${halt.reason} (Until ${endDate.toLocaleString()})`;
+                haltWarning.textContent = \`⚠️ TRADING HALTED: \${halt.reason} (Until \${endDate.toLocaleString()})\`;
                 haltWarning.style.display = 'block';
             } else {
                 haltWarning.style.display = 'none';
@@ -611,7 +585,7 @@
                 if (response.ok) {
                     const successDiv = document.createElement('div');
                     successDiv.className = 'message success';
-                    successDiv.textContent = `Trade successful! ${tradeAction.toUpperCase()} ${shares} shares of ${symbol}`;
+                    successDiv.textContent = \`Trade successful! \${tradeAction.toUpperCase()} \${shares} shares of \${symbol}\`;
                     messageDiv.innerHTML = '';
                     messageDiv.appendChild(successDiv);
                     document.getElementById('shares').value = '';
@@ -621,21 +595,20 @@
                 } else {
                     const errorDiv = document.createElement('div');
                     errorDiv.className = 'message error';
-                    errorDiv.textContent = `Error: ${data.error}`;
+                    errorDiv.textContent = \`Error: \${data.error}\`;
                     messageDiv.innerHTML = '';
                     messageDiv.appendChild(errorDiv);
                 }
                 
                 setTimeout(() => messageDiv.innerHTML = '', 5000);
             } catch (error) {
-                document.getElementById('message').innerHTML = `<div class="message error">Error: ${error.message}</div>`;
+                document.getElementById('message').innerHTML = \`<div class="message error">Error: \${error.message}</div>\`;
             }
         }
     </script>
     <script src="table-sorter.js"></script>
-    <script src="common.js"></script>
     <script>
-        async function renderPage() {
+async function renderPage() {
             if (!paginator) return;
             
             const pageStocks = paginator.getCurrentPageItems();
@@ -643,26 +616,26 @@
             tbody.innerHTML = pageStocks.map(stock => {
                 const sharesAvailable = stock.sharesAvailable || 0;
                 const sharesDisplay = sharesAvailable > 1000000 
-                    ? `${(sharesAvailable / 1000000).toFixed(1)}M`
+                    ? \`\${(sharesAvailable / 1000000).toFixed(1)}M\`
                     : sharesAvailable.toLocaleString();
                 
-                return `
+                return \`
                 <tr>
-                    <td>${escapeHtml(stock.symbol)}</td>
-                    <td>${escapeHtml(stock.name)}</td>
-                    <td>$${stock.price.toFixed(2)}</td>
-                    <td class="${stock.change >= 0 ? 'positive' : 'negative'}">
-                        ${stock.change >= 0 ? '+' : ''}${stock.change.toFixed(2)}%
+                    <td>\${escapeHtml(stock.symbol)}</td>
+                    <td>\${escapeHtml(stock.name)}</td>
+                    <td>$\${stock.price.toFixed(2)}</td>
+                    <td class="\${stock.change >= 0 ? 'positive' : 'negative'}">
+                        \${stock.change >= 0 ? '+' : ''}\${stock.change.toFixed(2)}%
                     </td>
-                    <td style="color: ${sharesAvailable > 100000 ? '#00ff00' : sharesAvailable > 10000 ? '#ffff00' : '#ff8800'}">
-                        ${sharesDisplay}
+                    <td style="color: \${sharesAvailable > 100000 ? '#00ff00' : sharesAvailable > 10000 ? '#ffff00' : '#ff8800'}">
+                        \${sharesDisplay}
                     </td>
                     <td>
-                        <button onclick="selectStock('${escapeHtml(stock.symbol)}')" class="buy-btn">Trade</button>
-                        <a href="/company/${escapeHtml(stock.symbol)}" style="margin-left: 5px; color: #00ff00; text-decoration: none; border: 1px solid #00ff00; padding: 5px 10px; display: inline-block;">Info</a>
+                        <button onclick="selectStock('\${escapeHtml(stock.symbol)}')" class="buy-btn">Trade</button>
+                        <a href="/company/\${escapeHtml(stock.symbol)}" style="margin-left: 5px; color: #00ff00; text-decoration: none; border: 1px solid #00ff00; padding: 5px 10px; display: inline-block;">Info</a>
                     </td>
                 </tr>
-                `;
+                \`;
             }).join('');
             
             // Add pagination controls
@@ -694,7 +667,7 @@
             const currentSelection = stockSelect.value;
             
             stockSelect.innerHTML = '<option value="">Select Stock</option>' + 
-                stocks.map(s => `<option value="${escapeHtml(s.symbol)}">${escapeHtml(s.symbol)} - ${escapeHtml(s.name)}</option>`).join('');
+                stocks.map(s => \`<option value="\${escapeHtml(s.symbol)}">\${escapeHtml(s.symbol)} - \${escapeHtml(s.name)}</option>\`).join('');
             
             // Restore the selection if it still exists in the updated list
             if (currentSelection && stocks.find(s => s.symbol === currentSelection)) {
@@ -757,5 +730,5 @@
         setInterval(loadAccountData, 5000); // Refresh account data
         setInterval(calculateTradingFee, 60000); // Recalculate fee every minute
     </script>
-</body>
-</html>
+    `
+}) %>
