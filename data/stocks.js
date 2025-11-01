@@ -32,6 +32,109 @@ for (const [symbol, stockInfo] of Object.entries(historicalStockData.data)) {
   stockSectors[symbol] = stockInfo.sector;
 }
 
+/**
+ * Calculate variable annual growth rate for a given year and sector
+ * Simulates market cycles with good years, bad years, and sector-specific performance
+ * @param {number} year - The year to calculate growth for
+ * @param {string} sector - The sector (e.g., 'Technology', 'Financial')
+ * @returns {number} - Annual growth rate (e.g., 0.15 for 15% growth)
+ */
+function getAnnualGrowthRate(year, sector = null) {
+  // Base market cycle using deterministic seed from year
+  // This creates consistent but variable returns across years
+  const yearSeed = year * 2654435761; // Large multiplier for better hash distribution
+  const marketCycleRandom = Math.abs(Math.sin(yearSeed) * 10000) % 1;
+  
+  // Define market regime based on year cycle
+  // Create a 7-10 year business cycle pattern
+  const cyclePosition = (year % 10) / 10; // Position in decade cycle
+  
+  // Base market return varies by cycle position
+  // Early cycle: stronger growth, late cycle: weaker growth
+  let baseMarketReturn;
+  if (cyclePosition < 0.3) {
+    // Early cycle - recovery/expansion (0-3 years)
+    baseMarketReturn = 0.08 + (marketCycleRandom * 0.10); // 8-18%
+  } else if (cyclePosition < 0.7) {
+    // Mid cycle - mature expansion (3-7 years)
+    baseMarketReturn = 0.05 + (marketCycleRandom * 0.08); // 5-13%
+  } else {
+    // Late cycle - slowdown (7-10 years)
+    baseMarketReturn = 0.02 + (marketCycleRandom * 0.06); // 2-8%
+  }
+  
+  // Add year-specific variation (good years vs bad years)
+  const yearVariationSeed = year * 1103515245;
+  const yearVariation = (Math.abs(Math.sin(yearVariationSeed) * 10000) % 1) - 0.5;
+  
+  // Some years are particularly good or bad
+  let yearAdjustment = yearVariation * 0.15; // ±7.5%
+  
+  // Occasionally have exceptional years (very good or very bad)
+  if (Math.abs(yearVariation) > 0.8) {
+    yearAdjustment *= 2; // Double the effect for extreme years
+  }
+  
+  // Calculate base return
+  let annualReturn = baseMarketReturn + yearAdjustment;
+  
+  // Add sector-specific performance if sector provided
+  if (sector) {
+    const sectorSeed = year * 16807 + sector.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+    const sectorRandom = Math.abs(Math.sin(sectorSeed) * 10000) % 1;
+    
+    // Sector rotation - different sectors perform better in different years
+    const sectorCycle = (year % 5) / 5; // 5-year sector rotation
+    
+    // Sector-specific multipliers based on cycle position
+    const sectorMultipliers = {
+      'Technology': sectorCycle < 0.4 ? 1.3 : (sectorCycle < 0.7 ? 1.1 : 0.9),
+      'Financial': sectorCycle < 0.3 ? 1.2 : (sectorCycle < 0.6 ? 1.0 : 0.85),
+      'Energy': sectorCycle < 0.5 ? 0.9 : 1.2,
+      'Healthcare': sectorCycle < 0.6 ? 1.1 : 1.0,
+      'Industrials': sectorCycle < 0.4 ? 1.15 : 0.95,
+      'Consumer': 1.0, // More stable
+      'Utilities': 0.8, // Defensive, lower growth
+      'Real Estate': sectorCycle < 0.5 ? 1.1 : 0.9,
+      'Materials': sectorCycle < 0.3 ? 1.2 : 0.85,
+      'Telecom': 0.9
+    };
+    
+    const sectorMultiplier = sectorMultipliers[sector] || 1.0;
+    const sectorVariation = (sectorRandom - 0.5) * 0.10; // ±5% sector-specific variation
+    
+    annualReturn = annualReturn * sectorMultiplier + sectorVariation;
+  }
+  
+  // Ensure returns stay within reasonable bounds
+  // Allow for occasional negative years but not extreme values
+  annualReturn = Math.max(-0.30, Math.min(0.40, annualReturn)); // -30% to +40%
+  
+  return annualReturn;
+}
+
+/**
+ * Get historical annual return for a specific year (for testing/debugging)
+ * @param {number} year - The year
+ * @returns {object} - Market statistics for that year
+ */
+function getYearMarketStats(year) {
+  const baseReturn = getAnnualGrowthRate(year);
+  // Use common sector names that appear in the stock data
+  const sectors = ['Technology', 'Financial', 'Energy', 'Healthcare', 'Industrials', 'Consumer'];
+  const sectorReturns = {};
+  
+  sectors.forEach(sector => {
+    sectorReturns[sector] = getAnnualGrowthRate(year, sector);
+  });
+  
+  return {
+    year: year,
+    marketReturn: baseReturn,
+    sectorReturns: sectorReturns
+  };
+}
+
 // Price cache for when market is closed
 let priceCache = {};
 let lastMarketState = null;
@@ -170,15 +273,40 @@ function getStockPrice(symbol, currentTime, timeMultiplier, isPaused, bypassCach
   if (currentTime >= stockData[stockData.length - 1].date) {
     let basePrice = stockData[stockData.length - 1].price;
     const lastDataDate = stockData[stockData.length - 1].date;
+    const sector = getStockSector(symbol);
     
     // Calculate time since last data point
     const daysSinceLastData = (currentTime.getTime() - lastDataDate.getTime()) / (1000 * 60 * 60 * 24);
     
-    // Apply continued growth: average 7% annual growth (historical market average)
-    // Compound daily: (1 + annual_rate)^(days/365.25)
-    const annualGrowthRate = 0.07; // 7% per year
-    const growthFactor = Math.pow(1 + annualGrowthRate, daysSinceLastData / 365.25);
-    basePrice = basePrice * growthFactor;
+    // Apply variable growth year by year for more realistic market cycles
+    // This simulates good years and bad years instead of constant growth
+    const lastYear = lastDataDate.getFullYear();
+    const currentYear = currentTime.getFullYear();
+    
+    // If we're spanning multiple years, apply year-by-year growth
+    if (currentYear > lastYear) {
+      // Start from the last data point
+      let price = basePrice;
+      
+      // Apply growth for each complete year
+      for (let year = lastYear + 1; year <= currentYear; year++) {
+        const yearGrowthRate = getAnnualGrowthRate(year, sector);
+        price = price * (1 + yearGrowthRate);
+      }
+      
+      // Apply partial year growth for the current year
+      const daysIntoCurrentYear = (currentTime.getTime() - new Date(currentYear, 0, 1).getTime()) / (1000 * 60 * 60 * 24);
+      const currentYearGrowthRate = getAnnualGrowthRate(currentYear, sector);
+      const partialYearGrowth = Math.pow(1 + currentYearGrowthRate, daysIntoCurrentYear / 365.25);
+      price = price * partialYearGrowth;
+      
+      basePrice = price;
+    } else {
+      // Same year as last data point, use simple compound growth
+      const annualGrowthRate = getAnnualGrowthRate(currentYear, sector);
+      const growthFactor = Math.pow(1 + annualGrowthRate, daysSinceLastData / 365.25);
+      basePrice = basePrice * growthFactor;
+    }
     
     // Add daily volatility (±2%)
     const randomValue = seededRandom(symbol, Math.floor(currentTime.getTime() / (1000 * 60 * 60 * 24)));
@@ -188,14 +316,58 @@ function getStockPrice(symbol, currentTime, timeMultiplier, isPaused, bypassCach
     // Apply crash simulation impact if module is loaded
     let finalPrice = basePrice;
     if (crashSimModule) {
-      const sector = getStockSector(symbol);
       finalPrice = crashSimModule.calculateStockPriceImpact(symbol, sector, basePrice, currentTime);
+    }
+    
+    // Calculate change from previous day for percentage change
+    let change = 0;
+    const previousDay = new Date(currentTime.getTime() - (24 * 60 * 60 * 1000));
+    const previousDaysSinceLastData = (previousDay.getTime() - lastDataDate.getTime()) / (1000 * 60 * 60 * 24);
+    
+    if (previousDaysSinceLastData >= 0) {
+      // Calculate previous day's price with same methodology
+      let prevBasePrice = stockData[stockData.length - 1].price;
+      const prevYear = previousDay.getFullYear();
+      
+      // Apply year-by-year growth for previous day
+      if (prevYear > lastYear) {
+        let prevPrice = prevBasePrice;
+        
+        for (let year = lastYear + 1; year <= prevYear; year++) {
+          const yearGrowthRate = getAnnualGrowthRate(year, sector);
+          prevPrice = prevPrice * (1 + yearGrowthRate);
+        }
+        
+        const daysIntoPrevYear = (previousDay.getTime() - new Date(prevYear, 0, 1).getTime()) / (1000 * 60 * 60 * 24);
+        const prevYearGrowthRate = getAnnualGrowthRate(prevYear, sector);
+        const partialYearGrowth = Math.pow(1 + prevYearGrowthRate, daysIntoPrevYear / 365.25);
+        prevPrice = prevPrice * partialYearGrowth;
+        
+        prevBasePrice = prevPrice;
+      } else {
+        const annualGrowthRate = getAnnualGrowthRate(prevYear, sector);
+        const prevGrowthFactor = Math.pow(1 + annualGrowthRate, previousDaysSinceLastData / 365.25);
+        prevBasePrice = prevBasePrice * prevGrowthFactor;
+      }
+      
+      const prevRandomValue = seededRandom(symbol, Math.floor(previousDay.getTime() / (1000 * 60 * 60 * 24)));
+      const prevVolatility = (prevRandomValue - 0.5) * 0.04;
+      prevBasePrice = prevBasePrice * (1 + prevVolatility);
+      
+      // Apply crash simulation impact for previous day
+      let prevFinalPrice = prevBasePrice;
+      if (crashSimModule) {
+        prevFinalPrice = crashSimModule.calculateStockPriceImpact(symbol, sector, prevBasePrice, previousDay);
+      }
+      
+      // Calculate percentage change
+      change = ((finalPrice - prevFinalPrice) / prevFinalPrice) * 100;
     }
     
     const result = {
       symbol,
       price: parseFloat(finalPrice.toFixed(2)),
-      change: 0,
+      change: parseFloat(change.toFixed(2)),
       name: getStockName(symbol),
       sector: getStockSector(symbol)
     };
@@ -272,5 +444,7 @@ function getAvailableStocks(currentTime, timeMultiplier, isPaused, bypassCache =
 module.exports = {
   getStockPrice,
   getStockData,
-  getAvailableStocks
+  getAvailableStocks,
+  getAnnualGrowthRate,
+  getYearMarketStats
 };

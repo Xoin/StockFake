@@ -610,6 +610,12 @@ app.get('/api/market/health', (req, res) => {
           if (priceChange > 0.5) advancing++;
           else if (priceChange < -0.5) declining++;
           else unchanged++;
+        } else {
+          // If no previous stock data found, use the stock's built-in change percentage
+          // This handles the case where we're beyond historical data
+          if (stock.change > 0.5) advancing++;
+          else if (stock.change < -0.5) declining++;
+          else unchanged++;
         }
       });
       
@@ -704,6 +710,30 @@ app.get('/api/market/stats', (req, res) => {
     topLosers,
     avgPrice: allStocks.reduce((sum, s) => sum + s.price, 0) / allStocks.length
   });
+});
+
+// Market year stats API - shows expected returns for different years
+app.get('/api/market/year-stats', (req, res) => {
+  const { year } = req.query;
+  
+  if (year) {
+    // Get stats for a specific year
+    const yearStats = stocks.getYearMarketStats(parseInt(year));
+    res.json(yearStats);
+  } else {
+    // Get stats for current year and next 10 years
+    const currentYear = gameTime.getFullYear();
+    const yearStats = [];
+    
+    for (let y = currentYear; y <= currentYear + 10; y++) {
+      yearStats.push(stocks.getYearMarketStats(y));
+    }
+    
+    res.json({
+      currentYear: currentYear,
+      stats: yearStats
+    });
+  }
 });
 
 // Company information API
@@ -4074,6 +4104,30 @@ setInterval(() => {
       if (result.success) {
         console.log(`Auto-triggered dynamic crash event: ${event.name} (${event.type})`);
       }
+    }
+    
+    // Process share buybacks based on market sentiment
+    const marketState = marketCrashSim.getMarketState();
+    const marketSentiment = marketState.sentimentScore || 0;
+    
+    // Convert sentiment from -1..1 to 0..1 scale for buyback function
+    const normalizedSentiment = (marketSentiment + 1) / 2;
+    
+    const buybackEvents = shareAvailability.processBuybacks(gameTime, normalizedSentiment);
+    if (buybackEvents.length > 0) {
+      console.log(`Processed ${buybackEvents.length} stock buyback(s):`);
+      buybackEvents.forEach(event => {
+        console.log(`  - ${event.symbol}: Bought back ${event.sharesBoughtBack.toLocaleString()} shares (${event.percentageOfFloat}% of float)`);
+      });
+    }
+    
+    // Process share issuance (less frequent)
+    const issuanceEvents = shareAvailability.processShareIssuance(gameTime, marketSentiment);
+    if (issuanceEvents.length > 0) {
+      console.log(`Processed ${issuanceEvents.length} share issuance(s):`);
+      issuanceEvents.forEach(event => {
+        console.log(`  - ${event.symbol}: Issued ${event.sharesIssued.toLocaleString()} shares (${event.percentageIncrease}% increase)`);
+      });
     }
   }
 }, 10000);  // Update every 10 seconds
