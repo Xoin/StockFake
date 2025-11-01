@@ -13,8 +13,8 @@
             <a href="/graphs">📉 Charts</a> |
             <a href="/loans">💰 Loans</a> |
             <a href="/taxes">📑 Taxes</a> |
-            <a href="/news">📰 News</a> |
-            <a href="/email">📧 Email</a>
+            <a href="/news" id="newsNavLink">📰 News<span id="newsBadgeNav" class="nav-badge" style="display: none;"></span></a> |
+            <a href="/email" id="emailNavLink">📧 Email<span id="emailBadgeNav" class="nav-badge" style="display: none;"></span></a>
         </div>
         
         <script>
@@ -65,7 +65,55 @@
             }
         }
         
+        // Update notification badges
+        async function updateNavNotifications() {
+            try {
+                // Get unread counts from localStorage
+                const readNewsIds = new Set(JSON.parse(localStorage.getItem('readNewsIds') || '[]'));
+                const readEmailIds = new Set(JSON.parse(localStorage.getItem('readEmailIds') || '[]'));
+                
+                // Fetch current news and emails
+                const [newsResponse, emailResponse] = await Promise.all([
+                    fetch('/api/news'),
+                    fetch('/api/emails')
+                ]);
+                
+                const newsData = await newsResponse.json();
+                const emailData = await emailResponse.json();
+                
+                // Calculate unread counts
+                const unreadNewsCount = newsData.filter(item => !readNewsIds.has(item.id)).length;
+                const unreadEmailCount = emailData.filter(item => !readEmailIds.has(item.id)).length;
+                
+                // Update news badge
+                const newsBadge = document.getElementById('newsBadgeNav');
+                if (newsBadge) {
+                    if (unreadNewsCount > 0) {
+                        newsBadge.textContent = unreadNewsCount > 99 ? '99+' : unreadNewsCount;
+                        newsBadge.style.display = 'inline-block';
+                    } else {
+                        newsBadge.style.display = 'none';
+                    }
+                }
+                
+                // Update email badge
+                const emailBadge = document.getElementById('emailBadgeNav');
+                if (emailBadge) {
+                    if (unreadEmailCount > 0) {
+                        emailBadge.textContent = unreadEmailCount > 99 ? '99+' : unreadEmailCount;
+                        emailBadge.style.display = 'inline-block';
+                    } else {
+                        emailBadge.style.display = 'none';
+                    }
+                }
+            } catch (error) {
+                console.error('Error updating nav notifications:', error);
+            }
+        }
+        
         // Initialize and update
         updateGameStatus();
+        updateNavNotifications();
         setInterval(updateGameStatus, 1000);
+        setInterval(updateNavNotifications, 3000); // Update badges every 3 seconds
         </script>
