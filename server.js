@@ -3733,6 +3733,155 @@ app.get('/api/emails', (req, res) => {
   res.json(emails.filter(email => email.date <= gameTime).sort((a, b) => b.date - a.date));
 });
 
+// Market Crash Simulation API endpoints
+
+const marketCrashSim = require('./helpers/marketCrashSimulation');
+const crashEvents = require('./data/market-crash-events');
+
+// Initialize crash simulation on server start
+marketCrashSim.initializeMarketState();
+
+// Update crash events periodically
+setInterval(() => {
+  if (!isPaused) {
+    marketCrashSim.updateCrashEvents(gameTime);
+  }
+}, 10000);  // Update every 10 seconds
+
+// Get all available crash scenarios
+app.get('/api/crash/scenarios', (req, res) => {
+  const scenarios = crashEvents.getAllScenarios();
+  res.json({
+    total: scenarios.length,
+    historical: crashEvents.getHistoricalScenarios().length,
+    hypothetical: crashEvents.getHypotheticalScenarios().length,
+    scenarios: scenarios.map(s => ({
+      id: s.id,
+      name: s.name,
+      type: s.type,
+      severity: s.severity,
+      description: s.description,
+      trigger: s.trigger
+    }))
+  });
+});
+
+// Get scenario details by ID
+app.get('/api/crash/scenarios/:id', (req, res) => {
+  const { id } = req.params;
+  const scenario = crashEvents.getScenarioById(id);
+  
+  if (!scenario) {
+    return res.status(404).json({ error: 'Scenario not found' });
+  }
+  
+  res.json(scenario);
+});
+
+// Trigger a crash event
+app.post('/api/crash/trigger', (req, res) => {
+  const { scenarioId, customConfig } = req.body;
+  
+  let eventConfig = scenarioId;
+  if (customConfig) {
+    eventConfig = customConfig;
+  }
+  
+  const result = marketCrashSim.triggerCrashEvent(eventConfig, gameTime);
+  
+  if (result.success) {
+    // Save to database
+    try {
+      dbModule.insertCrashEvent.run(
+        result.event.id,
+        result.event.name,
+        result.event.type,
+        result.event.severity,
+        result.event.activatedAt.toISOString(),
+        result.event.status,
+        JSON.stringify(result.event)
+      );
+    } catch (error) {
+      console.error('Failed to save crash event to database:', error);
+    }
+    
+    res.json(result);
+  } else {
+    res.status(400).json(result);
+  }
+});
+
+// Get active crash events
+app.get('/api/crash/active', (req, res) => {
+  const activeEvents = marketCrashSim.getActiveEvents();
+  res.json({
+    count: activeEvents.length,
+    events: activeEvents
+  });
+});
+
+// Deactivate a crash event
+app.post('/api/crash/deactivate/:eventId', (req, res) => {
+  const { eventId } = req.params;
+  
+  const result = marketCrashSim.deactivateCrashEvent(eventId);
+  
+  if (result.success) {
+    // Update database
+    try {
+      dbModule.updateCrashEventStatus.run(
+        'deactivated',
+        gameTime.toISOString(),
+        eventId
+      );
+    } catch (error) {
+      console.error('Failed to update crash event status in database:', error);
+    }
+  }
+  
+  res.json(result);
+});
+
+// Get crash analytics
+app.get('/api/crash/analytics', (req, res) => {
+  const analytics = marketCrashSim.getCrashAnalytics();
+  res.json(analytics);
+});
+
+// Get market state affected by crashes
+app.get('/api/crash/market-state', (req, res) => {
+  const marketState = marketCrashSim.getMarketState();
+  res.json(marketState);
+});
+
+// Get crash event history
+app.get('/api/crash/history', (req, res) => {
+  const { limit } = req.query;
+  const limitValue = parseInt(limit) || 50;
+  const history = marketCrashSim.getEventHistory(limitValue);
+  res.json({
+    count: history.length,
+    events: history
+  });
+});
+
+// Create custom crash scenario
+app.post('/api/crash/custom', (req, res) => {
+  const customConfig = req.body;
+  
+  // Validate required fields
+  if (!customConfig.name) {
+    return res.status(400).json({ error: 'Event name is required' });
+  }
+  
+  const scenario = crashEvents.createCrashTemplate(customConfig);
+  res.json({
+    success: true,
+    scenario: scenario,
+    message: 'Custom crash scenario created. Use /api/crash/trigger to activate it.'
+  });
+});
+
 // Debug/Cheat API Endpoints
 // These endpoints are for debugging and testing purposes only
 
