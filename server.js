@@ -62,6 +62,10 @@ console.log(`  Time multiplier: ${timeMultiplier}`);
 function saveGameState() {
   try {
     const savedState = dbModule.getGameState.get();
+    if (!savedState) {
+      console.error('Could not retrieve game state from database for saving');
+      return;
+    }
     dbModule.updateGameState.run(
       gameTime.toISOString(),
       isPaused ? 1 : 0,
@@ -373,6 +377,9 @@ function addHourlySamplingIfNeeded(history, daysToFetch, dataFetcher) {
   }
 }
 
+// Constants for historical data fetching
+const USE_REAL_HISTORICAL_PRICES = false; // Always use real prices for historical data, not cached prices
+
 // Stock history API for charts
 app.get('/api/stocks/:symbol/history', (req, res) => {
   const { symbol } = req.params;
@@ -395,7 +402,7 @@ app.get('/api/stocks/:symbol/history', (req, res) => {
   // Get historical prices for the specified number of days
   for (let i = daysToFetch; i >= 0; i -= sampleInterval) {
     const date = new Date(gameTime.getTime() - (i * 24 * 60 * 60 * 1000));
-    const price = stocks.getStockPrice(symbol, date, timeMultiplier, false); // Always use real prices for history
+    const price = stocks.getStockPrice(symbol, date, timeMultiplier, USE_REAL_HISTORICAL_PRICES);
     if (price) {
       history.push({
         date: date.toISOString(),
@@ -406,7 +413,7 @@ app.get('/api/stocks/:symbol/history', (req, res) => {
   
   // Always include the most recent data point
   if (history.length === 0 || history[history.length - 1].date !== gameTime.toISOString()) {
-    const price = stocks.getStockPrice(symbol, gameTime, timeMultiplier, false); // Always use real prices for history
+    const price = stocks.getStockPrice(symbol, gameTime, timeMultiplier, USE_REAL_HISTORICAL_PRICES);
     if (price) {
       history.push({
         date: gameTime.toISOString(),
@@ -417,7 +424,7 @@ app.get('/api/stocks/:symbol/history', (req, res) => {
   
   // If insufficient data, use hourly intervals for recent data
   addHourlySamplingIfNeeded(history, daysToFetch, (date) => {
-    const price = stocks.getStockPrice(symbol, date, timeMultiplier, false); // Always use real prices for history
+    const price = stocks.getStockPrice(symbol, date, timeMultiplier, USE_REAL_HISTORICAL_PRICES);
     return price ? { date: date.toISOString(), price: price.price } : null;
   });
   
@@ -443,7 +450,7 @@ app.get('/api/market/index', (req, res) => {
   // Calculate simple market index based on average of all stocks
   for (let i = daysToFetch; i >= 0; i -= sampleInterval) {
     const date = new Date(gameTime.getTime() - (i * 24 * 60 * 60 * 1000));
-    const allStocks = stocks.getStockData(date, timeMultiplier, false); // Always use real prices for history
+    const allStocks = stocks.getStockData(date, timeMultiplier, USE_REAL_HISTORICAL_PRICES);
     
     if (allStocks.length > 0) {
       const avgPrice = allStocks.reduce((sum, s) => sum + s.price, 0) / allStocks.length;
@@ -457,7 +464,7 @@ app.get('/api/market/index', (req, res) => {
   
   // Always include the most recent data point
   if (history.length === 0 || history[history.length - 1].date !== gameTime.toISOString()) {
-    const allStocks = stocks.getStockData(gameTime, timeMultiplier, false); // Always use real prices for history
+    const allStocks = stocks.getStockData(gameTime, timeMultiplier, USE_REAL_HISTORICAL_PRICES);
     if (allStocks.length > 0) {
       const avgPrice = allStocks.reduce((sum, s) => sum + s.price, 0) / allStocks.length;
       history.push({
@@ -470,7 +477,7 @@ app.get('/api/market/index', (req, res) => {
   
   // If insufficient data, use hourly intervals for recent data
   addHourlySamplingIfNeeded(history, daysToFetch, (date) => {
-    const allStocks = stocks.getStockData(date, timeMultiplier, false); // Always use real prices for history
+    const allStocks = stocks.getStockData(date, timeMultiplier, USE_REAL_HISTORICAL_PRICES);
     if (allStocks.length > 0) {
       const avgPrice = allStocks.reduce((sum, s) => sum + s.price, 0) / allStocks.length;
       return {
@@ -2760,7 +2767,7 @@ app.get('/api/indexfunds/:symbol/history', (req, res) => {
   const { days } = req.query;
   
   const daysToFetch = parseInt(days) || 30;
-  const history = indexFunds.getIndexFundHistory(symbol, gameTime, daysToFetch, timeMultiplier, false);
+  const history = indexFunds.getIndexFundHistory(symbol, gameTime, daysToFetch, timeMultiplier, USE_REAL_HISTORICAL_PRICES);
   
   res.json(history);
 });
