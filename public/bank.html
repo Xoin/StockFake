@@ -76,6 +76,29 @@
             padding: 10px;
             border-top: 2px solid #00ff00;
         }
+        .quick-btn {
+            background-color: #003300;
+            color: #00ff00;
+            border: 1px solid #00ff00;
+            padding: 5px 10px;
+            margin: 2px;
+            cursor: pointer;
+            font-family: 'Courier New', monospace;
+            font-size: 0.85em;
+        }
+        .quick-btn:hover {
+            background-color: #00ff00;
+            color: #000;
+        }
+        .quick-sell-btn {
+            background-color: #330000;
+            border-color: #ff0000;
+            color: #ff0000;
+        }
+        .quick-sell-btn:hover {
+            background-color: #ff0000;
+            color: #000;
+        }
     </style>
 </head>
 <body>
@@ -146,10 +169,11 @@
                         <th>Total Cost</th>
                         <th>Gain/Loss</th>
                         <th>Return %</th>
+                        <th>Quick Actions</th>
                     </tr>
                 </thead>
                 <tbody id="combinedPortfolioList">
-                    <tr><td colspan="9">Loading...</td></tr>
+                    <tr><td colspan="10">Loading...</td></tr>
                 </tbody>
             </table>
             <div class="total-value">
@@ -487,11 +511,15 @@
             
             // Render combined portfolio
             if (positions.length === 0) {
-                combinedList.innerHTML = '<tr><td colspan="9">No positions</td></tr>';
+                combinedList.innerHTML = '<tr><td colspan="10">No positions</td></tr>';
             } else {
                 combinedList.innerHTML = positions.map(pos => {
                     const gainLossClass = pos.gainLoss >= 0 ? 'positive' : 'negative';
                     const returnClass = pos.returnPercent >= 0 ? 'positive' : 'negative';
+                    
+                    // Determine the trade URL based on type
+                    const isStock = pos.type.includes('Stock');
+                    const tradeUrl = isStock ? '/trading' : '/indexfunds.html';
                     
                     return `
                         <tr>
@@ -504,6 +532,10 @@
                             <td>$${pos.totalCost.toFixed(2)}</td>
                             <td class="${gainLossClass}">$${pos.gainLoss.toFixed(2)}</td>
                             <td class="${returnClass}">${pos.returnPercent.toFixed(2)}%</td>
+                            <td>
+                                <button class="quick-btn" onclick="quickBuy('${escapeHtml(pos.symbol)}', ${isStock})">+Buy</button>
+                                <button class="quick-btn quick-sell-btn" onclick="quickSell('${escapeHtml(pos.symbol)}', ${pos.shares}, ${isStock})">Sell</button>
+                            </td>
                         </tr>
                     `;
                 }).join('');
@@ -531,6 +563,72 @@
             
             document.getElementById('totalReturnPercent').textContent = totalReturn.toFixed(2);
             document.getElementById('totalValue').textContent = (account.cash + totalPortfolioValue).toFixed(2);
+        }
+        
+        // Quick trade functions
+        async function quickBuy(symbol, isStock) {
+            const shares = prompt(`How many shares of ${symbol} would you like to buy?`, '1');
+            if (!shares || parseFloat(shares) <= 0) return;
+            
+            const endpoint = isStock ? '/api/trade' : '/api/indexfunds/trade';
+            
+            try {
+                const response = await fetch(endpoint, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        symbol: symbol,
+                        shares: parseFloat(shares),
+                        action: 'buy'
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok) {
+                    alert(`✓ Successfully bought ${shares} shares of ${symbol}!`);
+                    updateAccount(); // Refresh the display
+                } else {
+                    alert(`✗ Error: ${result.error || 'Trade failed'}`);
+                }
+            } catch (error) {
+                alert(`✗ Error: ${error.message}`);
+            }
+        }
+        
+        async function quickSell(symbol, maxShares, isStock) {
+            const shares = prompt(`How many shares of ${symbol} would you like to sell? (You own ${maxShares.toFixed(2)})`, maxShares.toFixed(2));
+            if (!shares || parseFloat(shares) <= 0) return;
+            
+            if (parseFloat(shares) > maxShares) {
+                alert(`You only own ${maxShares.toFixed(2)} shares of ${symbol}`);
+                return;
+            }
+            
+            const endpoint = isStock ? '/api/trade' : '/api/indexfunds/trade';
+            
+            try {
+                const response = await fetch(endpoint, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        symbol: symbol,
+                        shares: parseFloat(shares),
+                        action: 'sell'
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok) {
+                    alert(`✓ Successfully sold ${shares} shares of ${symbol}!`);
+                    updateAccount(); // Refresh the display
+                } else {
+                    alert(`✗ Error: ${result.error || 'Trade failed'}`);
+                }
+            } catch (error) {
+                alert(`✗ Error: ${error.message}`);
+            }
         }
         
         updateAccount();

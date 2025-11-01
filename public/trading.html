@@ -243,7 +243,19 @@
             font-size: 0.85em;
             text-shadow: 0 0 2px #fff;
         }
+        .content-wrapper {
+            display: grid;
+            grid-template-columns: 250px 1fr;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        @media (max-width: 768px) {
+            .content-wrapper {
+                grid-template-columns: 1fr;
+            }
+        }
     </style>
+    <script src="asset-filter.js"></script>
 </head>
 <body>
     <div class="container">
@@ -268,30 +280,34 @@
             <div id="currentConcentrations" class="current-concentrations"></div>
         </div>
         
-        <div class="stocks-container">
-            <h2>Available Stocks</h2>
-            <div style="margin-bottom: 15px;">
-                <input type="text" id="stockSearch" placeholder="Search stocks by symbol or name..." 
-                    style="width: 100%; max-width: 400px; padding: 10px; font-size: 1em;"
-                    oninput="filterStocks()">
+        <!-- Sidebar and Content Layout -->
+        <div class="content-wrapper">
+            <!-- Sidebar Filter -->
+            <div id="filterSidebar"></div>
+            
+            <!-- Main Content -->
+            <div>
+                <div class="stocks-container">
+                    <h2>Available Stocks</h2>
+                    <div class="pagination-controls-container"></div>
+                    <table id="stocksTable">
+                        <thead>
+                            <tr>
+                                <th>Symbol</th>
+                                <th>Name</th>
+                                <th>Price</th>
+                                <th>Change %</th>
+                                <th>Available</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="stocksList">
+                            <tr><td colspan="6">Loading...</td></tr>
+                        </tbody>
+                    </table>
+                    <div class="pagination-controls-container"></div>
+                </div>
             </div>
-            <div class="pagination-controls-container"></div>
-            <table id="stocksTable">
-                <thead>
-                    <tr>
-                        <th>Symbol</th>
-                        <th>Name</th>
-                        <th>Price</th>
-                        <th>Change %</th>
-                        <th>Available</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody id="stocksList">
-                    <tr><td colspan="6">Loading...</td></tr>
-                </tbody>
-            </table>
-            <div class="pagination-controls-container"></div>
         </div>
         
         <div class="trade-form">
@@ -663,9 +679,15 @@
             }
         }
         
+        // Asset filter instance
+        let assetFilter = null;
+        
         async function updateStocks() {
             const response = await fetch('/api/stocks');
             stocks = await response.json();
+            
+            // Add type property for filtering
+            stocks = stocks.map(s => ({...s, type: 'stocks'}));
             
             const stockSelect = document.getElementById('stockSymbol');
             // Preserve the currently selected value
@@ -679,19 +701,35 @@
                 stockSelect.value = currentSelection;
             }
             
-            // Apply search filter if active
+            // Initialize asset filter if not already done
+            if (!assetFilter) {
+                // Get unique sectors from stocks
+                const sectors = [...new Set(stocks.map(s => s.sector).filter(s => s))].sort();
+                
+                assetFilter = new AssetFilter({
+                    containerId: 'filterSidebar',
+                    availableTypes: ['stocks'],
+                    availableSectors: sectors,
+                    showSectors: true,
+                    showPriceRange: true,
+                    onFilterChange: (filters) => {
+                        filterStocks();
+                    }
+                });
+            }
+            
+            // Apply filter
             filterStocks();
         }
         
-        // Filter stocks based on search input
+        // Filter stocks based on search input and asset filter
         function filterStocks() {
-            const searchTerm = document.getElementById('stockSearch')?.value.toLowerCase() || '';
-            const filteredStocks = searchTerm 
-                ? stocks.filter(s => 
-                    s.symbol.toLowerCase().includes(searchTerm) || 
-                    s.name.toLowerCase().includes(searchTerm)
-                  )
-                : stocks;
+            let filteredStocks = stocks;
+            
+            // Apply asset filter if it exists
+            if (assetFilter) {
+                filteredStocks = stocks.filter(s => assetFilter.matchesFilter(s));
+            }
             
             // Preserve current page if paginator exists
             const currentPage = paginator ? paginator.currentPage : 1;
