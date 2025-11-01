@@ -35,7 +35,7 @@ const inflationRates = new Proxy({}, {
   },
   has(target, prop) {
     const year = parseInt(prop);
-    return !isNaN(year);
+    return !isNaN(year) && year >= 1970;
   },
   ownKeys() {
     // Return all historical years for Object.keys() and similar operations

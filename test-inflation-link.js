@@ -169,6 +169,7 @@ try {
   const has1970 = 1970 in constants.inflationRates;
   const has2025 = 2025 in constants.inflationRates;
   const hasInvalid = 'invalid' in constants.inflationRates;
+  const hasBefore1970 = 1950 in constants.inflationRates;
   
   if (!has1970) {
     throw new Error('Expected 1970 to be in inflationRates');
@@ -179,10 +180,14 @@ try {
   if (hasInvalid) {
     throw new Error('Expected "invalid" to not be in inflationRates');
   }
+  if (hasBefore1970) {
+    throw new Error('Expected years before 1970 to not be in inflationRates');
+  }
   
   console.log('✓ "in" operator works correctly');
   console.log(`  1970 in inflationRates: ${has1970}`);
   console.log(`  2025 in inflationRates: ${has2025}`);
+  console.log(`  1950 in inflationRates: ${hasBefore1970}`);
   console.log(`  "invalid" in inflationRates: ${hasInvalid}\n`);
 } catch (error) {
   console.error('✗ Failed:', error.message, '\n');

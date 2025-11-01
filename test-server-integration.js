@@ -183,10 +183,12 @@ try {
 // Test 7: Test edge cases
 console.log('Test 7: Test edge cases');
 try {
-  // Very old year (before 1970)
+  // Very old year (before 1970) - should not be available
   const before1970 = constants.getInflationRate(1950);
-  if (before1970 !== undefined && isNaN(before1970)) {
-    // It's okay if it's undefined or a valid number
+  const hasBefore1970 = 1950 in constants.inflationRates;
+  
+  if (hasBefore1970) {
+    throw new Error('Years before 1970 should not be in inflationRates');
   }
   
   // Very far future
