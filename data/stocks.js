@@ -42,7 +42,7 @@ for (const [symbol, stockInfo] of Object.entries(historicalStockData.data)) {
 function getAnnualGrowthRate(year, sector = null) {
   // Base market cycle using deterministic seed from year
   // This creates consistent but variable returns across years
-  const yearSeed = year * 2654435761; // Large prime for better distribution
+  const yearSeed = year * 2654435761; // Large multiplier for better hash distribution
   const marketCycleRandom = Math.abs(Math.sin(yearSeed) * 10000) % 1;
   
   // Define market regime based on year cycle
@@ -120,6 +120,7 @@ function getAnnualGrowthRate(year, sector = null) {
  */
 function getYearMarketStats(year) {
   const baseReturn = getAnnualGrowthRate(year);
+  // Use common sector names that appear in the stock data
   const sectors = ['Technology', 'Financial', 'Energy', 'Healthcare', 'Industrials', 'Consumer'];
   const sectorReturns = {};
   
