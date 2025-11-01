@@ -21,6 +21,12 @@ let marketState = {
   sectorSentiment: {}
 };
 
+// Decay constants for market state recovery
+const VOLATILITY_DECAY_RATE = 0.99;  // 1% daily decay when no events active
+const LIQUIDITY_RECOVERY_RATE = 1.01;  // 1% daily recovery when no events active
+const SENTIMENT_DECAY_RATE = 0.95;  // 5% daily decay towards neutral
+const SECTOR_SENTIMENT_DECAY_RATE = 0.95;  // 5% daily decay towards neutral
+
 /**
  * Event history for analytics
  */
@@ -112,13 +118,21 @@ function applyEventImpact(event, currentTime) {
   const daysSinceStart = (currentTime - new Date(event.startDate)) / (1000 * 60 * 60 * 24);
   event.daysSinceStart = daysSinceStart;
   
-  // Apply volatility impact
+  // Reset to baseline before applying event impacts to avoid exponential compounding
+  if (activeEvents.length === 1) {
+    marketState.currentVolatility = marketState.baseVolatility;
+    marketState.liquidityLevel = 1.0;
+    marketState.sentimentScore = 0.0;
+    marketState.sectorSentiment = {};
+  }
+  
+  // Apply volatility impact (multiplicative)
   marketState.currentVolatility *= event.impact.volatilityMultiplier;
   
-  // Apply liquidity impact
+  // Apply liquidity impact (multiplicative reduction)
   marketState.liquidityLevel *= (1 - event.impact.liquidityReduction);
   
-  // Apply sentiment impact
+  // Apply sentiment impact (additive, clamped)
   marketState.sentimentScore += event.impact.sentimentShift;
   marketState.sentimentScore = Math.max(-1.0, Math.min(1.0, marketState.sentimentScore));
   
@@ -274,13 +288,13 @@ function updateCrashEvents(currentTime) {
   
   // Decay volatility back to baseline
   if (activeEvents.length === 0) {
-    marketState.currentVolatility = Math.max(1.0, marketState.currentVolatility * 0.99);
-    marketState.liquidityLevel = Math.min(1.0, marketState.liquidityLevel * 1.01);
-    marketState.sentimentScore *= 0.95;  // Sentiment returns to neutral
+    marketState.currentVolatility = Math.max(1.0, marketState.currentVolatility * VOLATILITY_DECAY_RATE);
+    marketState.liquidityLevel = Math.min(1.0, marketState.liquidityLevel * LIQUIDITY_RECOVERY_RATE);
+    marketState.sentimentScore *= SENTIMENT_DECAY_RATE;  // Sentiment returns to neutral
     
     // Decay sector sentiment
     for (const sector in marketState.sectorSentiment) {
-      marketState.sectorSentiment[sector] *= 0.95;
+      marketState.sectorSentiment[sector] *= SECTOR_SENTIMENT_DECAY_RATE;
     }
   } else {
     // Update day counts
@@ -445,8 +459,8 @@ module.exports = {
   // Condition checking
   checkTriggerConditions,
   
-  // For testing
-  _resetState: () => {
+  // Test utilities
+  resetForTesting: () => {
     activeEvents = [];
     eventHistory = [];
     initializeMarketState();

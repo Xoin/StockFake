@@ -4,6 +4,15 @@
 const fs = require('fs');
 const path = require('path');
 
+// Load crash simulation module for price impact calculation
+let crashSimModule = null;
+try {
+  crashSimModule = require('../helpers/marketCrashSimulation');
+} catch (err) {
+  // Crash simulation module not available or error loading
+  console.warn('Market crash simulation module not loaded:', err.message);
+}
+
 // Load historical stock data
 const historicalStockData = JSON.parse(
   fs.readFileSync(path.join(__dirname, 'historical-stock-data.json'), 'utf8')
@@ -163,13 +172,9 @@ function getStockPrice(symbol, currentTime, timeMultiplier, isPaused, bypassCach
     
     // Apply crash simulation impact if module is loaded
     let finalPrice = basePrice;
-    try {
-      const crashSim = require('../helpers/marketCrashSimulation');
+    if (crashSimModule) {
       const sector = getStockSector(symbol);
-      finalPrice = crashSim.calculateStockPriceImpact(symbol, sector, basePrice, currentTime);
-    } catch (err) {
-      // Crash simulation not available or error occurred, use base price
-      finalPrice = basePrice;
+      finalPrice = crashSimModule.calculateStockPriceImpact(symbol, sector, basePrice, currentTime);
     }
     
     const result = {
@@ -205,12 +210,9 @@ function getStockPrice(symbol, currentTime, timeMultiplier, isPaused, bypassCach
   let price = Math.max(0.01, basePrice + fluctuation);
   
   // Apply crash simulation impact if module is loaded
-  try {
-    const crashSim = require('../helpers/marketCrashSimulation');
+  if (crashSimModule) {
     const sector = getStockSector(symbol);
-    price = crashSim.calculateStockPriceImpact(symbol, sector, price, currentTime);
-  } catch (err) {
-    // Crash simulation not available or error occurred, use calculated price
+    price = crashSimModule.calculateStockPriceImpact(symbol, sector, price, currentTime);
   }
   
   // Calculate change from previous base price

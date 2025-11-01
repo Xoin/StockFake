@@ -214,7 +214,7 @@ console.log('Test 9: Liquidity impact calculation');
 try {
   // Trigger a liquidity crisis
   const testDate = new Date('2008-09-15T09:30:00');
-  marketCrashSim._resetState();  // Reset state first
+  marketCrashSim.resetForTesting();  // Reset state first
   marketCrashSim.triggerCrashEvent('financial_crisis_2008', testDate);
   
   const normalLiquidity = 10000;
@@ -260,7 +260,7 @@ try {
 
 // Cleanup
 console.log('Cleaning up...');
-marketCrashSim._resetState();
+marketCrashSim.resetForTesting();
 
 console.log('\n=== All Tests Passed! ===');
 process.exit(0);
