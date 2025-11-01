@@ -273,7 +273,9 @@ let allSectors = [];
 const colorPalette = [
     '#00ff00', '#00ffff', '#ff00ff', '#ffff00', '#ff0000', 
     '#00ff88', '#88ff00', '#0088ff', '#ff8800', '#8800ff',
-    '#ff0088', '#88ff88', '#00ff00', '#ffaa00', '#aa00ff'
+    '#ff0088', '#88ff88', '#ffaa00', '#aa00ff', '#00aaff',
+    '#ff00aa', '#aaff00', '#00ffaa', '#aa88ff', '#ff88aa',
+    '#88ffaa', '#ffaa88', '#aaffff', '#ffaaff', '#aaffaa'
 ];
 
 // Helper function to show insufficient data message on canvas
@@ -631,8 +633,8 @@ async function updateSectorPieChart() {
                 datasets: [{
                     data: sectors.map(s => sectorBreakdown[s].count),
                     backgroundColor: sectors.map((s, idx) => colorPalette[idx % colorPalette.length]),
-                    borderColor: '#00ff00',
-                    borderWidth: 1
+                    borderColor: '#003300',
+                    borderWidth: 2
                 }]
             },
             options: {
@@ -643,7 +645,36 @@ async function updateSectorPieChart() {
                         position: 'right',
                         labels: {
                             color: '#00ff00',
-                            font: { family: 'Courier New', size: 10 }
+                            font: { family: 'Courier New', size: 11 },
+                            padding: 10,
+                            generateLabels: function(chart) {
+                                const data = chart.data;
+                                if (data.labels.length && data.datasets.length) {
+                                    const total = data.datasets[0].data.reduce((a, b) => a + b, 0);
+                                    return data.labels.map((label, i) => {
+                                        const value = data.datasets[0].data[i];
+                                        const percentage = ((value / total) * 100).toFixed(1);
+                                        return {
+                                            text: \`\${label}: \${value} (\${percentage}%)\`,
+                                            fillStyle: data.datasets[0].backgroundColor[i],
+                                            hidden: false,
+                                            index: i
+                                        };
+                                    });
+                                }
+                                return [];
+                            }
+                        }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                const label = context.label || '';
+                                const value = context.parsed;
+                                const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                const percentage = ((value / total) * 100).toFixed(1);
+                                return \`\${label}: \${value} stocks (\${percentage}%)\`;
+                            }
                         }
                     }
                 }

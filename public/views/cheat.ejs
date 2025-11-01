@@ -208,6 +208,35 @@
             </div>
         </div>
 
+        <!-- Advanced Features -->
+        <div class="panel">
+            <h2>⚙️ Advanced Features</h2>
+            
+            <div class="control-group">
+                <label>Margin Trading:</label>
+                <button onclick="toggleMargin()">Toggle Margin Account</button>
+            </div>
+            
+            <div class="control-group">
+                <label>Margin Debt:</label>
+                <input type="number" id="marginAmount" value="10000" step="1000">
+                <button onclick="setMarginDebt()">Set Debt</button>
+                <button onclick="clearMarginDebt()">Clear Debt</button>
+            </div>
+            
+            <div class="control-group">
+                <label>Clear Data:</label>
+                <button onclick="clearTransactions()">Clear Transactions</button>
+                <button onclick="clearLoans()">Clear All Loans</button>
+                <button onclick="clearTaxes()">Clear Tax History</button>
+            </div>
+            
+            <div class="control-group">
+                <label>Market Events:</label>
+                <button onclick="window.location.href='/events'">Open Events Console</button>
+            </div>
+        </div>
+
         <!-- Information Display -->
         <div class="panel">
             <h2>📊 Debug Information</h2>
@@ -528,6 +557,126 @@
                 document.getElementById('debugData').textContent = JSON.stringify(debugData, null, 2);
             } catch (error) {
                 document.getElementById('debugData').textContent = 'Error loading debug info: ' + error.message;
+            }
+        }
+        
+        async function toggleMargin() {
+            try {
+                const response = await fetch('/api/margin/toggle', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    showMessage(\`Margin trading \${data.enabled ? 'enabled' : 'disabled'}\`);
+                    updateAccountDisplay();
+                } else {
+                    const data = await response.json();
+                    showMessage(data.error || 'Failed to toggle margin', 'error');
+                }
+            } catch (error) {
+                showMessage('Error: ' + error.message, 'error');
+            }
+        }
+        
+        async function setMarginDebt() {
+            const amount = parseFloat(document.getElementById('marginAmount').value);
+            
+            try {
+                const response = await fetch('/api/debug/setmargindebt', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ amount })
+                });
+                
+                if (response.ok) {
+                    showMessage(\`Margin debt set to $\${amount.toLocaleString()}\`);
+                    updateAccountDisplay();
+                } else {
+                    const data = await response.json();
+                    showMessage(data.error || 'Failed to set margin debt', 'error');
+                }
+            } catch (error) {
+                showMessage('Error: ' + error.message, 'error');
+            }
+        }
+        
+        async function clearMarginDebt() {
+            try {
+                const response = await fetch('/api/debug/setmargindebt', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ amount: 0 })
+                });
+                
+                if (response.ok) {
+                    showMessage('Margin debt cleared');
+                    updateAccountDisplay();
+                } else {
+                    const data = await response.json();
+                    showMessage(data.error || 'Failed to clear margin debt', 'error');
+                }
+            } catch (error) {
+                showMessage('Error: ' + error.message, 'error');
+            }
+        }
+        
+        async function clearTransactions() {
+            if (!confirm('Clear all transaction history?')) return;
+            
+            try {
+                const response = await fetch('/api/debug/cleartransactions', {
+                    method: 'POST'
+                });
+                
+                if (response.ok) {
+                    showMessage('Transactions cleared');
+                } else {
+                    const data = await response.json();
+                    showMessage(data.error || 'Failed to clear transactions', 'error');
+                }
+            } catch (error) {
+                showMessage('Error: ' + error.message, 'error');
+            }
+        }
+        
+        async function clearLoans() {
+            if (!confirm('Clear all loans (active and history)?')) return;
+            
+            try {
+                const response = await fetch('/api/debug/clearloans', {
+                    method: 'POST'
+                });
+                
+                if (response.ok) {
+                    showMessage('All loans cleared');
+                    updateAccountDisplay();
+                } else {
+                    const data = await response.json();
+                    showMessage(data.error || 'Failed to clear loans', 'error');
+                }
+            } catch (error) {
+                showMessage('Error: ' + error.message, 'error');
+            }
+        }
+        
+        async function clearTaxes() {
+            if (!confirm('Clear all tax history?')) return;
+            
+            try {
+                const response = await fetch('/api/debug/cleartaxes', {
+                    method: 'POST'
+                });
+                
+                if (response.ok) {
+                    showMessage('Tax history cleared');
+                } else {
+                    const data = await response.json();
+                    showMessage(data.error || 'Failed to clear taxes', 'error');
+                }
+            } catch (error) {
+                showMessage('Error: ' + error.message, 'error');
             }
         }
 

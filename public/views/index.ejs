@@ -48,6 +48,10 @@
                 <h2>📋 Pending Orders</h2>
                 <p>View and manage pending orders</p>
             </a>
+            <a href="/events" class="portal-link">
+                <h2>⚡ Events</h2>
+                <p>Market events and crash scenarios</p>
+            </a>
             <a href="/news" class="portal-link" id="newsLink">
                 <h2>📰 News</h2>
                 <p>Historical events and market news</p>
@@ -131,33 +135,60 @@ async function updateTime() {
                 // Get current counts
                 const newsResponse = await fetch('/api/news');
                 const newsData = await newsResponse.json();
-                const newsCount = newsData.length;
                 
                 const emailResponse = await fetch('/api/emails');
                 const emailData = await emailResponse.json();
-                const emailCount = emailData.length;
                 
-                // Get last viewed counts from localStorage
-                const lastNewsCount = parseInt(localStorage.getItem('lastNewsCount') || '0');
-                const lastEmailCount = parseInt(localStorage.getItem('lastEmailCount') || '0');
+                // Get read tracking from localStorage (same keys as news.ejs and email.ejs)
+                const readNewsTimestamps = JSON.parse(localStorage.getItem('readNewsTimestamps') || '{}');
+                const readEmailTimestamps = JSON.parse(localStorage.getItem('readEmailTimestamps') || '{}');
                 
-                // Calculate new items
-                const newNewsCount = Math.max(0, newsCount - lastNewsCount);
-                const newEmailCount = Math.max(0, emailCount - lastEmailCount);
+                // Clean up old read items (older than 15 minutes)
+                const AUTO_DISCARD_TIME = 15 * 60 * 1000;
+                const now = Date.now();
+                
+                // Clean news timestamps
+                for (const [newsId, timestamp] of Object.entries(readNewsTimestamps)) {
+                    if (now - timestamp > AUTO_DISCARD_TIME) {
+                        delete readNewsTimestamps[newsId];
+                    }
+                }
+                localStorage.setItem('readNewsTimestamps', JSON.stringify(readNewsTimestamps));
+                
+                // Clean email timestamps
+                for (const [emailId, timestamp] of Object.entries(readEmailTimestamps)) {
+                    if (now - timestamp > AUTO_DISCARD_TIME) {
+                        delete readEmailTimestamps[emailId];
+                    }
+                }
+                localStorage.setItem('readEmailTimestamps', JSON.stringify(readEmailTimestamps));
+                
+                // Count unread items
+                const readNewsIds = new Set(Object.keys(readNewsTimestamps).map(id => parseInt(id)));
+                const unreadNewsCount = newsData.filter(item => !readNewsIds.has(item.id)).length;
+                
+                // Add IDs to emails if missing (same logic as email.ejs)
+                emailData.forEach((email, idx) => {
+                    if (!email.id) {
+                        email.id = \`email-\${idx}-\${new Date(email.date).getTime()}\`;
+                    }
+                });
+                const readEmailIds = new Set(Object.keys(readEmailTimestamps));
+                const unreadEmailCount = emailData.filter(item => item.id && !readEmailIds.has(item.id)).length;
                 
                 // Update badges
                 const newsBadge = document.getElementById('newsBadge');
                 const emailBadge = document.getElementById('emailBadge');
                 
-                if (newNewsCount > 0) {
-                    newsBadge.textContent = newNewsCount > 99 ? '99+' : newNewsCount;
+                if (unreadNewsCount > 0) {
+                    newsBadge.textContent = unreadNewsCount > 99 ? '99+' : unreadNewsCount;
                     newsBadge.style.display = 'flex';
                 } else {
                     newsBadge.style.display = 'none';
                 }
                 
-                if (newEmailCount > 0) {
-                    emailBadge.textContent = newEmailCount > 99 ? '99+' : newEmailCount;
+                if (unreadEmailCount > 0) {
+                    emailBadge.textContent = unreadEmailCount > 99 ? '99+' : unreadEmailCount;
                     emailBadge.style.display = 'flex';
                 } else {
                     emailBadge.style.display = 'none';
