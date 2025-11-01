@@ -503,6 +503,198 @@ app.get('/api/market/index', (req, res) => {
   res.json(history);
 });
 
+// Sector performance API for sector-based charts
+app.get('/api/market/sectors', (req, res) => {
+  const { days } = req.query;
+  const daysToFetch = parseInt(days) || 30;
+  
+  // Get all unique sectors
+  const allStocks = stocks.getStockData(gameTime, timeMultiplier, false, BYPASS_CACHE_FOR_HISTORICAL);
+  const sectors = [...new Set(allStocks.map(s => s.sector).filter(Boolean))];
+  
+  // Calculate sector performance over time
+  const sectorHistory = {};
+  sectors.forEach(sector => {
+    sectorHistory[sector] = [];
+  });
+  
+  // Determine sampling interval
+  let sampleInterval = 1;
+  if (daysToFetch > 365) {
+    sampleInterval = 7;
+  } else if (daysToFetch > 180) {
+    sampleInterval = 3;
+  } else if (daysToFetch > 90) {
+    sampleInterval = 2;
+  }
+  
+  // Calculate average price for each sector at each time point
+  for (let i = daysToFetch; i >= 0; i -= sampleInterval) {
+    const date = new Date(gameTime.getTime() - (i * 24 * 60 * 60 * 1000));
+    const stocksAtDate = stocks.getStockData(date, timeMultiplier, false, BYPASS_CACHE_FOR_HISTORICAL);
+    
+    // Group by sector
+    const sectorGroups = {};
+    stocksAtDate.forEach(stock => {
+      if (stock.sector) {
+        if (!sectorGroups[stock.sector]) {
+          sectorGroups[stock.sector] = [];
+        }
+        sectorGroups[stock.sector].push(stock.price);
+      }
+    });
+    
+    // Calculate average for each sector
+    Object.entries(sectorGroups).forEach(([sector, prices]) => {
+      const avgPrice = prices.reduce((sum, p) => sum + p, 0) / prices.length;
+      if (sectorHistory[sector]) {
+        sectorHistory[sector].push({
+          date: date.toISOString(),
+          value: avgPrice,
+          count: prices.length
+        });
+      }
+    });
+  }
+  
+  res.json({
+    sectors: Object.keys(sectorHistory).sort(),
+    history: sectorHistory
+  });
+});
+
+// Market health indicators API
+app.get('/api/market/health', (req, res) => {
+  const { days } = req.query;
+  const daysToFetch = parseInt(days) || 30;
+  const history = [];
+  
+  // Determine sampling interval
+  let sampleInterval = 1;
+  if (daysToFetch > 365) {
+    sampleInterval = 7;
+  } else if (daysToFetch > 180) {
+    sampleInterval = 3;
+  } else if (daysToFetch > 90) {
+    sampleInterval = 2;
+  }
+  
+  // Calculate market health metrics over time
+  for (let i = daysToFetch; i >= 0; i -= sampleInterval) {
+    const date = new Date(gameTime.getTime() - (i * 24 * 60 * 60 * 1000));
+    const stocksAtDate = stocks.getStockData(date, timeMultiplier, false, BYPASS_CACHE_FOR_HISTORICAL);
+    
+    if (stocksAtDate.length > 0) {
+      // Calculate advancing vs declining (compare to previous day)
+      const prevDate = new Date(date.getTime() - (24 * 60 * 60 * 1000));
+      const prevStocks = stocks.getStockData(prevDate, timeMultiplier, false, BYPASS_CACHE_FOR_HISTORICAL);
+      
+      let advancing = 0;
+      let declining = 0;
+      let unchanged = 0;
+      
+      stocksAtDate.forEach(stock => {
+        const prevStock = prevStocks.find(s => s.symbol === stock.symbol);
+        if (prevStock) {
+          if (stock.price > prevStock.price) advancing++;
+          else if (stock.price < prevStock.price) declining++;
+          else unchanged++;
+        }
+      });
+      
+      // Calculate market breadth (advancing - declining)
+      const breadth = advancing - declining;
+      const breadthRatio = stocksAtDate.length > 0 ? breadth / stocksAtDate.length : 0;
+      
+      // Calculate average price and volatility
+      const avgPrice = stocksAtDate.reduce((sum, s) => sum + s.price, 0) / stocksAtDate.length;
+      const prices = stocksAtDate.map(s => s.price);
+      const variance = prices.reduce((sum, p) => sum + Math.pow(p - avgPrice, 2), 0) / prices.length;
+      const volatility = Math.sqrt(variance);
+      
+      history.push({
+        date: date.toISOString(),
+        advancing,
+        declining,
+        unchanged,
+        breadth,
+        breadthRatio,
+        totalStocks: stocksAtDate.length,
+        avgPrice,
+        volatility
+      });
+    }
+  }
+  
+  res.json(history);
+});
+
+// Market statistics API (current snapshot)
+app.get('/api/market/stats', (req, res) => {
+  const allStocks = stocks.getStockData(gameTime, timeMultiplier, false);
+  
+  if (allStocks.length === 0) {
+    return res.json({
+      totalStocks: 0,
+      sectors: [],
+      marketCap: 0
+    });
+  }
+  
+  // Calculate sector breakdown
+  const sectorGroups = {};
+  allStocks.forEach(stock => {
+    if (stock.sector) {
+      if (!sectorGroups[stock.sector]) {
+        sectorGroups[stock.sector] = {
+          count: 0,
+          totalValue: 0,
+          avgPrice: 0
+        };
+      }
+      sectorGroups[stock.sector].count++;
+      sectorGroups[stock.sector].totalValue += stock.price;
+    }
+  });
+  
+  // Calculate averages
+  Object.keys(sectorGroups).forEach(sector => {
+    sectorGroups[sector].avgPrice = sectorGroups[sector].totalValue / sectorGroups[sector].count;
+  });
+  
+  // Get top gainers and losers (compared to previous day)
+  const prevDate = new Date(gameTime.getTime() - (24 * 60 * 60 * 1000));
+  const prevStocks = stocks.getStockData(prevDate, timeMultiplier, false);
+  
+  const changes = allStocks.map(stock => {
+    const prevStock = prevStocks.find(s => s.symbol === stock.symbol);
+    if (prevStock) {
+      const change = ((stock.price - prevStock.price) / prevStock.price) * 100;
+      return {
+        symbol: stock.symbol,
+        name: stock.name,
+        sector: stock.sector,
+        price: stock.price,
+        change
+      };
+    }
+    return null;
+  }).filter(Boolean);
+  
+  changes.sort((a, b) => b.change - a.change);
+  const topGainers = changes.slice(0, 5);
+  const topLosers = changes.slice(-5).reverse();
+  
+  res.json({
+    totalStocks: allStocks.length,
+    sectorBreakdown: sectorGroups,
+    sectors: Object.keys(sectorGroups).sort(),
+    topGainers,
+    topLosers,
+    avgPrice: allStocks.reduce((sum, s) => sum + s.price, 0) / allStocks.length
+  });
+});
+
 // Company information API
 app.get('/api/companies/:symbol', (req, res) => {
   const { symbol } = req.params;
