@@ -175,5 +175,17 @@ let paginator;
         updateEmails();
         setInterval(updateEmails, 5000);
     </script>
+    <script>
+async function updateEraTheme() {
+            const response = await fetch('/api/time');
+            const data = await response.json();
+            const gameDate = new Date(data.currentTime);
+            const year = gameDate.getFullYear();
+            applyEraTheme(year);
+        }
+        
+        updateEraTheme();
+        setInterval(updateEraTheme, 10000);
+    </script>
     `
 }) %>

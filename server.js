@@ -315,6 +315,21 @@ app.get('/api/stocks/:symbol', (req, res) => {
   res.json(result);
 });
 
+// Helper function to add hourly sampling when insufficient data
+function addHourlySamplingIfNeeded(history, daysToFetch, dataFetcher) {
+  if (history.length < 3 && daysToFetch <= 7) {
+    history.length = 0; // Clear and rebuild with hourly data
+    const hoursToFetch = Math.min(daysToFetch * 24, 168); // Max 7 days of hourly data
+    for (let i = hoursToFetch; i >= 0; i -= 1) {
+      const date = new Date(gameTime.getTime() - (i * 60 * 60 * 1000));
+      const data = dataFetcher(date);
+      if (data) {
+        history.push(data);
+      }
+    }
+  }
+}
+
 // Stock history API for charts
 app.get('/api/stocks/:symbol/history', (req, res) => {
   const { symbol } = req.params;
@@ -356,6 +371,12 @@ app.get('/api/stocks/:symbol/history', (req, res) => {
       });
     }
   }
+  
+  // If insufficient data, use hourly intervals for recent data
+  addHourlySamplingIfNeeded(history, daysToFetch, (date) => {
+    const price = stocks.getStockPrice(symbol, date, timeMultiplier);
+    return price ? { date: date.toISOString(), price: price.price } : null;
+  });
   
   res.json(history);
 });
@@ -403,6 +424,20 @@ app.get('/api/market/index', (req, res) => {
       });
     }
   }
+  
+  // If insufficient data, use hourly intervals for recent data
+  addHourlySamplingIfNeeded(history, daysToFetch, (date) => {
+    const allStocks = stocks.getStockData(date, timeMultiplier);
+    if (allStocks.length > 0) {
+      const avgPrice = allStocks.reduce((sum, s) => sum + s.price, 0) / allStocks.length;
+      return {
+        date: date.toISOString(),
+        value: avgPrice,
+        count: allStocks.length
+      };
+    }
+    return null;
+  });
   
   res.json(history);
 });
@@ -452,6 +487,8 @@ let userAccount = {
   creditScore: 750, // Starting credit score (fair)
   loans: [], // Active loans: { id, companyId, principal, balance, interestRate, startDate, dueDate, lastPaymentDate, missedPayments, status }
   loanHistory: [], // History of all loan activities
+  lastNegativeBalanceCheck: null, // Track last negative balance check
+  daysWithNegativeBalance: 0, // Track consecutive days with negative balance
   marginAccount: {
     marginBalance: 0, // Amount borrowed on margin
     marginInterestRate: 0.08, // 8% annual interest on margin (historical rates varied)
@@ -1180,6 +1217,132 @@ function processLoans() {
 
 // Call this periodically
 setInterval(processLoans, 10000);
+
+// Process negative balance penalties
+function processNegativeBalance() {
+  if (userAccount.cash >= 0) {
+    // Reset counter when balance becomes positive
+    if (userAccount.daysWithNegativeBalance > 0) {
+      userAccount.daysWithNegativeBalance = 0;
+    }
+    return; // No action needed if balance is positive
+  }
+  
+  const negativeAmount = Math.abs(userAccount.cash);
+  const lastCheck = userAccount.lastNegativeBalanceCheck || new Date('1970-01-01');
+  const daysSinceLastCheck = (gameTime.getTime() - new Date(lastCheck).getTime()) / (1000 * 60 * 60 * 24);
+  
+  // Only process once per day
+  if (daysSinceLastCheck < 1) return;
+  
+  userAccount.lastNegativeBalanceCheck = gameTime.toISOString();
+  
+  // Apply credit score penalty for negative balance (daily)
+  if (userAccount.creditScore > 300) {
+    const penalty = Math.min(5, Math.floor(negativeAmount / 1000)); // Lose 5 points per $1000 negative, max 5 per day
+    userAccount.creditScore = Math.max(300, userAccount.creditScore - penalty);
+    console.log(`Negative balance penalty: Credit score reduced by ${penalty} points to ${userAccount.creditScore}`);
+  }
+  
+  // If negative for more than 7 days, try to get an emergency loan
+  const daysNegative = userAccount.daysWithNegativeBalance || 0;
+  userAccount.daysWithNegativeBalance = daysNegative + 1;
+  
+  if (daysNegative >= 7 && daysNegative % 7 === 0) {
+    // Try to get an emergency loan to cover the negative balance
+    const loanAmount = Math.ceil(negativeAmount * 1.2); // 20% buffer
+    
+    // Find available lenders based on credit score
+    const availableLenders = loanCompanies.getLenders(userAccount.creditScore, gameTime);
+    
+    if (availableLenders.length > 0) {
+      // Take loan from the first available lender (likely higher interest)
+      const lender = availableLenders[0];
+      const interestRate = loanCompanies.calculateInterestRate(lender, userAccount.creditScore);
+      const originationFee = loanAmount * 0.02; // 2% fee
+      const netAmount = loanAmount - originationFee;
+      
+      // Create loan
+      const loan = {
+        id: Date.now(),
+        lender: lender.name,
+        amount: loanAmount,
+        interestRate: interestRate,
+        termDays: 90, // Short term emergency loan
+        originationFee: originationFee,
+        dateTaken: gameTime.toISOString(),
+        dueDate: new Date(gameTime.getTime() + (90 * 24 * 60 * 60 * 1000)).toISOString(),
+        amountPaid: 0,
+        status: 'active',
+        automatic: true // Mark as automatic
+      };
+      
+      userAccount.loans.push(loan);
+      userAccount.cash += netAmount;
+      
+      console.log(`Automatic emergency loan taken: $${loanAmount} from ${lender.name} (net: $${netAmount})`);
+      
+      // Log loan history
+      userAccount.loanHistory.push({
+        type: 'taken',
+        loanId: loan.id,
+        amount: loanAmount,
+        netAmount: netAmount,
+        interestRate: interestRate,
+        originationFee: originationFee,
+        date: gameTime.toISOString(),
+        automatic: true
+      });
+    } else {
+      // No lenders available - account manager must sell stocks
+      console.log(`No lenders available for emergency loan. Account manager selling stocks...`);
+      sellStocksToRecoverBalance(negativeAmount);
+    }
+  }
+}
+
+// Account manager sells stocks to recover negative balance
+function sellStocksToRecoverBalance(targetAmount) {
+  let amountToRaise = targetAmount * 1.1; // 10% buffer
+  let amountRaised = 0;
+  
+  // Sort portfolio by position size (sell largest positions first)
+  const sortedPositions = Object.entries(userAccount.portfolio)
+    .filter(([symbol, shares]) => shares > 0)
+    .sort((a, b) => b[1] - a[1]);
+  
+  for (const [symbol, shares] of sortedPositions) {
+    if (amountRaised >= amountToRaise) break;
+    
+    const stockPrice = stocks.getStockPrice(symbol, gameTime, timeMultiplier);
+    if (!stockPrice) continue;
+    
+    const saleValue = shares * stockPrice.price;
+    
+    // Sell this position
+    userAccount.portfolio[symbol] = 0;
+    userAccount.cash += saleValue;
+    amountRaised += saleValue;
+    
+    // Record transaction
+    userAccount.transactions.push({
+      type: 'sell',
+      symbol: symbol,
+      shares: shares,
+      price: stockPrice.price,
+      total: saleValue,
+      date: gameTime.toISOString(),
+      automatic: true,
+      reason: 'Account manager liquidation due to negative balance'
+    });
+    
+    console.log(`Account manager sold ${shares} shares of ${symbol} at $${stockPrice.price} (total: $${saleValue})`);
+  }
+  
+  console.log(`Account manager raised $${amountRaised} from stock sales`);
+}
+
+setInterval(processNegativeBalance, 10000);
 
 app.get('/api/account', (req, res) => {
   const portfolioValue = calculatePortfolioValue();
@@ -3059,17 +3222,53 @@ app.get('/api/emails', (req, res) => {
     }
   ];
   
-  // Add dividend emails
-  userAccount.dividends.forEach((dividend, index) => {
-    emails.push({
-      id: 100 + index,
-      from: 'dividends@stockfake.com',
-      subject: `Dividend Payment - ${dividend.quarter}`,
-      body: `You have received $${dividend.netAmount.toFixed(2)} in dividends (Gross: $${dividend.grossAmount.toFixed(2)}, Tax: $${dividend.tax.toFixed(2)}). Payment details: ${dividend.details.map(d => `${d.symbol}: ${d.shares} shares × $${d.dividend.toFixed(2)}`).join(', ')}`,
-      date: dividend.date,
-      spam: false
+  // Reduce dividend emails to yearly on higher speeds (86400 = fast speed, 1s = 1day)
+  const shouldThrottleDividends = timeMultiplier >= 86400;
+  
+  if (shouldThrottleDividends) {
+    // Group dividends by year and create yearly summary emails
+    const dividendsByYear = {};
+    userAccount.dividends.forEach((dividend) => {
+      const year = new Date(dividend.date).getFullYear();
+      if (!dividendsByYear[year]) {
+        dividendsByYear[year] = {
+          dividends: [],
+          totalGross: 0,
+          totalTax: 0,
+          totalNet: 0,
+          date: dividend.date
+        };
+      }
+      dividendsByYear[year].dividends.push(dividend);
+      dividendsByYear[year].totalGross += dividend.grossAmount;
+      dividendsByYear[year].totalTax += dividend.tax;
+      dividendsByYear[year].totalNet += dividend.netAmount;
     });
-  });
+    
+    // Create yearly summary emails
+    Object.entries(dividendsByYear).forEach(([year, summary], index) => {
+      emails.push({
+        id: 100 + index,
+        from: 'dividends@stockfake.com',
+        subject: `Annual Dividend Summary - ${year}`,
+        body: `Annual dividend summary for ${year}: You received a total of $${summary.totalNet.toFixed(2)} in net dividends (Gross: $${summary.totalGross.toFixed(2)}, Tax: $${summary.totalTax.toFixed(2)}) from ${summary.dividends.length} dividend payment(s).`,
+        date: summary.date,
+        spam: false
+      });
+    });
+  } else {
+    // Add individual dividend emails at normal/slow speeds
+    userAccount.dividends.forEach((dividend, index) => {
+      emails.push({
+        id: 100 + index,
+        from: 'dividends@stockfake.com',
+        subject: `Dividend Payment - ${dividend.quarter}`,
+        body: `You have received $${dividend.netAmount.toFixed(2)} in dividends (Gross: $${dividend.grossAmount.toFixed(2)}, Tax: $${dividend.tax.toFixed(2)}). Payment details: ${dividend.details.map(d => `${d.symbol}: ${d.shares} shares × $${d.dividend.toFixed(2)}`).join(', ')}`,
+        date: dividend.date,
+        spam: false
+      });
+    });
+  }
   
   // Add tax notification emails
   userAccount.taxes.forEach((tax, index) => {

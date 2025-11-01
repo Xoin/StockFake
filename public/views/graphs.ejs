@@ -81,6 +81,16 @@
 let marketChart = null;
         let stockChart = null;
         
+        // Helper function to show insufficient data message on canvas
+        function showInsufficientDataMessage(ctx, primaryMessage, secondaryMessage) {
+            ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+            ctx.fillStyle = '#00aa00';
+            ctx.font = '16px Courier New';
+            ctx.textAlign = 'center';
+            ctx.fillText(primaryMessage, ctx.canvas.width / 2, ctx.canvas.height / 2 - 10);
+            ctx.fillText(secondaryMessage, ctx.canvas.width / 2, ctx.canvas.height / 2 + 10);
+        }
+        
         async function loadStocks() {
             const response = await fetch('/api/stocks');
             const stocks = await response.json();
@@ -107,76 +117,21 @@ let marketChart = null;
             }
             
             const marketCtx = document.getElementById('marketChart').getContext('2d');
-            marketChart = new Chart(marketCtx, {
-                type: 'line',
-                data: {
-                    labels: marketData.map(d => new Date(d.date).toLocaleDateString()),
-                    datasets: [{
-                        label: 'Market Index',
-                        data: marketData.map(d => d.value),
-                        borderColor: '#00ff00',
-                        backgroundColor: 'rgba(0, 255, 0, 0.1)',
-                        tension: 0.1
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: true,
-                    plugins: {
-                        legend: {
-                            labels: {
-                                color: '#00ff00',
-                                font: {
-                                    family: 'Courier New'
-                                }
-                            }
-                        }
-                    },
-                    scales: {
-                        x: {
-                            ticks: {
-                                color: '#00ff00',
-                                font: {
-                                    family: 'Courier New'
-                                },
-                                maxTicksLimit: 10
-                            },
-                            grid: {
-                                color: '#003300'
-                            }
-                        },
-                        y: {
-                            ticks: {
-                                color: '#00ff00',
-                                font: {
-                                    family: 'Courier New'
-                                }
-                            },
-                            grid: {
-                                color: '#003300'
-                            }
-                        }
-                    }
-                }
-            });
             
-            // Update stock chart if symbol is selected
-            if (symbol) {
-                const stockResponse = await fetch(\`/api/stocks/\${symbol}/history?days=\${days}\`);
-                const stockData = await stockResponse.json();
-                
-                if (stockChart) {
-                    stockChart.destroy();
-                }
-                
-                const stockCtx = document.getElementById('stockChart').getContext('2d');
-                stockChart = new Chart(stockCtx, {
+            if (marketData.length < 2) {
+                // Show message when insufficient data
+                const marketCtx = document.getElementById('marketChart').getContext('2d');
+                showInsufficientDataMessage(marketCtx, 
+                    'Insufficient historical data for this time period',
+                    'Try running the game longer or selecting a shorter time period');
+            } else {
+                marketChart = new Chart(marketCtx, {
                     type: 'line',
                     data: {
-                        labels: stockData.map(d => new Date(d.date).toLocaleDateString()),
+                        labels: marketData.map(d => new Date(d.date).toLocaleDateString()),
                         datasets: [{
-                            label: \`\${symbol} Price\`,
-                            data: stockData.map(d => d.price),
+                            label: 'Market Index',
+                            data: marketData.map(d => d.value),
                             borderColor: '#00ff00',
                             backgroundColor: 'rgba(0, 255, 0, 0.1)',
                             tension: 0.1
@@ -213,9 +168,6 @@ let marketChart = null;
                                     color: '#00ff00',
                                     font: {
                                         family: 'Courier New'
-                                    },
-                                    callback: function(value) {
-                                        return '$' + value.toFixed(2);
                                     }
                                 },
                                 grid: {
@@ -225,6 +177,82 @@ let marketChart = null;
                         }
                     }
                 });
+            }
+            
+            // Update stock chart if symbol is selected
+            if (symbol) {
+                const stockResponse = await fetch(\`/api/stocks/\${symbol}/history?days=\${days}\`);
+                const stockData = await stockResponse.json();
+                
+                if (stockChart) {
+                    stockChart.destroy();
+                }
+                
+                const stockCtx = document.getElementById('stockChart').getContext('2d');
+                
+                if (stockData.length < 2) {
+                    // Show message when insufficient data
+                    const stockCtx = document.getElementById('stockChart').getContext('2d');
+                    showInsufficientDataMessage(stockCtx,
+                        'Insufficient historical data for this stock and time period',
+                        'Try running the game longer or selecting a shorter time period');
+                } else {
+                    stockChart = new Chart(stockCtx, {
+                        type: 'line',
+                        data: {
+                            labels: stockData.map(d => new Date(d.date).toLocaleDateString()),
+                            datasets: [{
+                                label: \`\${symbol} Price\`,
+                                data: stockData.map(d => d.price),
+                                borderColor: '#00ff00',
+                                backgroundColor: 'rgba(0, 255, 0, 0.1)',
+                                tension: 0.1
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: true,
+                            plugins: {
+                                legend: {
+                                    labels: {
+                                        color: '#00ff00',
+                                        font: {
+                                            family: 'Courier New'
+                                        }
+                                    }
+                                }
+                            },
+                            scales: {
+                                x: {
+                                    ticks: {
+                                        color: '#00ff00',
+                                        font: {
+                                            family: 'Courier New'
+                                        },
+                                        maxTicksLimit: 10
+                                    },
+                                    grid: {
+                                        color: '#003300'
+                                    }
+                                },
+                                y: {
+                                    ticks: {
+                                        color: '#00ff00',
+                                        font: {
+                                            family: 'Courier New'
+                                        },
+                                        callback: function(value) {
+                                            return '$' + value.toFixed(2);
+                                        }
+                                    },
+                                    grid: {
+                                        color: '#003300'
+                                    }
+                                }
+                            }
+                        }
+                    });
+                }
             }
         }
         
