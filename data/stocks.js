@@ -159,9 +159,22 @@ function getStockPrice(symbol, currentTime, timeMultiplier, isPaused, bypassCach
   
   // If after the last data point, use last price
   if (currentTime >= stockData[stockData.length - 1].date) {
+    const basePrice = stockData[stockData.length - 1].price;
+    
+    // Apply crash simulation impact if module is loaded
+    let finalPrice = basePrice;
+    try {
+      const crashSim = require('../helpers/marketCrashSimulation');
+      const sector = getStockSector(symbol);
+      finalPrice = crashSim.calculateStockPriceImpact(symbol, sector, basePrice, currentTime);
+    } catch (err) {
+      // Crash simulation not available or error occurred, use base price
+      finalPrice = basePrice;
+    }
+    
     const result = {
       symbol,
-      price: stockData[stockData.length - 1].price,
+      price: parseFloat(finalPrice.toFixed(2)),
       change: 0,
       name: getStockName(symbol),
       sector: getStockSector(symbol)
@@ -189,7 +202,16 @@ function getStockPrice(symbol, currentTime, timeMultiplier, isPaused, bypassCach
   const randomValue = seededRandom(symbol, currentTime.getTime());
   const baseFluctuation = (randomValue - 0.5) * 0.04 * basePrice;
   const fluctuation = baseFluctuation * volatilityScale;
-  const price = Math.max(0.01, basePrice + fluctuation);
+  let price = Math.max(0.01, basePrice + fluctuation);
+  
+  // Apply crash simulation impact if module is loaded
+  try {
+    const crashSim = require('../helpers/marketCrashSimulation');
+    const sector = getStockSector(symbol);
+    price = crashSim.calculateStockPriceImpact(symbol, sector, price, currentTime);
+  } catch (err) {
+    // Crash simulation not available or error occurred, use calculated price
+  }
   
   // Calculate change from previous base price
   const change = ((price - before.price) / before.price) * 100;
