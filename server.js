@@ -22,6 +22,7 @@ const historicalEvents = require('./data/historical-events');
 
 // Load helper modules
 const indexFundRebalancing = require('./helpers/indexFundRebalancing');
+const stockSplits = require('./helpers/stockSplits');
 const constants = require('./helpers/constants');
 
 // Set up EJS as the view engine
@@ -938,6 +939,37 @@ function checkIndexFundRebalancing() {
 
 // Call this periodically
 setInterval(checkIndexFundRebalancing, REBALANCING_CHECK_INTERVAL_MS);
+
+// Stock split check interval (30 minutes - checks daily when conditions are met)
+const STOCK_SPLIT_CHECK_INTERVAL_MS = 1800000; // 30 minutes
+
+// Check and process stock splits
+function checkStockSplits() {
+  if (!isPaused && isMarketOpen(gameTime)) {
+    try {
+      // Get current stock prices
+      const currentStocks = stocks.getStockData(gameTime, timeMultiplier, isPaused, true);
+      
+      // Check for splits
+      const result = stockSplits.checkAndApplySplits(gameTime.toISOString(), currentStocks);
+      
+      if (result.splitsApplied && result.splitsApplied.length > 0) {
+        console.log(`Applied ${result.splitsApplied.length} stock split(s):`);
+        for (const split of result.splitsApplied) {
+          console.log(`  - ${split.symbol}: ${split.ratio}:1 split ($${split.priceBeforeSplit.toFixed(2)} → $${split.priceAfterSplit.toFixed(2)})`);
+          if (split.portfolioAffected) {
+            console.log(`    User portfolio adjusted`);
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error checking stock splits:', error);
+    }
+  }
+}
+
+// Call this periodically
+setInterval(checkStockSplits, STOCK_SPLIT_CHECK_INTERVAL_MS);
 
 // Calculate trading fee based on year (fees decreased over time)
 function getTradingFee(tradeValue, currentTime) {
@@ -3921,6 +3953,28 @@ app.get('/api/emails', (req, res) => {
     });
   });
   
+  // Add stock split notification emails from database
+  try {
+    const splitEmails = dbModule.db.prepare(`
+      SELECT * FROM emails 
+      WHERE category = 'stock_split' 
+      ORDER BY date DESC
+    `).all();
+    
+    splitEmails.forEach((email, index) => {
+      emails.push({
+        id: 2000 + index,
+        from: email.from_address,
+        subject: email.subject,
+        body: email.body,
+        date: new Date(email.date),
+        spam: email.spam === 1
+      });
+    });
+  } catch (error) {
+    console.error('Error fetching split emails:', error);
+  }
+  
   res.json(emails.filter(email => email.date <= gameTime).sort((a, b) => b.date - a.date));
 });
 
@@ -4431,6 +4485,60 @@ app.post('/api/debug/reset', (req, res) => {
   };
   
   res.json({ success: true, message: 'Game reset to initial state' });
+});
+
+// Stock Splits API Endpoints
+
+// Get split threshold for current year
+app.get('/api/splits/threshold', (req, res) => {
+  try {
+    const year = gameTime.getFullYear();
+    const threshold = stockSplits.getSplitThreshold(year);
+    
+    res.json({
+      success: true,
+      year: year,
+      threshold: threshold
+    });
+  } catch (error) {
+    console.error('Error getting split threshold:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Get all stock splits
+app.get('/api/splits', (req, res) => {
+  try {
+    const limit = parseInt(req.query.limit) || 50;
+    const splits = stockSplits.getRecentSplits(limit);
+    
+    res.json({
+      success: true,
+      splits: splits,
+      count: splits.length
+    });
+  } catch (error) {
+    console.error('Error getting stock splits:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Get splits for a specific symbol
+app.get('/api/splits/:symbol', (req, res) => {
+  try {
+    const symbol = req.params.symbol.toUpperCase();
+    const splits = stockSplits.getSplitsForSymbol(symbol);
+    
+    res.json({
+      success: true,
+      symbol: symbol,
+      splits: splits,
+      count: splits.length
+    });
+  } catch (error) {
+    console.error('Error getting splits for symbol:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
 });
 
 // Add route for cheat page

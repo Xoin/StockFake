@@ -299,6 +299,45 @@ function initializeDatabase() {
     )
   `);
 
+  // Create stock_splits table for tracking stock split events
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS stock_splits (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      symbol TEXT NOT NULL,
+      split_date TEXT NOT NULL,
+      split_ratio INTEGER NOT NULL,
+      price_before_split REAL NOT NULL,
+      price_after_split REAL NOT NULL,
+      applied_to_portfolio INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(symbol, split_date)
+    )
+  `);
+
+  // Create stock_split_check_state table for tracking last check
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS stock_split_check_state (
+      id INTEGER PRIMARY KEY CHECK (id = 1),
+      last_check_date TEXT NOT NULL,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+
+  // Create emails table for storing notifications
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS emails (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      from_address TEXT NOT NULL,
+      subject TEXT NOT NULL,
+      body TEXT NOT NULL,
+      date TEXT NOT NULL,
+      is_read INTEGER NOT NULL DEFAULT 0,
+      spam INTEGER NOT NULL DEFAULT 0,
+      category TEXT,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+
   // Insert default market state if not exists
   const marketStateCount = db.prepare('SELECT COUNT(*) as count FROM market_state').get();
   if (marketStateCount.count === 0) {
