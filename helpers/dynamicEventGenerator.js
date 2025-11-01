@@ -136,23 +136,98 @@ function generateDynamicCrash(eventDate, eventType, seed) {
     }
   }
   
-  // Generate cascading effects
-  const durationDays = 30 + Math.floor(random2 * 150);  // 30-180 days
-  const cascadingEffects = [
-    { delay: 0, multiplier: 1.0 },
-    { delay: Math.floor(durationDays * 0.1), multiplier: 0.6 - (random3 * 0.2) },
-    { delay: Math.floor(durationDays * 0.3), multiplier: 0.3 - (random3 * 0.15) },
-    { delay: Math.floor(durationDays * 0.6), multiplier: 0.1 - (random3 * 0.1) }
-  ];
+  // Generate cascading effects based on severity
+  let durationDays;
+  let cascadingEffects;
+  let recoveryType;
   
-  // Recovery pattern selection
-  const recoveryTypes = ['v-shaped', 'gradual', 'slow'];
-  const recoveryType = recoveryTypes[Math.floor(random3 * recoveryTypes.length)];
+  if (severity === crashEvents.SEVERITY_LEVELS.CATASTROPHIC) {
+    // Catastrophic events have decade-long impacts (3-10 years)
+    durationDays = 1095 + Math.floor(random2 * 2555);  // 3-10 years
+    
+    // Create extended cascading effects over years
+    cascadingEffects = [
+      { delay: 0, multiplier: 1.0 },                                    // Initial impact
+      { delay: Math.floor(durationDays * 0.05), multiplier: 0.95 },     // Early continuation
+      { delay: Math.floor(durationDays * 0.10), multiplier: 0.90 },     // Sustained decline
+      { delay: Math.floor(durationDays * 0.15), multiplier: 0.85 },     // Deepening
+      { delay: Math.floor(durationDays * 0.20), multiplier: 0.80 },     // Bottom forming
+      { delay: Math.floor(durationDays * 0.30), multiplier: 0.70 },     // Long trough
+      { delay: Math.floor(durationDays * 0.40), multiplier: 0.60 },     // Extended low
+      { delay: Math.floor(durationDays * 0.50), multiplier: 0.50 },     // Slow recovery begins
+      { delay: Math.floor(durationDays * 0.60), multiplier: 0.40 },     // Gradual improvement
+      { delay: Math.floor(durationDays * 0.70), multiplier: 0.30 },     // Recovery continues
+      { delay: Math.floor(durationDays * 0.80), multiplier: 0.20 },     // Approaching normal
+      { delay: Math.floor(durationDays * 0.90), multiplier: 0.10 },     // Nearly recovered
+      { delay: Math.floor(durationDays * 0.95), multiplier: 0.05 }      // Final recovery
+    ];
+    
+    recoveryType = 'decade-long';
+    
+  } else if (severity === crashEvents.SEVERITY_LEVELS.SEVERE) {
+    // Severe events have multi-year impacts (1-5 years)
+    durationDays = 365 + Math.floor(random2 * 1460);  // 1-5 years
+    
+    cascadingEffects = [
+      { delay: 0, multiplier: 1.0 },
+      { delay: Math.floor(durationDays * 0.10), multiplier: 0.85 },
+      { delay: Math.floor(durationDays * 0.25), multiplier: 0.70 },
+      { delay: Math.floor(durationDays * 0.40), multiplier: 0.55 },
+      { delay: Math.floor(durationDays * 0.60), multiplier: 0.40 },
+      { delay: Math.floor(durationDays * 0.75), multiplier: 0.25 },
+      { delay: Math.floor(durationDays * 0.90), multiplier: 0.10 }
+    ];
+    
+    recoveryType = 'slow';
+    
+  } else if (severity === crashEvents.SEVERITY_LEVELS.MODERATE) {
+    // Moderate events have year-long impacts (6 months - 2 years)
+    durationDays = 180 + Math.floor(random2 * 550);  // 6 months - 2 years
+    
+    cascadingEffects = [
+      { delay: 0, multiplier: 1.0 },
+      { delay: Math.floor(durationDays * 0.15), multiplier: 0.70 },
+      { delay: Math.floor(durationDays * 0.35), multiplier: 0.50 },
+      { delay: Math.floor(durationDays * 0.60), multiplier: 0.30 },
+      { delay: Math.floor(durationDays * 0.85), multiplier: 0.15 }
+    ];
+    
+    recoveryType = 'gradual';
+    
+  } else {
+    // Minor events have shorter impacts (1-6 months)
+    durationDays = 30 + Math.floor(random2 * 150);  // 30-180 days
+    
+    cascadingEffects = [
+      { delay: 0, multiplier: 1.0 },
+      { delay: Math.floor(durationDays * 0.20), multiplier: 0.60 },
+      { delay: Math.floor(durationDays * 0.50), multiplier: 0.30 },
+      { delay: Math.floor(durationDays * 0.80), multiplier: 0.10 }
+    ];
+    
+    recoveryType = 'v-shaped';
+  }
+  
+  // Adjust volatility decay based on duration
+  // For multi-year events, use very slow decay to maintain elevated volatility
+  // Math: 0.9995 daily decay means ~18% annual reduction (0.9995^365 ≈ 0.82)
+  //       Takes ~5-7 years to return to baseline volatility
+  let volatilityDecay;
+  if (durationDays > 1095) {
+    // Multi-year events: very slow decay (0.05%-0.02% daily, ~18-7% annual)
+    volatilityDecay = 0.9995 + (random1 * 0.0003);  // 0.9995 to 0.9998
+  } else if (durationDays > 365) {
+    // Year+ events: slow decay (~1% daily, ~97% annual retention)
+    volatilityDecay = 0.997 + (random1 * 0.002);  // 0.997 to 0.999
+  } else {
+    // Shorter events: moderate decay (2-8% daily reduction)
+    volatilityDecay = 0.92 + (random1 * 0.06);  // 0.92 to 0.98
+  }
   
   const recoveryPattern = {
     type: recoveryType,
     durationDays: durationDays,
-    volatilityDecay: 0.92 + (random1 * 0.06)  // 0.92 to 0.98
+    volatilityDecay: volatilityDecay
   };
   
   // Generate event name

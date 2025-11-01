@@ -226,7 +226,7 @@ function calculateStockPriceImpact(symbol, sector, basePrice, currentTime) {
     // Apply recovery pattern
     if (event.recoveryPattern && daysSinceStart > 0) {
       const recoveryProgress = daysSinceStart / event.recoveryPattern.durationDays;
-      if (recoveryProgress > 1.0 && event.recoveryPattern.type !== 'prolonged') {
+      if (recoveryProgress > 1.0 && event.recoveryPattern.type !== 'prolonged' && event.recoveryPattern.type !== 'decade-long') {
         // Full recovery completed
         impact *= 0;
       } else {
@@ -247,6 +247,11 @@ function calculateStockPriceImpact(symbol, sector, basePrice, currentTime) {
           case 'prolonged':
             // Extended decline then slow recovery
             impact *= Math.max(0, 1 - recoveryProgress * 0.5);
+            break;
+          case 'decade-long':
+            // Very extended multi-year decline and recovery (for dot-com, 2008, etc.)
+            // Uses logarithmic decay over many years with a slower curve
+            impact *= Math.max(0, 1 - Math.log(1 + recoveryProgress) / Math.log(3));
             break;
           case 'immediate':
             // Very fast recovery

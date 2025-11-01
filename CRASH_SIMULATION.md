@@ -54,25 +54,50 @@ cascadingEffects: [
 ```
 
 #### Recovery Patterns
-- **V-Shaped**: Quick recovery (e.g., COVID-19)
-- **Gradual**: Linear recovery over time
-- **Slow**: Logarithmic recovery (e.g., 2008 crisis)
-- **Prolonged**: Extended decline then slow recovery (e.g., dot-com)
-- **Immediate**: Very fast recovery (e.g., flash crash)
+- **V-Shaped**: Quick recovery (e.g., COVID-19) - 3-6 months
+- **Gradual**: Linear recovery over time - 6-12 months
+- **Slow**: Logarithmic recovery - 1-3 years
+- **Prolonged**: Extended decline then slow recovery - 2-5 years
+- **Decade-Long**: Very extended multi-year decline and recovery (e.g., 2008 crisis: 6.5 years, Dot-Com: 15 years)
+- **Immediate**: Very fast recovery (e.g., flash crash) - days to weeks
+
+### Enhanced Historical Accuracy
+
+The crash simulation system now accurately models decade-long economic impacts:
+
+**2008 Financial Crisis:**
+- Peak-to-trough decline: -57% over 6 months
+- Recovery to pre-crisis levels: 6.5 years (2375 days)
+- 16-stage cascading effects over the entire recovery period
+- Sustained market volatility and reduced liquidity for years
+
+**2000 Dot-Com Bubble:**
+- Technology sector decline: -78% (accurate historical representation)
+- Broader market impact: -40%
+- Recovery to pre-crash levels: 15 years (5475 days)
+- 17-stage cascading effects modeling multi-year bear market
+- Demonstrates how major bubble bursts can impact markets for over a decade
+
+These enhanced models ensure that major economic events have the massive, lasting impact observed in historical data, not just short-term corrections.
 
 ### Dynamic Event Generation
 
 For dates beyond the historical data end point (December 31, 2024), the system automatically generates crash events using procedural algorithms:
 
 #### Generation Parameters
-- **Annual Crash Probability**: 15% per year
-- **Annual Correction Probability**: 25% per year
-- **Annual Sector Crash Probability**: 20% per year
-- **Check Interval**: Every 30 days
+- **Annual Crash Probability**: 30% per year (increased to ensure realistic frequency)
+- **Annual Correction Probability**: 50% per year
+- **Annual Sector Crash Probability**: 40% per year
+- **Check Interval**: Every 180 days (6 months)
 - **Minimum Days Between Events**: 90 days
 
 #### Event Characteristics
 - **Deterministic**: Same seed (date) produces same events for replay consistency
+- **Severity-Based Duration**: 
+  - Catastrophic: 3-10 year recovery with decade-long impacts
+  - Severe: 1-5 year recovery
+  - Moderate: 6 months - 2 year recovery
+  - Minor: 1-6 month recovery
 - **Configurable**: All probabilities and parameters can be adjusted via API
 - **Severity Distribution**: 
   - 10% Catastrophic (-30% to -55% impact)
