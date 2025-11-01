@@ -19,8 +19,31 @@ const tradeHalts = require('./data/trade-halts');
 const shareAvailability = require('./data/share-availability');
 const indexFunds = require('./data/index-funds');
 
+// Set up EJS as the view engine
+app.set('view engine', 'ejs');
+app.set('views', path.join(__dirname, 'public', 'views'));
+
 // Middleware
 app.use(express.json());
+
+// Middleware to handle legacy .html URLs (must be before static middleware)
+// Whitelist of known pages to prevent open redirects
+const validPages = new Set([
+  '/index', '/bank', '/trading', '/news', '/email', '/graphs', 
+  '/loans', '/taxes', '/cheat', '/indexfunds', '/indexfund', '/company'
+]);
+
+app.use((req, res, next) => {
+  if (req.path.endsWith('.html')) {
+    const newPath = req.path.replace('.html', '');
+    // Only redirect if the path (without .html) is in our whitelist or starts with /company/
+    if (validPages.has(newPath) || newPath.startsWith('/company/')) {
+      return res.redirect(301, newPath);
+    }
+  }
+  next();
+});
+
 app.use(express.static('public'));
 
 // Game state
@@ -203,43 +226,51 @@ app.post('/api/time/speed', (req, res) => {
 
 // Routes for different websites
 app.get('/bank', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'bank.html'));
+  res.render('bank');
 });
 
 app.get('/news', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'news.html'));
+  res.render('news');
 });
 
 app.get('/email', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'email.html'));
+  res.render('email');
 });
 
 app.get('/trading', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'trading.html'));
+  res.render('trading');
 });
 
 app.get('/graphs', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'graphs.html'));
+  res.render('graphs');
 });
 
 app.get('/loans', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'loans.html'));
+  res.render('loans');
 });
 
 app.get('/taxes', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'taxes.html'));
+  res.render('taxes');
 });
 
 app.get('/company/:symbol', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'company.html'));
+  res.render('company');
 });
 
 app.get('/indexfund', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'indexfund.html'));
+  res.render('indexfund');
+});
+
+app.get('/indexfunds', (req, res) => {
+  res.render('indexfunds');
+});
+
+app.get('/cheat', (req, res) => {
+  res.render('cheat');
 });
 
 app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+  res.render('index');
 });
 
 app.get('/api/stocks', (req, res) => {

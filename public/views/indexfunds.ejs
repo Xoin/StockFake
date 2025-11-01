@@ -1,203 +1,9 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>StockFake - Index Funds</title>
-    <link rel="stylesheet" href="era-themes.css">
-    <script src="header.js"></script>
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-        body {
-            font-family: 'Courier New', monospace;
-            background-color: #1a1a1a;
-            color: #00ff00;
-            padding: 20px;
-        }
-        .container {
-            max-width: 1200px;
-            margin: 0 auto;
-        }
-        h1 {
-            text-align: center;
-            margin-bottom: 20px;
-            color: #00ff00;
-            text-shadow: 0 0 10px #00ff00;
-        }
-        .nav {
-            text-align: center;
-            margin-bottom: 20px;
-        }
-        .nav a {
-            color: #00ff00;
-            margin: 0 10px;
-            text-decoration: none;
-        }
-        .nav a:hover {
-            text-decoration: underline;
-        }
-        .funds-container {
-            background-color: #000;
-            border: 2px solid #00ff00;
-            padding: 20px;
-            margin-bottom: 20px;
-        }
-        table {
-            width: 100%;
-            border-collapse: collapse;
-        }
-        th, td {
-            padding: 10px;
-            text-align: left;
-            border-bottom: 1px solid #003300;
-        }
-        th {
-            background-color: #003300;
-        }
-        .positive {
-            color: #00ff00;
-        }
-        .negative {
-            color: #ff0000;
-        }
-        .trade-form {
-            background-color: #000;
-            border: 2px solid #00ff00;
-            padding: 20px;
-            margin-top: 20px;
-        }
-        .trade-form h3 {
-            margin-bottom: 15px;
-            color: #00ff00;
-        }
-        .form-group {
-            margin: 15px 0;
-        }
-        .form-group label {
-            display: block;
-            margin-bottom: 5px;
-            color: #00ff00;
-        }
-        .cost-calculator {
-            margin: 15px 0;
-            padding: 10px;
-            background-color: #001100;
-            border: 1px solid #00ff00;
-            border-radius: 4px;
-        }
-        .cost-calculator .calc-row {
-            display: flex;
-            justify-content: space-between;
-            margin: 5px 0;
-            padding: 5px 0;
-        }
-        .cost-calculator .calc-total {
-            border-top: 2px solid #00ff00;
-            margin-top: 10px;
-            padding-top: 10px;
-            font-weight: bold;
-            font-size: 1.1em;
-        }
-        .affordability-info {
-            margin: 10px 0;
-            padding: 10px;
-            border-radius: 4px;
-        }
-        .can-afford {
-            background-color: #004400;
-            border: 1px solid #00ff00;
-            color: #00ff00;
-        }
-        .cannot-afford {
-            background-color: #440000;
-            border: 1px solid #ff0000;
-            color: #ff0000;
-        }
-        input, select {
-            background-color: #000;
-            color: #00ff00;
-            border: 1px solid #00ff00;
-            padding: 8px;
-            margin: 5px 0;
-            font-family: 'Courier New', monospace;
-            width: 100%;
-            max-width: 300px;
-        }
-        button {
-            background-color: #003300;
-            color: #00ff00;
-            border: 2px solid #00ff00;
-            padding: 10px 20px;
-            margin: 5px;
-            cursor: pointer;
-            font-family: 'Courier New', monospace;
-        }
-        button:hover {
-            background-color: #00ff00;
-            color: #000;
-        }
-        button:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-        }
-        .buy-btn {
-            background-color: #003300;
-        }
-        .sell-btn {
-            background-color: #330000;
-            border-color: #ff0000;
-            color: #ff0000;
-        }
-        .sell-btn:hover {
-            background-color: #ff0000;
-            color: #000;
-        }
-        .message {
-            padding: 10px;
-            margin: 10px 0;
-            border: 1px solid #00ff00;
-        }
-        .error {
-            border-color: #ff0000;
-            color: #ff0000;
-            background-color: #220000;
-        }
-        .success {
-            border-color: #00ff00;
-            color: #00ff00;
-            background-color: #002200;
-        }
-        .fund-info {
-            margin: 10px 0;
-            padding: 10px;
-            background-color: #001100;
-            border: 1px solid #00aa00;
-        }
-        .fund-info p {
-            margin: 5px 0;
-            color: #00cc00;
-        }
-        .content-wrapper {
-            display: grid;
-            grid-template-columns: 250px 1fr;
-            gap: 20px;
-            margin-bottom: 20px;
-        }
-        @media (max-width: 768px) {
-            .content-wrapper {
-                grid-template-columns: 1fr;
-            }
-        }
-    </style>
-    <script src="asset-filter.js"></script>
-</head>
-<body>
-    <div class="container">
-        <!-- Shared header component -->
+<%- include('partials/header', { 
+    title: 'Index Funds',
+    pageTitle: '📊 INDEX FUNDS'
+}) %>
+
+<!-- Shared header component -->
         <div id="shared-header" data-title="📊 INDEX FUNDS"></div>
         
         <!-- Sidebar and Content Layout -->
@@ -271,11 +77,11 @@
             <button id="executeTradeBtn" onclick="executeTrade()">Execute Trade</button>
             <button onclick="cancelTrade()">Cancel</button>
         </div>
-    </div>
-    
-    <script src="common.js"></script>
+
+<%- include('partials/footer', {
+    pageScripts: `
     <script>
-        let selectedFund = null;
+let selectedFund = null;
         let currentAccountData = null;
         let currentPrice = 0;
         let tradingFee = 0;
@@ -335,22 +141,22 @@
             } else if (filteredFunds.length === 0) {
                 tbody.innerHTML = '<tr><td colspan="6" style="text-align: center;">No funds match your filters.</td></tr>';
             } else {
-                tbody.innerHTML = filteredFunds.map(fund => `
+                tbody.innerHTML = filteredFunds.map(fund => \`
                     <tr>
-                        <td><strong>${escapeHtml(fund.symbol)}</strong></td>
-                        <td>${escapeHtml(fund.name)}</td>
-                        <td>$${fund.price.toFixed(2)}</td>
-                        <td class="${fund.change >= 0 ? 'positive' : 'negative'}">
-                            ${fund.change >= 0 ? '+' : ''}${fund.change.toFixed(2)}%
+                        <td><strong>\${escapeHtml(fund.symbol)}</strong></td>
+                        <td>\${escapeHtml(fund.name)}</td>
+                        <td>$\${fund.price.toFixed(2)}</td>
+                        <td class="\${fund.change >= 0 ? 'positive' : 'negative'}">
+                            \${fund.change >= 0 ? '+' : ''}\${fund.change.toFixed(2)}%
                         </td>
-                        <td>${fund.expenseRatio.toFixed(2)}%</td>
+                        <td>\${fund.expenseRatio.toFixed(2)}%</td>
                         <td>
-                            <button class="buy-btn" onclick="openTrade('${escapeHtml(fund.symbol)}', 'buy')">Buy</button>
-                            <button class="sell-btn" onclick="openTrade('${escapeHtml(fund.symbol)}', 'sell')">Sell</button>
-                            <a href="/indexfund?symbol=${escapeHtml(fund.symbol)}" style="margin-left: 5px; color: #00ff00; text-decoration: none; border: 1px solid #00ff00; padding: 5px 10px; display: inline-block;">Details</a>
+                            <button class="buy-btn" onclick="openTrade('\${escapeHtml(fund.symbol)}', 'buy')">Buy</button>
+                            <button class="sell-btn" onclick="openTrade('\${escapeHtml(fund.symbol)}', 'sell')">Sell</button>
+                            <a href="/indexfund?symbol=\${escapeHtml(fund.symbol)}" style="margin-left: 5px; color: #00ff00; text-decoration: none; border: 1px solid #00ff00; padding: 5px 10px; display: inline-block;">Details</a>
                         </td>
                     </tr>
-                `).join('');
+                \`).join('');
             }
         }
         
@@ -371,7 +177,7 @@
                 await loadAccountData();
                 
                 // Load fund details
-                const response = await fetch(`/api/indexfunds/${symbol}`);
+                const response = await fetch(\`/api/indexfunds/\${symbol}\`);
                 const fund = await response.json();
                 currentPrice = fund.price;
                 
@@ -396,14 +202,14 @@
                     tradingFee = 9.99;
                 }
                 
-                document.getElementById('tradeFormTitle').textContent = `Trade ${fund.symbol} - ${fund.name}`;
-                document.getElementById('fundInfo').innerHTML = `
-                    <p><strong>Symbol:</strong> ${escapeHtml(fund.symbol)}</p>
-                    <p><strong>Name:</strong> ${escapeHtml(fund.name)}</p>
-                    <p><strong>Description:</strong> ${escapeHtml(fund.description)}</p>
-                    <p><strong>Current Price:</strong> $${fund.price.toFixed(2)}</p>
-                    <p><strong>Expense Ratio:</strong> ${fund.expenseRatio.toFixed(2)}% (deducted on sale)</p>
-                `;
+                document.getElementById('tradeFormTitle').textContent = \`Trade \${fund.symbol} - \${fund.name}\`;
+                document.getElementById('fundInfo').innerHTML = \`
+                    <p><strong>Symbol:</strong> \${escapeHtml(fund.symbol)}</p>
+                    <p><strong>Name:</strong> \${escapeHtml(fund.name)}</p>
+                    <p><strong>Description:</strong> \${escapeHtml(fund.description)}</p>
+                    <p><strong>Current Price:</strong> $\${fund.price.toFixed(2)}</p>
+                    <p><strong>Expense Ratio:</strong> \${fund.expenseRatio.toFixed(2)}% (deducted on sale)</p>
+                \`;
                 
                 document.getElementById('tradeAction').value = action;
                 document.getElementById('shares').value = action === 'buy' ? '1' : '0';
@@ -434,10 +240,10 @@
             const totalCost = action === 'buy' ? subtotal + tradingFee : subtotal - tradingFee;
             
             // Update calculator display
-            document.getElementById('calcPrice').textContent = `$${currentPrice.toFixed(2)}`;
+            document.getElementById('calcPrice').textContent = \`$\${currentPrice.toFixed(2)}\`;
             document.getElementById('calcShares').textContent = shares.toFixed(2);
-            document.getElementById('calcFee').textContent = `$${tradingFee.toFixed(2)}`;
-            document.getElementById('calcTotal').textContent = `$${totalCost.toFixed(2)}`;
+            document.getElementById('calcFee').textContent = \`$\${tradingFee.toFixed(2)}\`;
+            document.getElementById('calcTotal').textContent = \`$\${totalCost.toFixed(2)}\`;
             document.getElementById('costCalculator').style.display = 'block';
             
             // Check affordability for buys
@@ -451,20 +257,20 @@
                 
                 if (canAfford) {
                     affordInfo.className = 'affordability-info can-afford';
-                    affordInfo.innerHTML = `
+                    affordInfo.innerHTML = \`
                         ✓ You can afford this purchase<br>
-                        Available Cash: $${cash.toFixed(2)}<br>
-                        Max Shares: ${maxShares.toFixed(2)} shares ($${(maxShares * currentPrice + tradingFee).toFixed(2)} total)
-                    `;
+                        Available Cash: $\${cash.toFixed(2)}<br>
+                        Max Shares: \${maxShares.toFixed(2)} shares ($\${(maxShares * currentPrice + tradingFee).toFixed(2)} total)
+                    \`;
                     document.getElementById('executeTradeBtn').disabled = false;
                 } else {
                     affordInfo.className = 'affordability-info cannot-afford';
-                    affordInfo.innerHTML = `
+                    affordInfo.innerHTML = \`
                         ✗ Insufficient funds<br>
-                        Available Cash: $${cash.toFixed(2)}<br>
-                        Needed: $${totalCost.toFixed(2)}<br>
-                        Short by: $${(totalCost - cash).toFixed(2)}
-                    `;
+                        Available Cash: $\${cash.toFixed(2)}<br>
+                        Needed: $\${totalCost.toFixed(2)}<br>
+                        Short by: $\${(totalCost - cash).toFixed(2)}
+                    \`;
                     document.getElementById('executeTradeBtn').disabled = true;
                 }
             } else if (action === 'sell') {
@@ -500,17 +306,17 @@
                 const result = await response.json();
                 
                 if (response.ok) {
-                    messageDiv.innerHTML = `<div class="message success">${escapeHtml(result.message)}</div>`;
+                    messageDiv.innerHTML = \`<div class="message success">\${escapeHtml(result.message)}</div>\`;
                     setTimeout(() => {
                         cancelTrade();
                         loadFunds();
                         loadAccountData();
                     }, 2000);
                 } else {
-                    messageDiv.innerHTML = `<div class="message error">${escapeHtml(result.error)}</div>`;
+                    messageDiv.innerHTML = \`<div class="message error">\${escapeHtml(result.error)}</div>\`;
                 }
             } catch (error) {
-                messageDiv.innerHTML = `<div class="message error">Error: ${escapeHtml(error.message)}</div>`;
+                messageDiv.innerHTML = \`<div class="message error">Error: \${escapeHtml(error.message)}</div>\`;
             }
         }
         
@@ -524,5 +330,5 @@
         loadAccountData();
         setInterval(loadFunds, 10000);
     </script>
-</body>
-</html>
+    `
+}) %>

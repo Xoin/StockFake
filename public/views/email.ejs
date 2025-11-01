@@ -1,0 +1,105 @@
+<%- include('partials/header', { 
+    title: 'Email',
+    pageTitle: '📧 EMAIL'
+}) %>
+
+<div class="pagination-controls-container"></div>
+        <div class="email-container" id="emailContainer">
+            <div class="no-emails">Loading emails...</div>
+        </div>
+        <div class="pagination-controls-container"></div>
+
+<%- include('partials/footer', {
+    pageScripts: `
+    <script>
+let paginator;
+        let allEmails = [];
+        let readEmailIds = new Set(JSON.parse(localStorage.getItem('readEmailIds') || '[]'));
+        let expandedEmails = new Set();
+        
+        // Pagination render function
+        function renderPage() {
+            renderEmailPage();
+        }
+        
+        async function renderEmailPage() {
+            if (!paginator) return;
+            
+            const pageEmails = paginator.getCurrentPageItems();
+            const container = document.getElementById('emailContainer');
+            
+            if (pageEmails.length === 0 && allEmails.length === 0) {
+                container.innerHTML = '<div class="no-emails">No emails yet.</div>';
+            } else if (pageEmails.length === 0) {
+                container.innerHTML = '<div class="no-emails">No items on this page.</div>';
+            } else {
+                const startIndex = (paginator.currentPage - 1) * paginator.itemsPerPage;
+                container.innerHTML = pageEmails.map((email, relativeIndex) => {
+                    const index = startIndex + relativeIndex;
+                    const isExpanded = expandedEmails.has(index);
+                    const isUnread = email.id && !readEmailIds.has(email.id);
+                    const unreadClass = isUnread ? 'unread' : '';
+                    return \`
+                        <div class="email-item \${email.spam ? 'spam' : ''} \${unreadClass} \${isExpanded ? 'expanded' : ''}" onclick="toggleEmail(\${index}, \${email.id || 0})">
+                            <div class="email-header">
+                                <div class="email-from">From: \${escapeHtml(email.from)}\${email.spam ? '<span class="spam-badge">SPAM</span>' : ''}</div>
+                                <div class="email-date">\${new Date(email.date).toLocaleString()}</div>
+                            </div>
+                            <div class="email-subject">\${escapeHtml(email.subject)}</div>
+                            <div class="email-body">\${escapeHtml(email.body)}</div>
+                        </div>
+                    \`;
+                }).join('');
+            }
+            
+            // Update pagination controls
+            const paginationDivs = document.querySelectorAll('.pagination-controls-container');
+            paginationDivs.forEach(div => {
+                div.innerHTML = paginator.renderControls();
+            });
+        }
+        
+        function toggleEmail(index, emailId) {
+            if (expandedEmails.has(index)) {
+                expandedEmails.delete(index);
+            } else {
+                expandedEmails.add(index);
+                // Mark as read when expanded
+                if (emailId) {
+                    readEmailIds.add(emailId);
+                    localStorage.setItem('readEmailIds', JSON.stringify([...readEmailIds]));
+                }
+            }
+            renderEmailPage();
+        }
+        
+        async function updateEmails() {
+            const response = await fetch('/api/emails');
+            const newEmails = await response.json();
+            
+            // Add IDs if missing (use index as fallback)
+            newEmails.forEach((email, idx) => {
+                if (!email.id) {
+                    email.id = \`email-\${idx}-\${new Date(email.date).getTime()}\`;
+                }
+            });
+            
+            // Only re-render if the email list has changed
+            const emailsChanged = JSON.stringify(newEmails) !== JSON.stringify(allEmails);
+            allEmails = newEmails;
+            
+            // Update localStorage with current count
+            localStorage.setItem('lastEmailCount', allEmails.length);
+            
+            if (!paginator || emailsChanged) {
+                paginator = new Paginator(allEmails, 15);
+                renderEmailPage();
+            }
+            // If emails haven't changed, don't re-render to preserve expanded state
+        }
+        
+        updateEmails();
+        setInterval(updateEmails, 5000);
+    </script>
+    `
+}) %>

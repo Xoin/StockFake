@@ -1,44 +1,7 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>StockFake - Bank Account</title>
-    <link rel="stylesheet" href="era-themes.css">
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-        body {
-            font-family: 'Courier New', monospace;
-            background-color: #1a1a1a;
-            color: #00ff00;
-            padding: 20px;
-        }
-        .container {
-            max-width: 1200px;
-            margin: 0 auto;
-        }
-        h1 {
-            text-align: center;
-            margin-bottom: 20px;
-            color: #00ff00;
-            text-shadow: 0 0 10px #00ff00;
-        }
-        .nav {
-            text-align: center;
-            margin-bottom: 20px;
-        }
-        .nav a {
-            color: #00ff00;
-            margin: 0 10px;
-            text-decoration: none;
-        }
-        .nav a:hover {
-            text-decoration: underline;
-        }
+<%- include('partials/header', { 
+    title: 'Bank Account',
+    pageTitle: '🏦 BANK ACCOUNT',
+    pageStyles: `
         .account-summary {
             background-color: #000;
             border: 2px solid #00ff00;
@@ -99,20 +62,9 @@
             background-color: #ff0000;
             color: #000;
         }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <h1>🏦 BANK ACCOUNT</h1>
-        <div class="nav">
-            <a href="/">← Back to Portal</a> |
-            <a href="/trading">Trading</a> |
-            <a href="/loans">Loans</a> |
-            <a href="/taxes">Taxes</a> |
-            <a href="/news">News</a> |
-            <a href="/email">Email</a>
-        </div>
-        
+    `
+}) %>
+
         <div class="account-summary">
             <h2>Account Summary</h2>
             <div class="balance">
@@ -264,8 +216,9 @@
                 </tbody>
             </table>
         </div>
-    </div>
-    
+
+<%- include('partials/footer', {
+    pageScripts: `
     <script src="table-sorter.js"></script>
     <script>
         let portfolioSorter, transactionsSorter;
@@ -338,15 +291,15 @@
                         const pnl = (position.borrowPrice - currentPrice) * position.shares;
                         const pnlClass = pnl >= 0 ? 'positive' : 'negative';
                         
-                        return `
+                        return \`
                             <tr>
-                                <td>${symbol}</td>
-                                <td>${position.shares}</td>
-                                <td>$${position.borrowPrice.toFixed(2)}</td>
-                                <td>$${currentPrice.toFixed(2)}</td>
-                                <td class="${pnlClass}">$${pnl.toFixed(2)}</td>
+                                <td>\${symbol}</td>
+                                <td>\${position.shares}</td>
+                                <td>$\${position.borrowPrice.toFixed(2)}</td>
+                                <td>$\${currentPrice.toFixed(2)}</td>
+                                <td class="\${pnlClass}">$\${pnl.toFixed(2)}</td>
                             </tr>
-                        `;
+                        \`;
                     }).join('');
             } else {
                 shortPositionsSection.style.display = 'none';
@@ -357,18 +310,18 @@
             if (!account.transactions || account.transactions.length === 0) {
                 transactionsList.innerHTML = '<tr><td colspan="8">No transactions</td></tr>';
             } else {
-                transactionsList.innerHTML = account.transactions.slice().reverse().map(tx => `
+                transactionsList.innerHTML = account.transactions.slice().reverse().map(tx => \`
                     <tr>
-                        <td>${new Date(tx.date).toLocaleDateString()}</td>
-                        <td>${escapeHtml(tx.type.toUpperCase())}</td>
-                        <td>${escapeHtml(tx.symbol)}</td>
-                        <td>${tx.shares}</td>
-                        <td>$${tx.pricePerShare.toFixed(2)}</td>
-                        <td>${tx.tradingFee ? '$' + tx.tradingFee.toFixed(2) : '-'}</td>
-                        <td>${tx.tax ? '$' + tx.tax.toFixed(2) : '-'}</td>
-                        <td>$${(tx.netProceeds || tx.total).toFixed(2)}</td>
+                        <td>\${new Date(tx.date).toLocaleDateString()}</td>
+                        <td>\${escapeHtml(tx.type.toUpperCase())}</td>
+                        <td>\${escapeHtml(tx.symbol)}</td>
+                        <td>\${tx.shares}</td>
+                        <td>$\${tx.pricePerShare.toFixed(2)}</td>
+                        <td>\${tx.tradingFee ? '$' + tx.tradingFee.toFixed(2) : '-'}</td>
+                        <td>\${tx.tax ? '$' + tx.tax.toFixed(2) : '-'}</td>
+                        <td>$\${(tx.netProceeds || tx.total).toFixed(2)}</td>
                     </tr>
-                `).join('');
+                \`).join('');
                 
                 // Initialize or refresh sorter for transactions
                 if (!transactionsSorter) {
@@ -383,15 +336,15 @@
             if (!account.dividends || account.dividends.length === 0) {
                 dividendsList.innerHTML = '<tr><td colspan="5">No dividends yet</td></tr>';
             } else {
-                dividendsList.innerHTML = account.dividends.slice().reverse().map(div => `
+                dividendsList.innerHTML = account.dividends.slice().reverse().map(div => \`
                     <tr>
-                        <td>${new Date(div.date).toLocaleDateString()}</td>
-                        <td>${escapeHtml(div.quarter)}</td>
-                        <td>$${div.grossAmount.toFixed(2)}</td>
-                        <td>$${div.tax.toFixed(2)}</td>
-                        <td>$${div.netAmount.toFixed(2)}</td>
+                        <td>\${new Date(div.date).toLocaleDateString()}</td>
+                        <td>\${escapeHtml(div.quarter)}</td>
+                        <td>$\${div.grossAmount.toFixed(2)}</td>
+                        <td>$\${div.tax.toFixed(2)}</td>
+                        <td>$\${div.netAmount.toFixed(2)}</td>
                     </tr>
-                `).join('');
+                \`).join('');
             }
             
             // Update fees list
@@ -399,14 +352,14 @@
             if (!account.fees || account.fees.length === 0) {
                 feesList.innerHTML = '<tr><td colspan="4">No fees charged</td></tr>';
             } else {
-                feesList.innerHTML = account.fees.slice().reverse().map(fee => `
+                feesList.innerHTML = account.fees.slice().reverse().map(fee => \`
                     <tr>
-                        <td>${new Date(fee.date).toLocaleDateString()}</td>
-                        <td>${escapeHtml(fee.type)}</td>
-                        <td>$${fee.amount.toFixed(2)}</td>
-                        <td>${escapeHtml(fee.description)}</td>
+                        <td>\${new Date(fee.date).toLocaleDateString()}</td>
+                        <td>\${escapeHtml(fee.type)}</td>
+                        <td>$\${fee.amount.toFixed(2)}</td>
+                        <td>\${escapeHtml(fee.description)}</td>
                     </tr>
-                `).join('');
+                \`).join('');
             }
         }
         
@@ -519,25 +472,25 @@
                     
                     // Determine the trade URL based on type
                     const isStock = pos.type.includes('Stock');
-                    const tradeUrl = isStock ? '/trading' : '/indexfunds.html';
+                    const tradeUrl = isStock ? '/trading' : '/indexfunds';
                     
-                    return `
+                    return \`
                         <tr>
-                            <td><strong>${pos.symbol}</strong></td>
-                            <td>${pos.type}</td>
-                            <td>${pos.shares.toFixed(2)}</td>
-                            <td>$${pos.avgCost.toFixed(2)}</td>
-                            <td>$${pos.currentPrice.toFixed(2)}</td>
-                            <td>$${pos.totalValue.toFixed(2)}</td>
-                            <td>$${pos.totalCost.toFixed(2)}</td>
-                            <td class="${gainLossClass}">$${pos.gainLoss.toFixed(2)}</td>
-                            <td class="${returnClass}">${pos.returnPercent.toFixed(2)}%</td>
+                            <td><strong>\${pos.symbol}</strong></td>
+                            <td>\${pos.type}</td>
+                            <td>\${pos.shares.toFixed(2)}</td>
+                            <td>$\${pos.avgCost.toFixed(2)}</td>
+                            <td>$\${pos.currentPrice.toFixed(2)}</td>
+                            <td>$\${pos.totalValue.toFixed(2)}</td>
+                            <td>$\${pos.totalCost.toFixed(2)}</td>
+                            <td class="\${gainLossClass}">$\${pos.gainLoss.toFixed(2)}</td>
+                            <td class="\${returnClass}">\${pos.returnPercent.toFixed(2)}%</td>
                             <td>
-                                <button class="quick-btn" onclick="quickBuy('${escapeHtml(pos.symbol)}', ${isStock})">+Buy</button>
-                                <button class="quick-btn quick-sell-btn" onclick="quickSell('${escapeHtml(pos.symbol)}', ${pos.shares}, ${isStock})">Sell</button>
+                                <button class="quick-btn" onclick="quickBuy('\${escapeHtml(pos.symbol)}', \${isStock})">+Buy</button>
+                                <button class="quick-btn quick-sell-btn" onclick="quickSell('\${escapeHtml(pos.symbol)}', \${pos.shares}, \${isStock})">Sell</button>
                             </td>
                         </tr>
-                    `;
+                    \`;
                 }).join('');
                 
                 // Initialize or refresh sorter
@@ -567,7 +520,7 @@
         
         // Quick trade functions
         async function quickBuy(symbol, isStock) {
-            const shares = prompt(`How many shares of ${symbol} would you like to buy?`, '1');
+            const shares = prompt(\`How many shares of \${symbol} would you like to buy?\`, '1');
             if (!shares || parseFloat(shares) <= 0) return;
             
             const endpoint = isStock ? '/api/trade' : '/api/indexfunds/trade';
@@ -586,22 +539,22 @@
                 const result = await response.json();
                 
                 if (response.ok) {
-                    alert(`✓ Successfully bought ${shares} shares of ${symbol}!`);
+                    alert(\`✓ Successfully bought \${shares} shares of \${symbol}!\`);
                     updateAccount(); // Refresh the display
                 } else {
-                    alert(`✗ Error: ${result.error || 'Trade failed'}`);
+                    alert(\`✗ Error: \${result.error || 'Trade failed'}\`);
                 }
             } catch (error) {
-                alert(`✗ Error: ${error.message}`);
+                alert(\`✗ Error: \${error.message}\`);
             }
         }
         
         async function quickSell(symbol, maxShares, isStock) {
-            const shares = prompt(`How many shares of ${symbol} would you like to sell? (You own ${maxShares.toFixed(2)})`, maxShares.toFixed(2));
+            const shares = prompt(\`How many shares of \${symbol} would you like to sell? (You own \${maxShares.toFixed(2)})\`, maxShares.toFixed(2));
             if (!shares || parseFloat(shares) <= 0) return;
             
             if (parseFloat(shares) > maxShares) {
-                alert(`You only own ${maxShares.toFixed(2)} shares of ${symbol}`);
+                alert(\`You only own \${maxShares.toFixed(2)} shares of \${symbol}\`);
                 return;
             }
             
@@ -621,23 +574,20 @@
                 const result = await response.json();
                 
                 if (response.ok) {
-                    alert(`✓ Successfully sold ${shares} shares of ${symbol}!`);
+                    alert(\`✓ Successfully sold \${shares} shares of \${symbol}!\`);
                     updateAccount(); // Refresh the display
                 } else {
-                    alert(`✗ Error: ${result.error || 'Trade failed'}`);
+                    alert(\`✗ Error: \${result.error || 'Trade failed'}\`);
                 }
             } catch (error) {
-                alert(`✗ Error: ${error.message}`);
+                alert(\`✗ Error: \${error.message}\`);
             }
         }
         
         updateAccount();
         setInterval(updateAccount, 2000);
     </script>
-    <script src="common.js"></script>
     <script>
-        let transactionsPaginator, dividendsPaginator, feesPaginator;
-        
         // Apply era theme based on game time
         async function updateEraTheme() {
             const response = await fetch('/api/time');
@@ -650,5 +600,5 @@
         updateEraTheme();
         setInterval(updateEraTheme, 10000);
     </script>
-</body>
-</html>
+    `
+}) %>

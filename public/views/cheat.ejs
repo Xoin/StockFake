@@ -1,143 +1,9 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>StockFake - Debug Console</title>
-    <link rel="stylesheet" href="era-themes.css">
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-        body {
-            font-family: 'Courier New', monospace;
-            background-color: #1a1a1a;
-            color: #00ff00;
-            padding: 20px;
-        }
-        .container {
-            max-width: 1200px;
-            margin: 0 auto;
-        }
-        h1 {
-            text-align: center;
-            margin-bottom: 20px;
-            color: #ff00ff;
-            text-shadow: 0 0 10px #ff00ff;
-        }
-        h2 {
-            color: #00ffff;
-            margin-top: 20px;
-            margin-bottom: 10px;
-            border-bottom: 2px solid #00ffff;
-            padding-bottom: 5px;
-        }
-        .nav {
-            text-align: center;
-            margin-bottom: 20px;
-        }
-        .nav a {
-            color: #00ff00;
-            margin: 0 10px;
-            text-decoration: none;
-        }
-        .nav a:hover {
-            text-decoration: underline;
-        }
-        .warning {
-            background-color: #440000;
-            border: 2px solid #ff0000;
-            padding: 15px;
-            margin-bottom: 20px;
-            text-align: center;
-            color: #ff0000;
-            font-weight: bold;
-        }
-        .panel {
-            background-color: #000;
-            border: 2px solid #00ffff;
-            padding: 20px;
-            margin-bottom: 20px;
-        }
-        .control-group {
-            margin-bottom: 15px;
-        }
-        label {
-            display: inline-block;
-            width: 200px;
-            color: #00ffff;
-        }
-        input, select {
-            background-color: #000;
-            color: #00ff00;
-            border: 1px solid #00ff00;
-            padding: 8px;
-            margin: 5px;
-            font-family: 'Courier New', monospace;
-            width: 250px;
-        }
-        button {
-            background-color: #003333;
-            color: #00ffff;
-            border: 2px solid #00ffff;
-            padding: 10px 20px;
-            margin: 5px;
-            cursor: pointer;
-            font-family: 'Courier New', monospace;
-        }
-        button:hover {
-            background-color: #00ffff;
-            color: #000;
-        }
-        button.danger {
-            background-color: #330000;
-            border-color: #ff0000;
-            color: #ff0000;
-        }
-        button.danger:hover {
-            background-color: #ff0000;
-            color: #000;
-        }
-        .message {
-            padding: 10px;
-            margin: 10px 0;
-            border: 1px solid #00ff00;
-        }
-        .error {
-            border-color: #ff0000;
-            color: #ff0000;
-        }
-        .success {
-            border-color: #00ff00;
-            color: #00ff00;
-        }
-        .info-display {
-            background-color: #001100;
-            border: 1px solid #00ff00;
-            padding: 10px;
-            margin: 10px 0;
-            font-size: 0.9em;
-        }
-        .button-group {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 10px;
-            margin: 10px 0;
-        }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <h1>🔧 DEBUG CONSOLE 🔧</h1>
-        <div class="nav">
-            <a href="/">← Back to Portal</a> |
-            <a href="/trading">Trading</a> |
-            <a href="/bank">Bank</a>
-        </div>
-        
-        <div class="warning">
+<%- include('partials/header', { 
+    title: 'Debug Panel',
+    pageTitle: '🎮 DEBUG PANEL'
+}) %>
+
+<div class="warning">
             ⚠️ WARNING: This page is for debugging purposes only. Changes made here can break your game state!
         </div>
 
@@ -235,10 +101,10 @@
             <button onclick="updateDebugInfo()">Refresh Debug Info</button>
         </div>
 
-    </div>
-    
+<%- include('partials/footer', {
+    pageScripts: `
     <script>
-        // Helper to escape HTML
+// Helper to escape HTML
         function escapeHtml(text) {
             const div = document.createElement('div');
             div.textContent = text;
@@ -247,7 +113,7 @@
         
         function showMessage(text, type = 'success') {
             const messageDiv = document.getElementById('message');
-            messageDiv.innerHTML = `<div class="message ${type}">${escapeHtml(text)}</div>`;
+            messageDiv.innerHTML = \`<div class="message \${type}">\${escapeHtml(text)}</div>\`;
             setTimeout(() => messageDiv.innerHTML = '', 5000);
         }
 
@@ -259,11 +125,11 @@
                 const status = data.isMarketOpen ? '🟢 MARKET OPEN' : '🔴 MARKET CLOSED';
                 const pauseStatus = data.isPaused ? '⏸ PAUSED' : '▶ RUNNING';
                 
-                document.getElementById('currentTimeDisplay').innerHTML = `
-                    Current Time: ${date.toLocaleString()}<br>
-                    Status: ${status} | ${pauseStatus}<br>
-                    Speed: ${data.timeMultiplier}x (${getSpeedName(data.timeMultiplier)})
-                `;
+                document.getElementById('currentTimeDisplay').innerHTML = \`
+                    Current Time: \${date.toLocaleString()}<br>
+                    Status: \${status} | \${pauseStatus}<br>
+                    Speed: \${data.timeMultiplier}x (\${getSpeedName(data.timeMultiplier)})
+                \`;
             } catch (error) {
                 console.error('Error updating time:', error);
             }
@@ -281,12 +147,12 @@
                 const response = await fetch('/api/account');
                 const data = await response.json();
                 
-                document.getElementById('accountDisplay').innerHTML = `
-                    Cash: $${data.cash.toLocaleString()}<br>
-                    Credit Score: ${data.creditScore}<br>
-                    Portfolio Value: $${(data.portfolioValue || 0).toLocaleString()}<br>
-                    Total Assets: $${(data.totalAssets || 0).toLocaleString()}
-                `;
+                document.getElementById('accountDisplay').innerHTML = \`
+                    Cash: $\${data.cash.toLocaleString()}<br>
+                    Credit Score: \${data.creditScore}<br>
+                    Portfolio Value: $\${(data.portfolioValue || 0).toLocaleString()}<br>
+                    Total Assets: $\${(data.totalAssets || 0).toLocaleString()}
+                \`;
             } catch (error) {
                 console.error('Error updating account:', error);
             }
@@ -335,7 +201,7 @@
                 });
 
                 if (response.ok) {
-                    showMessage(`Skipped ${amount} ${unit}(s)!`);
+                    showMessage(\`Skipped \${amount} \${unit}(s)!\`);
                     updateTimeDisplay();
                 } else {
                     const data = await response.json();
@@ -359,7 +225,7 @@
                 });
 
                 if (response.ok) {
-                    showMessage(`Cash ${amount > 0 ? 'added' : 'removed'}: $${Math.abs(amount).toLocaleString()}`);
+                    showMessage(\`Cash \${amount > 0 ? 'added' : 'removed'}: $\${Math.abs(amount).toLocaleString()}\`);
                     updateAccountDisplay();
                 } else {
                     const data = await response.json();
@@ -381,7 +247,7 @@
                 });
 
                 if (response.ok) {
-                    showMessage(`Credit score set to ${score}`);
+                    showMessage(\`Credit score set to \${score}\`);
                     updateAccountDisplay();
                 } else {
                     const data = await response.json();
@@ -409,7 +275,7 @@
                 });
 
                 if (response.ok) {
-                    showMessage(`Added ${shares} shares of ${symbol}`);
+                    showMessage(\`Added \${shares} shares of \${symbol}\`);
                     updateAccountDisplay();
                 } else {
                     const data = await response.json();
@@ -436,7 +302,7 @@
                 });
 
                 if (response.ok) {
-                    showMessage(`Removed ${symbol} from portfolio`);
+                    showMessage(\`Removed \${symbol} from portfolio\`);
                     updateAccountDisplay();
                 } else {
                     const data = await response.json();
@@ -486,7 +352,7 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ multiplier })
                 });
-                showMessage(`Speed set to ${getSpeedName(multiplier)}`);
+                showMessage(\`Speed set to \${getSpeedName(multiplier)}\`);
                 updateTimeDisplay();
             } catch (error) {
                 showMessage('Error: ' + error.message, 'error');
@@ -563,9 +429,8 @@
         setInterval(updateTimeDisplay, 2000);
         setInterval(updateAccountDisplay, 5000);
     </script>
-    <script src="common.js"></script>
     <script>
-        async function updateEraTheme() {
+async function updateEraTheme() {
             const response = await fetch('/api/time');
             const data = await response.json();
             const gameDate = new Date(data.currentTime);
@@ -576,5 +441,5 @@
         updateEraTheme();
         setInterval(updateEraTheme, 10000);
     </script>
-</body>
-</html>
+    `
+}) %>
