@@ -227,6 +227,50 @@ function initializeDatabase() {
     )
   `);
 
+  // Create index_fund_constituents table for tracking constituent weights over time
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS index_fund_constituents (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      fund_symbol TEXT NOT NULL,
+      constituent_symbol TEXT NOT NULL,
+      weight REAL NOT NULL,
+      market_cap REAL,
+      effective_date TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(fund_symbol, constituent_symbol, effective_date)
+    )
+  `);
+
+  // Create index_fund_rebalancing_events table for tracking rebalancing history
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS index_fund_rebalancing_events (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      fund_symbol TEXT NOT NULL,
+      rebalancing_date TEXT NOT NULL,
+      trigger_type TEXT NOT NULL,
+      constituents_added TEXT,
+      constituents_removed TEXT,
+      weights_adjusted TEXT,
+      total_constituents INTEGER NOT NULL,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+
+  // Create index_fund_rebalancing_config table for rebalancing strategy settings
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS index_fund_rebalancing_config (
+      fund_symbol TEXT PRIMARY KEY,
+      strategy TEXT NOT NULL DEFAULT 'periodic',
+      rebalancing_frequency TEXT NOT NULL DEFAULT 'quarterly',
+      drift_threshold REAL DEFAULT 0.05,
+      last_rebalancing_date TEXT,
+      next_scheduled_rebalancing TEXT,
+      auto_rebalance_enabled INTEGER NOT NULL DEFAULT 1,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+
   // Insert default game state if not exists
   const gameStateCount = db.prepare('SELECT COUNT(*) as count FROM game_state').get();
   if (gameStateCount.count === 0) {
@@ -428,6 +472,54 @@ const updatePendingOrderStatus = db.prepare(`
 `);
 const deletePendingOrder = db.prepare('DELETE FROM pending_orders WHERE id = ?');
 
+// Index fund constituents functions
+const getIndexFundConstituents = db.prepare(`
+  SELECT * FROM index_fund_constituents 
+  WHERE fund_symbol = ? AND effective_date <= ? 
+  ORDER BY effective_date DESC, weight DESC
+`);
+const insertConstituent = db.prepare(`
+  INSERT INTO index_fund_constituents (fund_symbol, constituent_symbol, weight, market_cap, effective_date)
+  VALUES (?, ?, ?, ?, ?)
+  ON CONFLICT(fund_symbol, constituent_symbol, effective_date) DO UPDATE 
+  SET weight = excluded.weight, market_cap = excluded.market_cap
+`);
+
+// Index fund rebalancing events functions
+const getRebalancingEvents = db.prepare(`
+  SELECT * FROM index_fund_rebalancing_events 
+  WHERE fund_symbol = ? 
+  ORDER BY rebalancing_date DESC 
+  LIMIT ?
+`);
+const getAllRebalancingEvents = db.prepare(`
+  SELECT * FROM index_fund_rebalancing_events 
+  ORDER BY rebalancing_date DESC 
+  LIMIT ?
+`);
+const insertRebalancingEvent = db.prepare(`
+  INSERT INTO index_fund_rebalancing_events 
+  (fund_symbol, rebalancing_date, trigger_type, constituents_added, constituents_removed, weights_adjusted, total_constituents)
+  VALUES (?, ?, ?, ?, ?, ?, ?)
+`);
+
+// Index fund rebalancing config functions
+const getRebalancingConfig = db.prepare('SELECT * FROM index_fund_rebalancing_config WHERE fund_symbol = ?');
+const getAllRebalancingConfigs = db.prepare('SELECT * FROM index_fund_rebalancing_config');
+const upsertRebalancingConfig = db.prepare(`
+  INSERT INTO index_fund_rebalancing_config 
+  (fund_symbol, strategy, rebalancing_frequency, drift_threshold, last_rebalancing_date, next_scheduled_rebalancing, auto_rebalance_enabled)
+  VALUES (?, ?, ?, ?, ?, ?, ?)
+  ON CONFLICT(fund_symbol) DO UPDATE SET
+    strategy = excluded.strategy,
+    rebalancing_frequency = excluded.rebalancing_frequency,
+    drift_threshold = excluded.drift_threshold,
+    last_rebalancing_date = excluded.last_rebalancing_date,
+    next_scheduled_rebalancing = excluded.next_scheduled_rebalancing,
+    auto_rebalance_enabled = excluded.auto_rebalance_enabled,
+    updated_at = CURRENT_TIMESTAMP
+`);
+
 module.exports = {
   db,
   initializeDatabase,
@@ -518,5 +610,19 @@ module.exports = {
   getPendingOrder,
   insertPendingOrder,
   updatePendingOrderStatus,
-  deletePendingOrder
+  deletePendingOrder,
+  
+  // Index fund constituents
+  getIndexFundConstituents,
+  insertConstituent,
+  
+  // Index fund rebalancing events
+  getRebalancingEvents,
+  getAllRebalancingEvents,
+  insertRebalancingEvent,
+  
+  // Index fund rebalancing config
+  getRebalancingConfig,
+  getAllRebalancingConfigs,
+  upsertRebalancingConfig
 };
