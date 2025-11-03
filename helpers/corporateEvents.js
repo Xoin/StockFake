@@ -183,7 +183,8 @@ function processMergerOrAcquisition(event, eventData, currentGameTime) {
     const profit = (shortPosition.borrow_price - coverPrice) * shortPosition.shares;
     
     const userAccount = dbModule.getUserAccount.get();
-    dbModule.updateUserAccount.run(userAccount.cash - coverCost + profit, userAccount.credit_score);
+    const newBalance = (userAccount.cash - coverCost) + profit;
+    dbModule.updateUserAccount.run(newBalance, userAccount.credit_score);
     
     dbModule.insertTransaction.run(
       currentGameTime.toISOString(),
@@ -360,7 +361,8 @@ function processGoingPrivate(event, eventData, currentGameTime) {
     const profit = (shortPosition.borrow_price - eventData.cashPerShare) * shortPosition.shares;
     
     const userAccount = dbModule.getUserAccount.get();
-    dbModule.updateUserAccount.run(userAccount.cash - coverCost + profit, userAccount.credit_score);
+    const newBalance = (userAccount.cash - coverCost) + profit;
+    dbModule.updateUserAccount.run(newBalance, userAccount.credit_score);
     
     dbModule.insertTransaction.run(
       currentGameTime.toISOString(),
@@ -390,6 +392,22 @@ function processGoingPrivate(event, eventData, currentGameTime) {
  * Generate dynamic financial data for a company
  */
 function generateFinancialData(symbol, startYear, endYear, sector = 'Technology') {
+  // Financial data generation constants
+  const FINANCIAL_CONSTANTS = {
+    BASE_REVENUE_MIN: 100,      // Minimum base revenue in millions
+    BASE_REVENUE_RANGE: 900,    // Range for revenue variation
+    MIN_PROFIT_MARGIN: 0.05,    // 5% minimum profit margin
+    PROFIT_MARGIN_VARIATION: 0.1, // 10% variation in margin
+    ASSETS_REVENUE_RATIO_BASE: 1.5,
+    ASSETS_REVENUE_RATIO_VARIATION: 0.5,
+    MIN_EMPLOYEES: 50,
+    EMPLOYEE_RANGE: 500,
+    MIN_PATENTS: 10,
+    PATENT_RANGE: 100,
+    YEAR_SEED_MULTIPLIER: 1103515245,  // Large prime for seeding randomness
+    GROWTH_VARIATION_FACTOR: 0.05
+  };
+
   const financials = [];
   
   // Base values depend on sector and symbol
@@ -411,19 +429,19 @@ function generateFinancialData(symbol, startYear, endYear, sector = 'Technology'
   const multipliers = sectorMultipliers[sector] || sectorMultipliers['Technology'];
   
   // Initial values (millions)
-  let revenue = (100 + (seed % 900)) * multipliers.revenue;
-  let netIncome = revenue * (0.05 + (seed % 100) / 1000);
-  let assets = revenue * (1.5 + (seed % 50) / 100);
-  let employees = Math.floor(50 + (seed % 500));
-  let patents = Math.floor(10 + (seed % 100));
+  let revenue = (FINANCIAL_CONSTANTS.BASE_REVENUE_MIN + (seed % FINANCIAL_CONSTANTS.BASE_REVENUE_RANGE)) * multipliers.revenue;
+  let netIncome = revenue * (FINANCIAL_CONSTANTS.MIN_PROFIT_MARGIN + (seed % 100) / 1000);
+  let assets = revenue * (FINANCIAL_CONSTANTS.ASSETS_REVENUE_RATIO_BASE + (seed % 50) / 100);
+  let employees = Math.floor(FINANCIAL_CONSTANTS.MIN_EMPLOYEES + (seed % FINANCIAL_CONSTANTS.EMPLOYEE_RANGE));
+  let patents = Math.floor(FINANCIAL_CONSTANTS.MIN_PATENTS + (seed % FINANCIAL_CONSTANTS.PATENT_RANGE));
   
   for (let year = startYear; year <= endYear; year++) {
     // Add some year-to-year variation
-    const yearSeed = year * 1103515245 + seed;
-    const growthRate = multipliers.growth + ((yearSeed % 100) / 1000 - 0.05);
+    const yearSeed = year * FINANCIAL_CONSTANTS.YEAR_SEED_MULTIPLIER + seed;
+    const growthRate = multipliers.growth + ((yearSeed % 100) / 1000 - FINANCIAL_CONSTANTS.GROWTH_VARIATION_FACTOR);
     
     revenue *= growthRate;
-    netIncome = revenue * (0.05 + ((yearSeed % 150) / 1000));
+    netIncome = revenue * (FINANCIAL_CONSTANTS.MIN_PROFIT_MARGIN + ((yearSeed % 150) / 1000));
     assets *= (1 + (growthRate - 1) * 0.8);
     employees = Math.floor(employees * (1 + (growthRate - 1) * 0.5));
     patents = Math.floor(patents * (1 + (growthRate - 1) * 0.3));
