@@ -17,6 +17,7 @@ StockFake is a single-player financial simulation that lets you trade stocks usi
 - **Historical Trade Halts**: Trading suspensions during major events (Black Monday 1987, 9/11, 2008 Crisis, COVID-19)
 - **Price Fluctuations**: Realistic ±2% variations between data points
 - **Market Crash Simulation**: Dynamic crash events with configurable magnitude, duration, and cascading effects
+- **Corporate Events**: Historical mergers, acquisitions, bankruptcies, and going private events (Enron, Lehman Brothers, Dell, etc.)
 
 ### 💼 Advanced Trading Features
 - **Multiple Order Types**: Buy, sell, short sell, and cover positions
@@ -204,6 +205,21 @@ Deep dive into company profiles with financials and product history
 
 See [CRASH_SIMULATION.md](CRASH_SIMULATION.md) for detailed documentation.
 
+### Corporate Events & Company Lifecycle 🏢
+- **Historical Events**: 13+ major corporate events from 1970-2022
+- **Bankruptcies**: Penn Central (1970), Enron (2001), Lehman Brothers (2008), GM (2009), FTX (2022)
+- **Mergers & Acquisitions**: NeXT→Apple (1995), Pixar→Disney (2006), LinkedIn→Microsoft (2016), Whole Foods→Amazon (2017)
+- **Going Private**: Dell (2013) leveraged buyout
+- **Automatic Processing**: Events trigger automatically at historical dates
+- **Portfolio Impact**: Positions automatically liquidated or converted based on event type
+- **Cash Payouts**: Receive cash for acquisitions and going private events
+- **Stock Exchanges**: Automatic conversion to acquiring company stock in stock-for-stock mergers
+- **Email Notifications**: Detailed notifications about corporate actions affecting your holdings
+- **Company Status Tracking**: Monitor which companies are active, bankrupt, acquired, or private
+- **Dynamic Financials**: Procedurally generated financial data for new companies
+
+See [CORPORATE_EVENTS_SUMMARY.md](CORPORATE_EVENTS_SUMMARY.md) for detailed documentation.
+
 ## 📚 API Documentation
 
 ### Time & Market Status
@@ -277,6 +293,13 @@ See [CRASH_SIMULATION.md](CRASH_SIMULATION.md) for detailed documentation.
 - `GET /api/crash/dynamic/events` - Get all dynamically generated events
 - `POST /api/crash/dynamic/generate` - Manually trigger dynamic event generation
 
+### Corporate Events
+- `GET /api/corporate-events` - List all corporate events (mergers, bankruptcies, IPOs, going private)
+- `GET /api/corporate-events/pending` - List pending events that haven't occurred yet
+- `GET /api/companies/:symbol/status` - Check company status (active, bankrupt, acquired, private)
+- `GET /api/companies/:symbol/financials` - Get company financial data over time
+
+
 ## 🗄️ Database Architecture
 
 StockFake uses SQLite for data persistence with the following schema:
@@ -297,6 +320,11 @@ StockFake uses SQLite for data persistence with the following schema:
 ### Market Crash Simulation
 - **market_crash_events**: Active and historical crash events with full configuration
 - **market_state**: Current market state (volatility, liquidity, sentiment)
+
+### Corporate Events
+- **corporate_events**: Historical and future corporate events (mergers, bankruptcies, IPOs, going private)
+- **company_status**: Tracks company availability status (active, bankrupt, acquired, private, delisted)
+- **company_financials**: Dynamic financial data for companies (revenue, net income, assets, employees, patents)
 
 ### Transaction Tracking
 - **transactions**: Complete trading history
@@ -420,7 +448,9 @@ StockFake/
 - Bonds and treasury securities
 - Cryptocurrency (post-2009)
 - Economic indicators and Federal Reserve policy
-- Corporate actions (stock splits, mergers, acquisitions)
+- ~~Corporate actions (stock splits, mergers, acquisitions)~~ ✅ **Implemented**
+- Spin-offs and stock distribution events
+- Dynamic IPO generation for new companies beyond 2025
 - International stocks and forex trading
 - Advanced charting with technical indicators
 - Portfolio analysis and backtesting tools
