@@ -27,6 +27,7 @@ const stockSplits = require('./helpers/stockSplits');
 const constants = require('./helpers/constants');
 const corporateEvents = require('./helpers/corporateEvents');
 const dynamicRates = require('./helpers/dynamicRatesGenerator');
+const dataRetention = require('./helpers/dataRetention');
 
 // Set up EJS as the view engine
 app.set('view engine', 'ejs');
@@ -1199,6 +1200,21 @@ setInterval(checkAndChargeMonthlyFee, 10000);
 setInterval(trackInflation, 5000);
 setInterval(assessWealthTax, 5000);
 setInterval(updateShortPositions, 10000);
+
+// Check and run data pruning periodically (every 5 minutes of real time)
+setInterval(() => {
+  try {
+    const config = dbModule.getDataRetentionConfig.get();
+    if (config && config.auto_pruning_enabled) {
+      if (dataRetention.shouldRunPruning(gameTime)) {
+        console.log('Running automatic data pruning...');
+        dataRetention.pruneOldData(gameTime);
+      }
+    }
+  } catch (error) {
+    console.error('Error during data pruning check:', error);
+  }
+}, 5 * 60 * 1000); // Check every 5 minutes
 
 // Margin account helper functions
 
@@ -4899,6 +4915,98 @@ app.post('/api/economic/config', (req, res) => {
     console.error('Error updating economic config:', error);
     res.status(400).json({ 
       error: 'Failed to update economic configuration',
+      message: error.message 
+    });
+  }
+});
+
+// Data retention configuration endpoints
+app.get('/api/retention/config', (req, res) => {
+  try {
+    const config = dataRetention.getRetentionConfig();
+    const lastPruning = dataRetention.getLastPruningTime();
+    const dbConfig = dbModule.getDataRetentionConfig.get();
+    
+    res.json({
+      success: true,
+      config,
+      lastPruningDate: lastPruning,
+      autoPruningEnabled: dbConfig ? Boolean(dbConfig.auto_pruning_enabled) : true
+    });
+  } catch (error) {
+    console.error('Error getting retention config:', error);
+    res.status(500).json({ 
+      error: 'Failed to get retention configuration',
+      message: error.message 
+    });
+  }
+});
+
+app.post('/api/retention/config', (req, res) => {
+  try {
+    const { retentionPeriods, autoPruningEnabled } = req.body;
+    
+    if (retentionPeriods) {
+      dataRetention.saveRetentionConfig(retentionPeriods);
+    }
+    
+    if (autoPruningEnabled !== undefined) {
+      const config = dbModule.getDataRetentionConfig.get();
+      const currentRetention = config ? config.retention_periods : JSON.stringify(dataRetention.DEFAULT_RETENTION_PERIODS);
+      const currentLastPruning = config ? config.last_pruning_date : null;
+      
+      dbModule.updateDataRetentionConfig.run(
+        currentRetention,
+        autoPruningEnabled ? 1 : 0,
+        currentLastPruning
+      );
+    }
+    
+    res.json({
+      success: true,
+      message: 'Retention configuration updated',
+      config: dataRetention.getRetentionConfig()
+    });
+  } catch (error) {
+    console.error('Error updating retention config:', error);
+    res.status(400).json({ 
+      error: 'Failed to update retention configuration',
+      message: error.message 
+    });
+  }
+});
+
+app.get('/api/retention/stats', (req, res) => {
+  try {
+    const stats = dataRetention.getPruningStats(gameTime);
+    
+    res.json({
+      success: true,
+      currentGameTime: gameTime.toISOString(),
+      stats
+    });
+  } catch (error) {
+    console.error('Error getting pruning stats:', error);
+    res.status(500).json({ 
+      error: 'Failed to get pruning statistics',
+      message: error.message 
+    });
+  }
+});
+
+app.post('/api/retention/prune', (req, res) => {
+  try {
+    const results = dataRetention.pruneOldData(gameTime);
+    
+    res.json({
+      success: true,
+      message: 'Data pruning completed',
+      results
+    });
+  } catch (error) {
+    console.error('Error running manual pruning:', error);
+    res.status(500).json({ 
+      error: 'Failed to run data pruning',
       message: error.message 
     });
   }
