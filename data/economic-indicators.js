@@ -306,35 +306,46 @@ function getEconomicIndicators(year, inflationRate = null) {
 function calculateMarketImpact(economicIndicators) {
   let impact = 0;
   
+  // Impact calculation coefficients (configurable)
+  const NEUTRAL_FED_RATE = 3.5;           // Neutral federal funds rate
+  const RATE_IMPACT_COEFF = 0.01;         // Impact per 1% rate deviation
+  const QE_IMPACT_COEFF = 0.03;           // Impact per $1T QE
+  const GDP_BASELINE = 2.0;               // Long-term GDP trend
+  const GDP_IMPACT_COEFF = 0.01;          // Impact per 1% GDP deviation
+  const UNEMP_NATURAL_RATE = 4.5;         // Natural unemployment rate
+  const UNEMP_IMPACT_COEFF = 0.008;       // Impact per 1% unemployment deviation
+  const INFLATION_THRESHOLD = 1.0;        // Inflation deviation before penalty
+  const INFLATION_IMPACT_COEFF = 0.005;   // Impact per 1% inflation over threshold
+  
   // 1. Fed Funds Rate impact (higher rates = slower growth)
-  // Normalize around neutral rate of 3.5%
-  const rateDeviation = economicIndicators.fedFundsRate - 3.5;
-  const rateImpact = -0.01 * rateDeviation; // -1% per 1% above neutral
+  // Normalize around neutral rate
+  const rateDeviation = economicIndicators.fedFundsRate - NEUTRAL_FED_RATE;
+  const rateImpact = -RATE_IMPACT_COEFF * rateDeviation;
   impact += rateImpact;
   
   // 2. Quantitative Easing impact (QE boosts markets, QT hurts)
-  // Normalize QE impact (every $1T of QE = +3% boost, more moderate than before)
-  const qeImpact = (economicIndicators.quantitativeEasing / 1000) * 0.03;
+  // Normalize QE impact (every $1T of QE = +3% boost)
+  const qeImpact = (economicIndicators.quantitativeEasing / 1000) * QE_IMPACT_COEFF;
   impact += qeImpact;
   
   // 3. GDP growth impact (strong economy = better earnings)
-  // Normalize around 2% long-term GDP growth
-  const gdpDeviation = economicIndicators.gdpGrowth - 2.0;
-  const gdpImpact = gdpDeviation * 0.01; // 1% per 1% above trend
+  // Normalize around long-term GDP growth
+  const gdpDeviation = economicIndicators.gdpGrowth - GDP_BASELINE;
+  const gdpImpact = gdpDeviation * GDP_IMPACT_COEFF;
   impact += gdpImpact;
   
   // 4. Unemployment impact (low unemployment = strong economy)
-  // Normalize around natural rate of 4.5%
-  const unemploymentDeviation = economicIndicators.unemploymentRate - 4.5;
-  const unemploymentImpact = -unemploymentDeviation * 0.008; // 0.8% per 1% deviation
+  // Normalize around natural rate
+  const unemploymentDeviation = economicIndicators.unemploymentRate - UNEMP_NATURAL_RATE;
+  const unemploymentImpact = -unemploymentDeviation * UNEMP_IMPACT_COEFF;
   impact += unemploymentImpact;
   
   // 5. Inflation impact (moderate inflation good, extreme bad)
   if (economicIndicators.inflationRate) {
     const inflationDeviation = Math.abs(economicIndicators.inflationRate - 2.0);
-    // Penalize only if inflation is significantly off target (>1%)
-    if (inflationDeviation > 1.0) {
-      const inflationImpact = -(inflationDeviation - 1.0) * 0.005; // Mild penalty
+    // Penalize only if inflation is significantly off target
+    if (inflationDeviation > INFLATION_THRESHOLD) {
+      const inflationImpact = -(inflationDeviation - INFLATION_THRESHOLD) * INFLATION_IMPACT_COEFF;
       impact += inflationImpact;
     }
   }
@@ -364,10 +375,50 @@ function getConfiguration() {
 }
 
 /**
- * Update configuration
+ * Update configuration with validation
  */
 function updateConfiguration(newConfig) {
+  // Validate configuration parameters
+  const validations = {
+    baseFedFundsRate: { min: 0, max: 15, type: 'number' },
+    baseGDPGrowth: { min: -2, max: 10, type: 'number' },
+    baseUnemploymentRate: { min: 2, max: 15, type: 'number' },
+    inflationTargetRate: { min: 0, max: 10, type: 'number' },
+    fedResponseStrength: { min: 0, max: 2, type: 'number' },
+    qeTaperRate: { min: 0, max: 2000, type: 'number' },
+    businessCycleLength: { min: 3, max: 15, type: 'number' },
+    recessionProbability: { min: 0, max: 0.5, type: 'number' },
+    recessionDuration: { min: 0.5, max: 5, type: 'number' },
+    rateVolatility: { min: 0, max: 5, type: 'number' },
+    gdpVolatility: { min: 0, max: 5, type: 'number' },
+    unemploymentVolatility: { min: 0, max: 2, type: 'number' }
+  };
+  
+  // Validate each provided parameter
+  for (const [key, value] of Object.entries(newConfig)) {
+    const validation = validations[key];
+    
+    if (!validation) {
+      console.warn(`Unknown configuration parameter: ${key}`);
+      continue;
+    }
+    
+    if (typeof value !== validation.type) {
+      throw new Error(`Invalid type for ${key}: expected ${validation.type}, got ${typeof value}`);
+    }
+    
+    if (validation.min !== undefined && value < validation.min) {
+      throw new Error(`Invalid value for ${key}: ${value} < ${validation.min}`);
+    }
+    
+    if (validation.max !== undefined && value > validation.max) {
+      throw new Error(`Invalid value for ${key}: ${value} > ${validation.max}`);
+    }
+  }
+  
+  // All validations passed, update configuration
   Object.assign(ECONOMIC_CONFIG, newConfig);
+  return true;
 }
 
 module.exports = {

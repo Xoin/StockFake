@@ -4886,6 +4886,8 @@ app.get('/api/economic/config', (req, res) => {
 app.post('/api/economic/config', (req, res) => {
   try {
     const newConfig = req.body;
+    
+    // Validate configuration update
     economicIndicators.updateConfiguration(newConfig);
     
     res.json({
@@ -4895,7 +4897,10 @@ app.post('/api/economic/config', (req, res) => {
     });
   } catch (error) {
     console.error('Error updating economic config:', error);
-    res.status(500).json({ error: 'Failed to update economic configuration' });
+    res.status(400).json({ 
+      error: 'Failed to update economic configuration',
+      message: error.message 
+    });
   }
 });
 

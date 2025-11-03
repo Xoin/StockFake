@@ -117,7 +117,14 @@ for (let year = startYear + 1; year <= endYear; year++) {
   
   // Print milestone years
   if (year === 2025 || year === 2030 || year === 2035 || year === 2040 || year === 2050) {
-    const realValue = portfolioValue / Math.pow(1 + inflationRate / 100, year - startYear);
+    // Calculate real value by compounding inflation backwards from current year
+    let inflationAdjustment = 1.0;
+    for (let y = startYear + 1; y <= year; y++) {
+      const yearInflation = dynamicRates.generateInflationRate(y);
+      inflationAdjustment *= (1 + yearInflation / 100); // inflationRate is percentage, convert to decimal
+    }
+    const realValue = portfolioValue / inflationAdjustment;
+    
     console.log(`${year}: $${portfolioValue.toLocaleString('en-US', { maximumFractionDigits: 0 })} (${(avgGrowth * 100).toFixed(1)}% growth)`);
     console.log(`       Real value (inflation-adjusted): $${realValue.toLocaleString('en-US', { maximumFractionDigits: 0 })}`);
     console.log(`       Fed Funds: ${economics.fedFundsRate.toFixed(2)}%, Inflation: ${inflationRate.toFixed(1)}%\n`);
