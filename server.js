@@ -20,6 +20,8 @@ const shareAvailability = require('./data/share-availability');
 const indexFunds = require('./data/index-funds');
 const historicalEvents = require('./data/historical-events');
 const economicIndicators = require('./data/economic-indicators');
+const bondsData = require('./data/bonds');
+const treasuryYields = require('./data/treasury-yields');
 
 // Load helper modules
 const indexFundRebalancing = require('./helpers/indexFundRebalancing');
@@ -28,6 +30,7 @@ const constants = require('./helpers/constants');
 const corporateEvents = require('./helpers/corporateEvents');
 const dynamicRates = require('./helpers/dynamicRatesGenerator');
 const dataRetention = require('./helpers/dataRetention');
+const bondManager = require('./helpers/bondManager');
 
 // Set up EJS as the view engine
 app.set('view engine', 'ejs');
@@ -1195,11 +1198,53 @@ function updateShortPositions() {
   }
 }
 
+// Bond processing functions
+let lastBondInterestCheck = null;
+let lastBondMaturityCheck = null;
+
+function checkBondInterestPayments() {
+  if (isPaused) return;
+  
+  try {
+    const currentCheck = `${gameTime.getFullYear()}-${gameTime.getMonth() + 1}`;
+    
+    if (lastBondInterestCheck !== currentCheck) {
+      const payments = bondManager.processInterestPayments(gameTime);
+      if (payments.length > 0) {
+        console.log(`Processed ${payments.length} bond interest payment(s)`);
+      }
+      lastBondInterestCheck = currentCheck;
+    }
+  } catch (error) {
+    console.error('Error processing bond interest payments:', error);
+  }
+}
+
+function checkBondMaturities() {
+  if (isPaused) return;
+  
+  try {
+    const currentCheck = gameTime.toISOString().split('T')[0];
+    
+    if (lastBondMaturityCheck !== currentCheck) {
+      const maturedBonds = bondManager.processMaturities(gameTime);
+      if (maturedBonds.length > 0) {
+        console.log(`Processed ${maturedBonds.length} bond maturity/maturities`);
+      }
+      lastBondMaturityCheck = currentCheck;
+    }
+  } catch (error) {
+    console.error('Error processing bond maturities:', error);
+  }
+}
+
 // Call these periodically
 setInterval(checkAndChargeMonthlyFee, 10000);
 setInterval(trackInflation, 5000);
 setInterval(assessWealthTax, 5000);
 setInterval(updateShortPositions, 10000);
+setInterval(checkBondInterestPayments, 10000);
+setInterval(checkBondMaturities, 10000);
 
 // Check and run data pruning periodically (every 5 minutes of real time)
 setInterval(() => {
@@ -5009,6 +5054,346 @@ app.post('/api/retention/prune', (req, res) => {
       error: 'Failed to run data pruning',
       message: error.message 
     });
+  }
+});
+
+// Bond API endpoints
+
+// Get all available bonds
+app.get('/api/bonds', (req, res) => {
+  try {
+    const bonds = bondsData.getAvailableBonds();
+    
+    // Add current market prices
+    const bondsWithPrices = bonds.map(bond => {
+      const pricing = bondManager.getBondMarketPrice(bond.symbol, gameTime);
+      return {
+        ...bond,
+        marketPrice: pricing ? pricing.price : 100,
+        currentYield: pricing ? pricing.yield : bond.couponRate * 100,
+        yearsToMaturity: pricing ? pricing.yearsToMaturity : (bond.maturityYears || bond.maturityWeeks / 52)
+      };
+    });
+    
+    res.json(bondsWithPrices);
+  } catch (error) {
+    console.error('Error fetching bonds:', error);
+    res.status(500).json({ error: 'Failed to fetch bonds' });
+  }
+});
+
+// Get bonds by type
+app.get('/api/bonds/type/:type', (req, res) => {
+  try {
+    const { type } = req.params;
+    const bonds = bondsData.getBondsByType(type);
+    
+    const bondsWithPrices = bonds.map(bond => {
+      const pricing = bondManager.getBondMarketPrice(bond.symbol, gameTime);
+      return {
+        ...bond,
+        marketPrice: pricing ? pricing.price : 100,
+        currentYield: pricing ? pricing.yield : bond.couponRate * 100,
+        yearsToMaturity: pricing ? pricing.yearsToMaturity : (bond.maturityYears || bond.maturityWeeks / 52)
+      };
+    });
+    
+    res.json(bondsWithPrices);
+  } catch (error) {
+    console.error('Error fetching bonds by type:', error);
+    res.status(500).json({ error: 'Failed to fetch bonds' });
+  }
+});
+
+// Get specific bond details
+app.get('/api/bonds/:symbol', (req, res) => {
+  try {
+    const { symbol } = req.params;
+    const bond = bondsData.getBond(symbol);
+    
+    if (!bond) {
+      return res.status(404).json({ error: 'Bond not found' });
+    }
+    
+    const pricing = bondManager.getBondMarketPrice(symbol, gameTime);
+    
+    res.json({
+      ...bond,
+      marketPrice: pricing ? pricing.price : 100,
+      currentYield: pricing ? pricing.yield : bond.couponRate * 100,
+      yearsToMaturity: pricing ? pricing.yearsToMaturity : (bond.maturityYears || bond.maturityWeeks / 52)
+    });
+  } catch (error) {
+    console.error('Error fetching bond:', error);
+    res.status(500).json({ error: 'Failed to fetch bond' });
+  }
+});
+
+// Get user's bond holdings
+app.get('/api/bonds/holdings/all', (req, res) => {
+  try {
+    const holdings = dbModule.getBondHoldings.all();
+    
+    const holdingsWithCurrentValue = holdings.map(holding => {
+      const bond = bondsData.getBond(`${holding.bond_type.toUpperCase()}-${holding.issuer}`);
+      const pricing = bond ? bondManager.getBondMarketPrice(`${holding.bond_type.toUpperCase()}-${holding.issuer}`, gameTime) : null;
+      
+      return {
+        id: holding.id,
+        bondType: holding.bond_type,
+        issuer: holding.issuer,
+        faceValue: holding.face_value,
+        couponRate: holding.coupon_rate,
+        purchasePrice: holding.purchase_price,
+        purchaseDate: holding.purchase_date,
+        maturityDate: holding.maturity_date,
+        creditRating: holding.credit_rating,
+        quantity: holding.quantity,
+        currentPrice: pricing ? pricing.price : holding.purchase_price,
+        currentValue: pricing ? pricing.price * holding.quantity : holding.purchase_price * holding.quantity,
+        totalCost: holding.purchase_price * holding.quantity,
+        gainLoss: pricing ? (pricing.price - holding.purchase_price) * holding.quantity : 0
+      };
+    });
+    
+    res.json(holdingsWithCurrentValue);
+  } catch (error) {
+    console.error('Error fetching bond holdings:', error);
+    res.status(500).json({ error: 'Failed to fetch bond holdings' });
+  }
+});
+
+// Get bond portfolio statistics
+app.get('/api/bonds/portfolio/stats', (req, res) => {
+  try {
+    const stats = bondManager.getBondPortfolioStats(gameTime);
+    res.json(stats);
+  } catch (error) {
+    console.error('Error fetching bond portfolio stats:', error);
+    res.status(500).json({ error: 'Failed to fetch bond portfolio stats' });
+  }
+});
+
+// Get treasury yield curve
+app.get('/api/bonds/yields/curve', (req, res) => {
+  try {
+    const curve = treasuryYields.getYieldCurve(gameTime);
+    res.json(curve);
+  } catch (error) {
+    console.error('Error fetching yield curve:', error);
+    res.status(500).json({ error: 'Failed to fetch yield curve' });
+  }
+});
+
+// Buy bonds
+app.post('/api/bonds/buy', (req, res) => {
+  try {
+    const { symbol, quantity } = req.body;
+    
+    if (!symbol || !quantity || quantity <= 0) {
+      return res.status(400).json({ error: 'Invalid bond symbol or quantity' });
+    }
+    
+    const bond = bondsData.getBond(symbol);
+    if (!bond) {
+      return res.status(404).json({ error: 'Bond not found' });
+    }
+    
+    const pricing = bondManager.getBondMarketPrice(symbol, gameTime);
+    if (!pricing) {
+      return res.status(500).json({ error: 'Failed to calculate bond price' });
+    }
+    
+    const faceValue = bond.minPurchase || 100;
+    const purchasePrice = pricing.price;
+    const totalCost = purchasePrice * quantity;
+    const tradingFee = totalCost * 0.001; // 0.1% trading fee
+    const totalAmount = totalCost + tradingFee;
+    
+    // Check if user has enough cash
+    const account = dbModule.getUserAccount.get();
+    if (account.cash < totalAmount) {
+      return res.status(400).json({ 
+        error: 'Insufficient funds',
+        required: totalAmount,
+        available: account.cash
+      });
+    }
+    
+    // Calculate maturity date
+    let maturityDate = new Date(gameTime);
+    if (bond.maturityWeeks) {
+      maturityDate.setDate(maturityDate.getDate() + (bond.maturityWeeks * 7));
+    } else {
+      maturityDate.setFullYear(maturityDate.getFullYear() + (bond.maturityYears || 10));
+    }
+    
+    // Insert bond holding
+    const result = dbModule.insertBondHolding.run(
+      bond.type,
+      bond.issuer || symbol,
+      faceValue,
+      bond.couponRate,
+      purchasePrice,
+      gameTime.toISOString(),
+      maturityDate.toISOString(),
+      bond.creditRating,
+      quantity
+    );
+    
+    // Update user's cash
+    dbModule.updateUserAccount.run(
+      account.cash - totalAmount,
+      account.credit_score
+    );
+    
+    // Record transaction
+    dbModule.insertTransaction.run(
+      gameTime.toISOString(),
+      'bond_purchase',
+      bond.issuer || symbol,
+      quantity,
+      purchasePrice,
+      tradingFee,
+      null,
+      -totalAmount,
+      JSON.stringify({
+        bondId: result.lastInsertRowid,
+        bondType: bond.type,
+        bondSymbol: symbol,
+        faceValue,
+        couponRate: bond.couponRate,
+        maturityDate: maturityDate.toISOString()
+      })
+    );
+    
+    // Record fee
+    dbModule.insertFee.run(
+      gameTime.toISOString(),
+      'trading',
+      tradingFee,
+      `Trading fee for bond purchase: ${symbol}`
+    );
+    
+    res.json({
+      success: true,
+      bondId: result.lastInsertRowid,
+      symbol,
+      quantity,
+      purchasePrice,
+      totalCost,
+      tradingFee,
+      totalAmount,
+      remainingCash: account.cash - totalAmount
+    });
+  } catch (error) {
+    console.error('Error buying bond:', error);
+    res.status(500).json({ error: 'Failed to buy bond', message: error.message });
+  }
+});
+
+// Sell bonds (before maturity)
+app.post('/api/bonds/sell', (req, res) => {
+  try {
+    const { bondId, quantity } = req.body;
+    
+    if (!bondId || !quantity || quantity <= 0) {
+      return res.status(400).json({ error: 'Invalid bond ID or quantity' });
+    }
+    
+    const holding = dbModule.getBondHolding.get(bondId);
+    if (!holding) {
+      return res.status(404).json({ error: 'Bond holding not found' });
+    }
+    
+    if (holding.quantity < quantity) {
+      return res.status(400).json({ 
+        error: 'Insufficient quantity',
+        available: holding.quantity,
+        requested: quantity
+      });
+    }
+    
+    const bond = bondsData.getBond(`${holding.bond_type.toUpperCase()}-${holding.issuer}`);
+    const pricing = bond ? bondManager.getBondMarketPrice(`${holding.bond_type.toUpperCase()}-${holding.issuer}`, gameTime) : null;
+    const sellPrice = pricing ? pricing.price : holding.purchase_price;
+    
+    const totalProceeds = sellPrice * quantity;
+    const tradingFee = totalProceeds * 0.001;
+    const netProceeds = totalProceeds - tradingFee;
+    
+    // Calculate capital gain/loss
+    const costBasis = holding.purchase_price * quantity;
+    const gainLoss = totalProceeds - costBasis;
+    let capitalGainsTax = 0;
+    
+    if (gainLoss > 0) {
+      capitalGainsTax = gainLoss * 0.15; // 15% capital gains tax
+      dbModule.insertTax.run(
+        gameTime.toISOString(),
+        'capital_gains',
+        capitalGainsTax,
+        `Capital gains tax on bond sale: ${holding.issuer}`
+      );
+    }
+    
+    const finalProceeds = netProceeds - capitalGainsTax;
+    
+    // Update or delete bond holding
+    if (holding.quantity === quantity) {
+      dbModule.deleteBondHolding.run(bondId);
+    } else {
+      dbModule.updateBondQuantity.run(holding.quantity - quantity, bondId);
+    }
+    
+    // Update user's cash
+    const account = dbModule.getUserAccount.get();
+    dbModule.updateUserAccount.run(
+      account.cash + finalProceeds,
+      account.credit_score
+    );
+    
+    // Record transaction
+    dbModule.insertTransaction.run(
+      gameTime.toISOString(),
+      'bond_sale',
+      holding.issuer,
+      quantity,
+      sellPrice,
+      tradingFee,
+      capitalGainsTax,
+      finalProceeds,
+      JSON.stringify({
+        bondId,
+        bondType: holding.bond_type,
+        purchasePrice: holding.purchase_price,
+        gainLoss
+      })
+    );
+    
+    // Record fee
+    dbModule.insertFee.run(
+      gameTime.toISOString(),
+      'trading',
+      tradingFee,
+      `Trading fee for bond sale: ${holding.issuer}`
+    );
+    
+    res.json({
+      success: true,
+      bondId,
+      quantity,
+      sellPrice,
+      totalProceeds,
+      tradingFee,
+      capitalGainsTax,
+      finalProceeds,
+      gainLoss,
+      remainingCash: account.cash + finalProceeds
+    });
+  } catch (error) {
+    console.error('Error selling bond:', error);
+    res.status(500).json({ error: 'Failed to sell bond', message: error.message });
   }
 });
 
