@@ -114,6 +114,9 @@ function getAllDividendRates(year = null) {
   return dynamicRatesGenerator.getAllDividendRates(year);
 }
 
+// Wealth tax threshold for 2025 and beyond
+const WEALTH_TAX_THRESHOLD_2025 = 1000000; // $1M minimum for 2025+
+
 /**
  * Get tax rates for a given year
  * Uses base rates for historical period, can generate dynamic rates for future years
@@ -131,7 +134,7 @@ function getTaxRates(year = null) {
   // For 2025 and beyond, use higher threshold
   const rates = dynamicRatesGenerator.generateTaxRates(year);
   if (year >= 2025) {
-    rates.wealthTaxThreshold = Math.max(1000000, rates.wealthTaxThreshold); // At least $1M for 2025+
+    rates.wealthTaxThreshold = Math.max(WEALTH_TAX_THRESHOLD_2025, rates.wealthTaxThreshold);
   }
   return rates;
 }

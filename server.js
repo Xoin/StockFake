@@ -800,6 +800,7 @@ let userAccount = {
 
 // Trading restrictions
 const TRADE_COOLDOWN_MS = 5 * 60 * 1000; // 5 minutes cooldown between trades for same stock
+const MS_PER_DAY = 24 * 60 * 60 * 1000; // Milliseconds in a day
 
 // Margin trading constants
 const INITIAL_MARGIN_REQUIREMENT = 0.50; // 50% initial margin (post-1974 regulation)
@@ -1317,7 +1318,7 @@ function processMarginInterest() {
     userAccount.marginAccount.marginBalance += interest;
     
     // Update last interest date by the number of days we accrued
-    const newInterestDate = new Date(lastInterestDate.getTime() + (daysToAccrue * 24 * 60 * 60 * 1000));
+    const newInterestDate = new Date(lastInterestDate.getTime() + (daysToAccrue * MS_PER_DAY));
     userAccount.marginAccount.lastMarginInterestDate = newInterestDate;
     
     // Record fee
@@ -1465,7 +1466,7 @@ function processLoans() {
       loan.balance += interest;
       
       // Update last accrual time by the number of days we just accrued
-      const newAccrualDate = new Date(lastAccrual.getTime() + (daysToAccrue * 24 * 60 * 60 * 1000));
+      const newAccrualDate = new Date(lastAccrual.getTime() + (daysToAccrue * MS_PER_DAY));
       loan.lastInterestAccrual = newAccrualDate.toISOString();
     }
     

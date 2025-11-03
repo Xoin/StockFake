@@ -200,6 +200,10 @@ let autoRefresh = true;
             return '$' + value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
         }
         
+        function bytesToMB(bytes) {
+            return (bytes / 1024 / 1024).toFixed(2);
+        }
+        
         function formatUptime(ms) {
             const seconds = Math.floor(ms / 1000);
             const minutes = Math.floor(seconds / 60);
@@ -249,8 +253,8 @@ let autoRefresh = true;
                 
                 // Memory information (client-side approximation since server doesn't provide it yet)
                 if (performance && performance.memory) {
-                    const memUsedMB = (performance.memory.usedJSHeapSize / 1024 / 1024).toFixed(2);
-                    const memLimitMB = (performance.memory.jsHeapSizeLimit / 1024 / 1024).toFixed(2);
+                    const memUsedMB = bytesToMB(performance.memory.usedJSHeapSize);
+                    const memLimitMB = bytesToMB(performance.memory.jsHeapSizeLimit);
                     const memPercent = ((performance.memory.usedJSHeapSize / performance.memory.jsHeapSizeLimit) * 100).toFixed(1);
                     
                     document.getElementById('memoryUsage').textContent = \`\${memUsedMB} MB (\${memPercent}%)\`;
