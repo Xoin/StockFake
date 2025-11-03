@@ -2352,6 +2352,17 @@ app.post('/api/trade', (req, res) => {
         return res.status(400).json({ error: 'Invalid action' });
       }
       
+      // For buy orders, validate share availability before queueing
+      if (action === 'buy' || action === 'buy-margin') {
+        const availabilityCheck = shareAvailability.canPurchaseShares(symbol, shares);
+        if (!availabilityCheck.canPurchase) {
+          return res.status(400).json({ 
+            error: availabilityCheck.reason,
+            availableShares: availabilityCheck.availableShares
+          });
+        }
+      }
+      
       // Queue the order
       const result = dbModule.insertPendingOrder.run(
         symbol,
