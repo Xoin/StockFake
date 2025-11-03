@@ -424,6 +424,45 @@ function initializeDatabase() {
     )
   `);
 
+  // Create crypto_holdings table for tracking cryptocurrency positions
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS crypto_holdings (
+      symbol TEXT PRIMARY KEY,
+      quantity REAL NOT NULL DEFAULT 0,
+      last_staking_reward_date TEXT,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+
+  // Create crypto_transactions table for tracking crypto trades and staking rewards
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS crypto_transactions (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      symbol TEXT NOT NULL,
+      transaction_type TEXT NOT NULL,
+      quantity REAL NOT NULL,
+      price_per_unit REAL NOT NULL,
+      trading_fee REAL,
+      total REAL NOT NULL,
+      transaction_date TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+
+  // Create staking_rewards table for tracking staking income
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS staking_rewards (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      symbol TEXT NOT NULL,
+      quantity REAL NOT NULL,
+      reward_date TEXT NOT NULL,
+      price_at_reward REAL NOT NULL,
+      total_value REAL NOT NULL,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+
   // Insert default market state if not exists
   const marketStateCount = db.prepare('SELECT COUNT(*) as count FROM market_state').get();
   if (marketStateCount.count === 0) {
@@ -807,6 +846,35 @@ const insertBondInterestPayment = db.prepare(`
   VALUES (?, ?, ?)
 `);
 
+// Crypto holdings functions
+const getCryptoHoldings = db.prepare('SELECT * FROM crypto_holdings ORDER BY symbol ASC');
+const getCryptoHolding = db.prepare('SELECT * FROM crypto_holdings WHERE symbol = ?');
+const upsertCryptoHolding = db.prepare(`
+  INSERT INTO crypto_holdings (symbol, quantity, last_staking_reward_date, updated_at)
+  VALUES (?, ?, ?, ?)
+  ON CONFLICT(symbol) DO UPDATE SET
+    quantity = excluded.quantity,
+    last_staking_reward_date = excluded.last_staking_reward_date,
+    updated_at = excluded.updated_at
+`);
+const deleteCryptoHolding = db.prepare('DELETE FROM crypto_holdings WHERE symbol = ?');
+
+// Crypto transaction functions
+const getCryptoTransactions = db.prepare('SELECT * FROM crypto_transactions WHERE symbol = ? ORDER BY transaction_date DESC LIMIT ?');
+const getAllCryptoTransactions = db.prepare('SELECT * FROM crypto_transactions ORDER BY transaction_date DESC LIMIT ?');
+const insertCryptoTransaction = db.prepare(`
+  INSERT INTO crypto_transactions (symbol, transaction_type, quantity, price_per_unit, trading_fee, total, transaction_date)
+  VALUES (?, ?, ?, ?, ?, ?, ?)
+`);
+
+// Staking rewards functions
+const getStakingRewards = db.prepare('SELECT * FROM staking_rewards WHERE symbol = ? ORDER BY reward_date DESC LIMIT ?');
+const getAllStakingRewards = db.prepare('SELECT * FROM staking_rewards ORDER BY reward_date DESC LIMIT ?');
+const insertStakingReward = db.prepare(`
+  INSERT INTO staking_rewards (symbol, quantity, reward_date, price_at_reward, total_value)
+  VALUES (?, ?, ?, ?, ?)
+`);
+
 module.exports = {
   db,
   initializeDatabase,
@@ -957,5 +1025,21 @@ module.exports = {
   // Bond interest payments
   getBondInterestPayments,
   getAllBondInterestPayments,
-  insertBondInterestPayment
+  insertBondInterestPayment,
+  
+  // Crypto holdings
+  getCryptoHoldings,
+  getCryptoHolding,
+  upsertCryptoHolding,
+  deleteCryptoHolding,
+  
+  // Crypto transactions
+  getCryptoTransactions,
+  getAllCryptoTransactions,
+  insertCryptoTransaction,
+  
+  // Staking rewards
+  getStakingRewards,
+  getAllStakingRewards,
+  insertStakingReward
 };
