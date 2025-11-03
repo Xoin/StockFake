@@ -264,6 +264,56 @@ const bonds = {
     description: 'High-yield corporate bond with speculative grade rating, higher risk'
   },
   
+  // Additional Corporate Bonds
+  'CORP-GE-10Y': {
+    type: 'corporate',
+    name: 'General Electric 10-Year Bond',
+    issuer: 'GE',
+    maturityYears: 10,
+    couponRate: 0.048,
+    creditRating: 'A',
+    taxStatus: 'fully_taxable',
+    minPurchase: 1000,
+    callable: true,
+    description: 'General Electric corporate bond with good credit rating'
+  },
+  'CORP-IBM-7Y': {
+    type: 'corporate',
+    name: 'IBM 7-Year Bond',
+    issuer: 'IBM',
+    maturityYears: 7,
+    couponRate: 0.041,
+    creditRating: 'AA',
+    taxStatus: 'fully_taxable',
+    minPurchase: 1000,
+    callable: false,
+    description: 'IBM corporate bond with high credit rating'
+  },
+  'CORP-DIS-5Y': {
+    type: 'corporate',
+    name: 'Disney 5-Year Bond',
+    issuer: 'DIS',
+    maturityYears: 5,
+    couponRate: 0.037,
+    creditRating: 'A',
+    taxStatus: 'fully_taxable',
+    minPurchase: 1000,
+    callable: false,
+    description: 'Disney corporate bond with good credit rating'
+  },
+  'CORP-PG-10Y': {
+    type: 'corporate',
+    name: 'Procter & Gamble 10-Year Bond',
+    issuer: 'PG',
+    maturityYears: 10,
+    couponRate: 0.039,
+    creditRating: 'AA',
+    taxStatus: 'fully_taxable',
+    minPurchase: 1000,
+    callable: false,
+    description: 'Procter & Gamble corporate bond with high credit rating'
+  },
+  
   // Municipal Bonds (tax-free interest)
   'MUNI-CA-5Y': {
     type: 'municipal',

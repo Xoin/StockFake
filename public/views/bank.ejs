@@ -190,6 +190,30 @@
             </table>
         </div>
         
+        <div class="portfolio" id="bondHoldingsSection" style="display: none;">
+            <h2>Bond Holdings</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Issuer</th>
+                        <th>Type</th>
+                        <th>Face Value</th>
+                        <th>Coupon</th>
+                        <th>Quantity</th>
+                        <th>Purchase Price</th>
+                        <th>Current Price</th>
+                        <th>Current Value</th>
+                        <th>Gain/Loss</th>
+                        <th>Maturity Date</th>
+                        <th>Rating</th>
+                    </tr>
+                </thead>
+                <tbody id="bondHoldingsList">
+                    <tr><td colspan="11">No bond holdings</td></tr>
+                </tbody>
+            </table>
+        </div>
+        
         <div class="portfolio">
             <h2>Recent Transactions</h2>
             <table id="transactionsTable">
@@ -335,6 +359,46 @@
                     }).join('');
             } else {
                 shortPositionsSection.style.display = 'none';
+            }
+            
+            // Update bond holdings list
+            const bondHoldingsSection = document.getElementById('bondHoldingsSection');
+            const bondHoldingsList = document.getElementById('bondHoldingsList');
+            if (account.bondHoldings && account.bondHoldings.length > 0) {
+                bondHoldingsSection.style.display = 'block';
+                
+                // Fetch current bond prices
+                const bondsResponse = await fetch('/api/bonds');
+                const bonds = await bondsResponse.json();
+                
+                bondHoldingsList.innerHTML = account.bondHoldings.map(holding => {
+                    const bondSymbol = \`\${holding.bondType.toUpperCase()}-\${holding.issuer}\`;
+                    const bond = bonds.find(b => b.symbol === bondSymbol || b.issuer === holding.issuer);
+                    const currentPrice = bond ? bond.marketPrice : holding.purchasePrice;
+                    const currentValue = currentPrice * holding.quantity;
+                    const totalCost = holding.purchasePrice * holding.quantity;
+                    const gainLoss = currentValue - totalCost;
+                    const gainLossClass = gainLoss >= 0 ? 'positive' : 'negative';
+                    const maturityDate = new Date(holding.maturityDate).toLocaleDateString();
+                    
+                    return \`
+                        <tr>
+                            <td>\${escapeHtml(holding.issuer)}</td>
+                            <td>\${escapeHtml(holding.bondType)}</td>
+                            <td>$\${holding.faceValue}</td>
+                            <td>\${(holding.couponRate * 100).toFixed(2)}%</td>
+                            <td>\${holding.quantity}</td>
+                            <td>$\${holding.purchasePrice.toFixed(2)}</td>
+                            <td>$\${currentPrice.toFixed(2)}</td>
+                            <td>$\${currentValue.toFixed(2)}</td>
+                            <td class="\${gainLossClass}">$\${gainLoss.toFixed(2)}</td>
+                            <td>\${maturityDate}</td>
+                            <td>\${escapeHtml(holding.creditRating)}</td>
+                        </tr>
+                    \`;
+                }).join('');
+            } else {
+                bondHoldingsSection.style.display = 'none';
             }
             
             // Update transactions list
@@ -496,6 +560,23 @@
                     });
                     
                     totalPortfolioValue += totalValue;
+                    totalCost += positionCost;
+                }
+            }
+            
+            // Add bond holdings to portfolio value
+            if (account.bondHoldings && account.bondHoldings.length > 0) {
+                const bondsResponse = await fetch('/api/bonds');
+                const bonds = await bondsResponse.json();
+                
+                for (const holding of account.bondHoldings) {
+                    const bondSymbol = \`\${holding.bondType.toUpperCase()}-\${holding.issuer}\`;
+                    const bond = bonds.find(b => b.symbol === bondSymbol || b.issuer === holding.issuer);
+                    const currentPrice = bond ? bond.marketPrice : holding.purchasePrice;
+                    const currentValue = currentPrice * holding.quantity;
+                    const positionCost = holding.purchasePrice * holding.quantity;
+                    
+                    totalPortfolioValue += currentValue;
                     totalCost += positionCost;
                 }
             }

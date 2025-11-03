@@ -43,7 +43,7 @@ app.use(express.json());
 // Whitelist of known pages to prevent open redirects
 const validPages = new Set([
   '/index', '/bank', '/trading', '/news', '/email', '/graphs', 
-  '/loans', '/taxes', '/cheat', '/indexfunds', '/indexfund', '/company', '/pendingorders', '/status'
+  '/loans', '/bonds', '/taxes', '/cheat', '/indexfunds', '/indexfund', '/company', '/pendingorders', '/status'
 ]);
 
 app.use((req, res, next) => {
@@ -316,6 +316,10 @@ app.get('/graphs', (req, res) => {
 
 app.get('/loans', (req, res) => {
   res.render('loans');
+});
+
+app.get('/bonds', (req, res) => {
+  res.render('bonds');
 });
 
 app.get('/taxes', (req, res) => {

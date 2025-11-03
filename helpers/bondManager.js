@@ -85,28 +85,30 @@ function calculateYieldToMaturity(bond, price, yearsToMaturity, faceValue = 100)
     return Math.pow(faceValue / price, 1 / yearsToMaturity) - 1;
   }
   
-  // For coupon bonds, use iterative approximation (Newton's method)
-  let ytm = 0.05; // Initial guess
-  const tolerance = 0.00001;
+  // For coupon bonds, use binary search (more reliable than Newton's method)
+  let lowerBound = 0.0001; // 0.01%
+  let upperBound = 0.5;    // 50%
+  const tolerance = 0.0001;
   const maxIterations = 100;
   
   for (let i = 0; i < maxIterations; i++) {
+    const ytm = (lowerBound + upperBound) / 2;
     const calculatedPrice = calculateBondPrice(bond, ytm, yearsToMaturity, faceValue);
-    const priceDiff = calculatedPrice - price;
     
-    if (Math.abs(priceDiff) < tolerance) {
-      break;
+    if (Math.abs(calculatedPrice - price) < tolerance) {
+      return ytm;
     }
     
-    // Adjust YTM based on price difference
-    const adjustment = priceDiff / faceValue;
-    ytm -= adjustment * 0.1; // Damped adjustment
-    
-    // Keep YTM in reasonable bounds
-    ytm = Math.max(0.001, Math.min(0.5, ytm));
+    // If calculated price is too high, we need higher yield (lower bound)
+    if (calculatedPrice > price) {
+      lowerBound = ytm;
+    } else {
+      upperBound = ytm;
+    }
   }
   
-  return ytm;
+  // Return mid-point if we didn't converge
+  return (lowerBound + upperBound) / 2;
 }
 
 // Process bond interest payments (called during game time updates)
