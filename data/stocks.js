@@ -13,6 +13,22 @@ try {
   console.warn('Market crash simulation module not loaded:', err.message);
 }
 
+// Load economic indicators module for Fed policy and economic constraints
+let economicIndicators = null;
+try {
+  economicIndicators = require('./economic-indicators');
+} catch (err) {
+  console.warn('Economic indicators module not loaded:', err.message);
+}
+
+// Load dynamic rates generator for inflation data
+let dynamicRates = null;
+try {
+  dynamicRates = require('../helpers/dynamicRatesGenerator');
+} catch (err) {
+  console.warn('Dynamic rates generator not loaded:', err.message);
+}
+
 // Load historical stock data
 const historicalStockData = JSON.parse(
   fs.readFileSync(path.join(__dirname, 'historical-stock-data.json'), 'utf8')
@@ -35,6 +51,7 @@ for (const [symbol, stockInfo] of Object.entries(historicalStockData.data)) {
 /**
  * Calculate variable annual growth rate for a given year and sector
  * Simulates market cycles with good years, bad years, and sector-specific performance
+ * Incorporates economic indicators and Federal Reserve policy after 2024
  * @param {number} year - The year to calculate growth for
  * @param {string} sector - The sector (e.g., 'Technology', 'Financial')
  * @returns {number} - Annual growth rate (e.g., 0.15 for 15% growth)
@@ -106,9 +123,32 @@ function getAnnualGrowthRate(year, sector = null) {
     annualReturn = annualReturn * sectorMultiplier + sectorVariation;
   }
   
-  // Ensure returns stay within reasonable bounds
-  // Allow for occasional negative years but not extreme values
-  annualReturn = Math.max(-0.30, Math.min(0.40, annualReturn)); // -30% to +40%
+  // Apply economic constraints for years after 2024
+  if (year > 2024 && economicIndicators && dynamicRates) {
+    // Get inflation rate for the year
+    const inflationRate = dynamicRates.generateInflationRate(year);
+    
+    // Get economic indicators (Fed policy, GDP, unemployment, etc.)
+    const economics = economicIndicators.getEconomicIndicators(year, inflationRate);
+    
+    // Calculate market impact from economic conditions
+    const economicImpact = economicIndicators.calculateMarketImpact(economics);
+    
+    // Apply economic impact to annual return
+    // This constrains growth based on Fed policy, interest rates, QE, etc.
+    annualReturn += economicImpact;
+    
+    // Additional constraint: gradually reduce max growth cap in future years
+    // to prevent runaway valuations while still allowing reasonable returns
+    const yearsSince2024 = year - 2024;
+    const capReduction = Math.min(0.03, yearsSince2024 * 0.002); // Reduce cap by 0.2% per year, max 3%
+    const maxReturn = 0.40 - capReduction; // Start at 40%, reduce gradually
+    
+    annualReturn = Math.max(-0.30, Math.min(maxReturn, annualReturn));
+  } else {
+    // Pre-2025: use original bounds
+    annualReturn = Math.max(-0.30, Math.min(0.40, annualReturn)); // -30% to +40%
+  }
   
   return annualReturn;
 }
