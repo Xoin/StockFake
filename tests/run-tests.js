@@ -91,7 +91,7 @@ function runTestFile(testPath) {
 function runAllTests() {
   printHeader('StockFake Test Suite');
   
-  const testDir = path.join(__dirname, '..');
+  const testDir = __dirname; // Start from tests/ directory
   const testFiles = discoverTests(testDir);
   
   if (testFiles.length === 0) {

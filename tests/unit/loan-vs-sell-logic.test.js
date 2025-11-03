@@ -12,8 +12,11 @@ const { createMockUserAccount, calculatePortfolioValue, calculateTotalLoanDebt }
 const suite = new TestSuite('Loan vs Sell Decision Logic');
 
 /**
- * Mock the decision logic that should be implemented
- * This is what the fixed logic should look like
+ * Reference implementation of the decision logic
+ * This mirrors the logic that should be in server.js
+ * Note: The actual server.js implementation accesses userAccount globally
+ * and only takes negativeAmount as a parameter. This version takes
+ * account as a parameter for testability.
  */
 function shouldSellAssetsInsteadOfLoan(account, negativeAmount, gameTime) {
   const portfolioValue = calculatePortfolioValue(account.portfolio, gameTime);

@@ -1596,6 +1596,9 @@ setInterval(processLoans, 10000);
  * Determine whether to sell assets or take a loan to cover negative balance
  * This function implements smart decision-making based on portfolio value,
  * existing debt, credit score, and the relative size of the shortfall
+ * 
+ * Note: This function is only called once per day when balance is negative,
+ * so the portfolio value recalculation is not a performance concern.
  */
 function shouldSellAssetsInsteadOfLoan(negativeAmount) {
   // Calculate portfolio value
