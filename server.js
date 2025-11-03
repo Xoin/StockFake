@@ -5622,7 +5622,7 @@ app.post('/api/crypto/sell', (req, res) => {
     
     // Update holding
     const newQuantity = holding.quantity - quantity;
-    if (newQuantity > 0.0001) {
+    if (newQuantity > MIN_HOLDING_THRESHOLD) {
       dbModule.upsertCryptoHolding.run(
         symbol,
         newQuantity,
@@ -5630,6 +5630,7 @@ app.post('/api/crypto/sell', (req, res) => {
         gameTime.toISOString()
       );
     } else {
+      // Quantity too small to keep - delete holding
       dbModule.deleteCryptoHolding.run(symbol);
     }
     
@@ -5697,7 +5698,18 @@ app.post('/api/crypto/sell', (req, res) => {
   }
 });
 
+// Constants for crypto trading
+const MIN_HOLDING_THRESHOLD = 0.0001; // Minimum quantity threshold for keeping a crypto holding
+
 // Helper function to calculate average cost basis for crypto
+/**
+ * Calculate the average cost basis for a cryptocurrency holding.
+ * Uses average cost method: tracks total cost and quantity across all purchases,
+ * adjusting proportionally for sales. This is a simplified tax calculation method.
+ * 
+ * @param {string} symbol - The cryptocurrency symbol (BTC, ETH, etc.)
+ * @returns {number} The average cost per unit, or 0 if no holdings
+ */
 function calculateCryptoCostBasis(symbol) {
   try {
     const transactions = dbModule.getCryptoTransactions.all(symbol, 1000);
@@ -5709,7 +5721,7 @@ function calculateCryptoCostBasis(symbol) {
         totalCost += tx.price_per_unit * tx.quantity;
         totalQuantity += tx.quantity;
       } else if (tx.transaction_type === 'sell') {
-        // Reduce proportionally
+        // Reduce proportionally using average cost method
         if (totalQuantity > 0) {
           const proportion = tx.quantity / totalQuantity;
           totalCost -= totalCost * proportion;

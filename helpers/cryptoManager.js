@@ -1,6 +1,10 @@
 // Crypto manager - handles crypto pricing, trading, staking, and volatility
 const cryptoData = require('../data/cryptocurrencies');
 
+// Constants for price calculation
+const VOLATILITY_TIME_DIVISOR = 100000; // Divisor for deterministic "random" volatility based on timestamp
+const MIN_CRYPTO_PRICE = 0.00001; // Minimum price floor to prevent zero/negative prices
+
 // Historical price points for major cryptocurrencies (simplified)
 // These are rough approximations of key price points
 const priceAnchors = {
@@ -132,7 +136,7 @@ function getCryptoPrice(symbol, currentDate) {
     // After last anchor - use last anchor with some growth/volatility
     const daysSinceAnchor = (currentTime - new Date(beforeAnchor.date).getTime()) / (1000 * 60 * 60 * 24);
     const volatility = crypto.baseVolatility;
-    const randomFactor = 1 + (Math.sin(currentTime / 100000) * volatility * 2); // Deterministic "random"
+    const randomFactor = 1 + (Math.sin(currentTime / VOLATILITY_TIME_DIVISOR) * volatility * 2);
     return beforeAnchor.price * randomFactor;
   }
   
@@ -147,9 +151,9 @@ function getCryptoPrice(symbol, currentDate) {
   const logPrice = logBefore + (logAfter - logBefore) * progress;
   let basePrice = Math.exp(logPrice);
   
-  // Add daily volatility
+  // Add daily volatility using deterministic pseudo-random based on time and symbol
   const daysSinceAnchor = (currentTime - beforeTime) / (1000 * 60 * 60 * 24);
-  const volatilityFactor = 1 + (Math.sin(currentTime / 100000 + symbol.charCodeAt(0)) * crypto.baseVolatility);
+  const volatilityFactor = 1 + (Math.sin(currentTime / VOLATILITY_TIME_DIVISOR + symbol.charCodeAt(0)) * crypto.baseVolatility);
   let price = basePrice * volatilityFactor;
   
   // Apply blockchain events
@@ -186,7 +190,7 @@ function getCryptoPrice(symbol, currentDate) {
     }
   }
   
-  return Math.max(0.00001, price); // Ensure price doesn't go below a minimum
+  return Math.max(MIN_CRYPTO_PRICE, price);
 }
 
 // Calculate crypto trading fee
