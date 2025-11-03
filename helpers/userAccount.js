@@ -94,6 +94,24 @@ function getUserAccount() {
       markedAsMissed: Boolean(loan.marked_as_missed),
       termDays: loan.term_days
     })),
+    bondHoldings: db.getBondHoldings().all().map(bond => ({
+      id: bond.id,
+      bondType: bond.bond_type,
+      issuer: bond.issuer,
+      faceValue: bond.face_value,
+      couponRate: bond.coupon_rate,
+      purchasePrice: bond.purchase_price,
+      purchaseDate: new Date(bond.purchase_date),
+      maturityDate: new Date(bond.maturity_date),
+      creditRating: bond.credit_rating,
+      quantity: bond.quantity
+    })),
+    bondInterestPayments: db.getAllBondInterestPayments().all(20).map(payment => ({
+      id: payment.id,
+      bondId: payment.bond_id,
+      paymentDate: new Date(payment.payment_date),
+      amount: payment.amount
+    })),
     transactions: db.getTransactions.all(20).map(tx => {
       const data = tx.data ? JSON.parse(tx.data) : {};
       return {

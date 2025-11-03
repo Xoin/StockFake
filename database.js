@@ -395,6 +395,35 @@ function initializeDatabase() {
     )
   `);
 
+  // Create bond_holdings table for tracking bond positions
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS bond_holdings (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      bond_type TEXT NOT NULL,
+      issuer TEXT NOT NULL,
+      face_value REAL NOT NULL,
+      coupon_rate REAL NOT NULL,
+      purchase_price REAL NOT NULL,
+      purchase_date TEXT NOT NULL,
+      maturity_date TEXT NOT NULL,
+      credit_rating TEXT,
+      quantity INTEGER NOT NULL DEFAULT 1,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+
+  // Create bond_interest_payments table for tracking interest payments
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS bond_interest_payments (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      bond_id INTEGER NOT NULL,
+      payment_date TEXT NOT NULL,
+      amount REAL NOT NULL,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (bond_id) REFERENCES bond_holdings(id)
+    )
+  `);
+
   // Insert default market state if not exists
   const marketStateCount = db.prepare('SELECT COUNT(*) as count FROM market_state').get();
   if (marketStateCount.count === 0) {
@@ -455,7 +484,8 @@ function initializeDatabase() {
       marketCrashEvents: 365 * 10,
       stockSplits: 365 * 10,
       pendingOrders: 30,
-      companyFinancials: 365 * 10
+      companyFinancials: 365 * 10,
+      bondInterestPayments: 365 * 10
     };
     db.prepare(`
       INSERT INTO data_retention_config (id, retention_periods, auto_pruning_enabled)
@@ -754,6 +784,29 @@ const updateDataRetentionConfig = db.prepare(`
   WHERE id = 1
 `);
 
+// Bond holdings functions
+const getBondHoldings = db.prepare('SELECT * FROM bond_holdings ORDER BY maturity_date ASC');
+const getBondHolding = db.prepare('SELECT * FROM bond_holdings WHERE id = ?');
+const getBondHoldingsByType = db.prepare('SELECT * FROM bond_holdings WHERE bond_type = ? ORDER BY maturity_date ASC');
+const insertBondHolding = db.prepare(`
+  INSERT INTO bond_holdings (bond_type, issuer, face_value, coupon_rate, purchase_price, purchase_date, maturity_date, credit_rating, quantity)
+  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+`);
+const updateBondQuantity = db.prepare(`
+  UPDATE bond_holdings 
+  SET quantity = ?
+  WHERE id = ?
+`);
+const deleteBondHolding = db.prepare('DELETE FROM bond_holdings WHERE id = ?');
+
+// Bond interest payment functions
+const getBondInterestPayments = db.prepare('SELECT * FROM bond_interest_payments WHERE bond_id = ? ORDER BY payment_date DESC');
+const getAllBondInterestPayments = db.prepare('SELECT * FROM bond_interest_payments ORDER BY payment_date DESC LIMIT ?');
+const insertBondInterestPayment = db.prepare(`
+  INSERT INTO bond_interest_payments (bond_id, payment_date, amount)
+  VALUES (?, ?, ?)
+`);
+
 module.exports = {
   db,
   initializeDatabase,
@@ -891,5 +944,18 @@ module.exports = {
   
   // Data retention config
   getDataRetentionConfig,
-  updateDataRetentionConfig
+  updateDataRetentionConfig,
+  
+  // Bond holdings
+  getBondHoldings,
+  getBondHolding,
+  getBondHoldingsByType,
+  insertBondHolding,
+  updateBondQuantity,
+  deleteBondHolding,
+  
+  // Bond interest payments
+  getBondInterestPayments,
+  getAllBondInterestPayments,
+  insertBondInterestPayment
 };
