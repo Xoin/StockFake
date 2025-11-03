@@ -1592,6 +1592,70 @@ function processLoans() {
 // Call this periodically
 setInterval(processLoans, 10000);
 
+/**
+ * Determine whether to sell assets or take a loan to cover negative balance
+ * This function implements smart decision-making based on portfolio value,
+ * existing debt, credit score, and the relative size of the shortfall
+ * 
+ * Note: This function is only called once per day when balance is negative,
+ * so the portfolio value recalculation is not a performance concern.
+ */
+function shouldSellAssetsInsteadOfLoan(negativeAmount) {
+  // Calculate portfolio value
+  let portfolioValue = 0;
+  for (const [symbol, shares] of Object.entries(userAccount.portfolio)) {
+    if (shares > 0) {
+      const stockData = stocks.getStockPrice(symbol, gameTime, timeMultiplier, isPaused);
+      if (stockData && stockData.price > 0) {
+        portfolioValue += stockData.price * shares;
+      }
+    }
+  }
+  
+  // Calculate total loan debt
+  let totalLoanDebt = 0;
+  for (const loan of userAccount.loans) {
+    if (loan.status === 'active') {
+      totalLoanDebt += loan.balance;
+    }
+  }
+  
+  // Decision logic:
+  
+  // 1. If no portfolio to sell, must take loan (if available)
+  if (portfolioValue === 0) {
+    return false;
+  }
+  
+  // 2. If already heavily in debt (loans > 50% of portfolio value), prefer selling
+  if (totalLoanDebt > portfolioValue * 0.5) {
+    console.log(`Decision: SELL - Already heavily in debt ($${totalLoanDebt.toFixed(2)} vs portfolio $${portfolioValue.toFixed(2)})`);
+    return true;
+  }
+  
+  // 3. If portfolio value can easily cover the negative amount (>2x), prefer selling
+  if (portfolioValue > negativeAmount * 2) {
+    console.log(`Decision: SELL - Portfolio ($${portfolioValue.toFixed(2)}) can easily cover debt ($${negativeAmount.toFixed(2)})`);
+    return true;
+  }
+  
+  // 4. If credit score is poor (<600), avoid more loans
+  if (userAccount.creditScore < 600) {
+    console.log(`Decision: SELL - Credit score too low (${userAccount.creditScore})`);
+    return true;
+  }
+  
+  // 5. If negative amount is small relative to portfolio (<10%), prefer selling
+  if (portfolioValue > 0 && negativeAmount < portfolioValue * 0.1) {
+    console.log(`Decision: SELL - Shortfall is small relative to portfolio (${((negativeAmount / portfolioValue) * 100).toFixed(1)}%)`);
+    return true;
+  }
+  
+  // Default: take loan if available (portfolio is small or would be wiped out)
+  console.log(`Decision: LOAN - Portfolio too small to liquidate ($${portfolioValue.toFixed(2)} vs debt $${negativeAmount.toFixed(2)})`);
+  return false;
+}
+
 // Process negative balance penalties
 function processNegativeBalance() {
   if (userAccount.cash >= 0) {
@@ -1624,58 +1688,67 @@ function processNegativeBalance() {
   
   // Take action after configured days of negative balance
   if (daysNegative >= EMERGENCY_ACTION_DAYS && daysNegative % EMERGENCY_ACTION_DAYS === 0) {
-    // Try to get an emergency loan to cover the negative balance
-    const loanAmount = Math.ceil(negativeAmount * EMERGENCY_LOAN_BUFFER);
+    // Decide whether to sell assets or take a loan
+    const shouldSell = shouldSellAssetsInsteadOfLoan(negativeAmount);
     
-    // Find available lenders based on credit score
-    const availableLenders = loanCompanies.getAvailableCompanies(gameTime, userAccount.creditScore);
-    
-    if (availableLenders.length > 0) {
-      // Take loan from the first available lender
-      const lender = availableLenders[0];
-      const interestRate = loanCompanies.getAdjustedInterestRate(lender, userAccount.creditScore);
-      const originationFee = loanAmount * lender.originationFee;
-      const netAmount = loanAmount - originationFee;
-      
-      // Create loan
-      const loan = {
-        id: loanIdCounter++,
-        companyId: lender.id,
-        companyName: lender.name,
-        principal: loanAmount,
-        balance: loanAmount,
-        interestRate: interestRate,
-        startDate: new Date(gameTime),
-        dueDate: new Date(gameTime.getTime() + (lender.termDays * 24 * 60 * 60 * 1000)),
-        lastPaymentDate: null,
-        lastInterestAccrual: new Date(gameTime),
-        missedPayments: 0,
-        status: 'active',
-        termDays: lender.termDays,
-        automatic: true // Mark as automatic
-      };
-      
-      userAccount.loans.push(loan);
-      userAccount.cash += netAmount;
-      
-      console.log(`Automatic emergency loan taken: $${loanAmount.toFixed(2)} from ${lender.name} (net: $${netAmount.toFixed(2)})`);
-      
-      // Log loan history
-      userAccount.loanHistory.push({
-        date: new Date(gameTime),
-        type: 'taken',
-        loanId: loan.id,
-        companyId: lender.id,
-        amount: loanAmount,
-        netAmount: netAmount,
-        interestRate: interestRate,
-        originationFee: originationFee,
-        automatic: true
-      });
-    } else {
-      // No lenders available - account manager must sell stocks
-      console.log(`No lenders available for emergency loan. Account manager selling stocks...`);
+    if (shouldSell) {
+      // Sell stocks to cover negative balance
+      console.log(`Account manager selling stocks to cover negative balance of $${negativeAmount.toFixed(2)}...`);
       sellStocksToRecoverBalance(negativeAmount);
+    } else {
+      // Try to get an emergency loan to cover the negative balance
+      const loanAmount = Math.ceil(negativeAmount * EMERGENCY_LOAN_BUFFER);
+      
+      // Find available lenders based on credit score
+      const availableLenders = loanCompanies.getAvailableCompanies(gameTime, userAccount.creditScore);
+      
+      if (availableLenders.length > 0) {
+        // Take loan from the first available lender
+        const lender = availableLenders[0];
+        const interestRate = loanCompanies.getAdjustedInterestRate(lender, userAccount.creditScore);
+        const originationFee = loanAmount * lender.originationFee;
+        const netAmount = loanAmount - originationFee;
+        
+        // Create loan
+        const loan = {
+          id: loanIdCounter++,
+          companyId: lender.id,
+          companyName: lender.name,
+          principal: loanAmount,
+          balance: loanAmount,
+          interestRate: interestRate,
+          startDate: new Date(gameTime),
+          dueDate: new Date(gameTime.getTime() + (lender.termDays * 24 * 60 * 60 * 1000)),
+          lastPaymentDate: null,
+          lastInterestAccrual: new Date(gameTime),
+          missedPayments: 0,
+          status: 'active',
+          termDays: lender.termDays,
+          automatic: true // Mark as automatic
+        };
+        
+        userAccount.loans.push(loan);
+        userAccount.cash += netAmount;
+        
+        console.log(`Automatic emergency loan taken: $${loanAmount.toFixed(2)} from ${lender.name} (net: $${netAmount.toFixed(2)})`);
+        
+        // Log loan history
+        userAccount.loanHistory.push({
+          date: new Date(gameTime),
+          type: 'taken',
+          loanId: loan.id,
+          companyId: lender.id,
+          amount: loanAmount,
+          netAmount: netAmount,
+          interestRate: interestRate,
+          originationFee: originationFee,
+          automatic: true
+        });
+      } else {
+        // No lenders available - must sell stocks
+        console.log(`No lenders available for emergency loan. Account manager selling stocks...`);
+        sellStocksToRecoverBalance(negativeAmount);
+      }
     }
   }
 }

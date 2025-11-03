@@ -64,6 +64,9 @@ npm install
 
 # Start the server
 npm start
+
+# Run tests (optional)
+npm test
 ```
 
 The application will be available at `http://localhost:3000`
@@ -168,6 +171,13 @@ Deep dive into company profiles with financials and product history
 8. **Easy Money Lending** (3/10 trust): 18% APR, minimal requirements
 9. **Cash Now Services** (2/10 trust): 24% APR, predatory terms
 10. **Fast Cash Loans** (1/10 trust): 28-35% APR, extremely high risk
+
+**Smart Emergency Decision Making**:
+- Intelligently decides whether to take loans or sell assets when cash goes negative
+- Considers portfolio value, existing debt, credit score, and shortfall size
+- Prevents debt spirals by prioritizing asset sales when appropriate
+- Protects small portfolios from complete liquidation
+- See [LOAN_VS_SELL_LOGIC.md](LOAN_VS_SELL_LOGIC.md) for details
 
 ### Credit Score System
 - **Range**: 300 (Poor) to 850 (Excellent)
@@ -400,18 +410,24 @@ StockFake/
 │   ├── emails.js            # Email generation
 │   ├── trade-halts.js       # Market suspension events
 │   └── share-availability.js # Public float tracking
-├── test-rebalancing.js      # Integration test for rebalancing
-├── test-rebalancing-api.js  # API integration test for rebalancing
-└── public/                   # Frontend HTML/CSS/JS
-    ├── index.html           # Portal page
-    ├── trading.html         # Trading platform
-    ├── bank.html            # Bank account
-    ├── loans.html           # Loan management
-    ├── taxes.html           # Tax center
-    ├── graphs.html          # Market charts
-    ├── news.html            # News feed
-    ├── email.html           # Email inbox
-    └── company.html         # Company profiles
+├── tests/                    # Modular test suite
+│   ├── run-tests.js         # Test runner
+│   ├── helpers/             # Test utilities
+│   ├── unit/                # Unit tests
+│   ├── integration/         # Integration tests
+│   └── simulation/          # Historical market simulations
+├── public/                   # Frontend HTML/CSS/JS
+│   ├── index.html           # Portal page
+│   ├── trading.html         # Trading platform
+│   ├── bank.html            # Bank account
+│   ├── loans.html           # Loan management
+│   ├── taxes.html           # Tax center
+│   ├── graphs.html          # Market charts
+│   ├── news.html            # News feed
+│   ├── email.html           # Email inbox
+│   └── company.html         # Company profiles
+├── TESTING.md                # Testing guide
+└── LOAN_VS_SELL_LOGIC.md    # Loan decision documentation
 ```
 
 ## 🎯 Tips & Strategies
@@ -440,6 +456,41 @@ StockFake/
 - **Predatory Loans**: Avoid high-interest lenders (>20% APR)
 - **Trading Fees**: In early years, excessive trading erodes profits
 - **Ignoring Taxes**: Capital gains can significantly reduce net profit
+
+## 🧪 Testing
+
+StockFake includes a comprehensive test suite to validate game logic and ensure realistic behavior.
+
+### Running Tests
+```bash
+npm test
+```
+
+### Test Categories
+- **Unit Tests**: Validate individual functions and decision logic
+- **Integration Tests**: Verify components work correctly together
+- **Simulation Tests**: Run full market scenarios across historical periods
+
+### What's Tested
+✓ Stock price movements during historical events  
+✓ Portfolio management and rebalancing  
+✓ Loan vs sell decision logic  
+✓ Dividend accumulation over time  
+✓ Market crash responses  
+✓ Long-term wealth building (20+ year simulations)  
+✓ Tax calculations  
+✓ Credit score management  
+
+### Test Coverage
+The test suite includes simulations of:
+- 1970s Oil Crisis
+- 1980s Bull Market
+- 1987 Black Monday
+- Dot-com Bubble (1998-2002)
+- 2008 Financial Crisis
+- Long-term buy-and-hold strategies
+
+See [TESTING.md](TESTING.md) for detailed testing documentation.
 
 ## 🔮 Future Enhancements
 
