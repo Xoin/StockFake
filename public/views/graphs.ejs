@@ -456,17 +456,14 @@ async function updateBreadthChart() {
                 labels: healthData.map(d => new Date(d.date).toLocaleDateString()),
                 datasets: [
                     {
-                        label: 'Advancing',
-                        data: healthData.map(d => d.advancing),
-                        backgroundColor: 'rgba(0, 255, 0, 0.5)',
-                        borderColor: '#00ff00',
-                        borderWidth: 1
-                    },
-                    {
-                        label: 'Declining',
-                        data: healthData.map(d => -d.declining),
-                        backgroundColor: 'rgba(255, 0, 0, 0.5)',
-                        borderColor: '#ff0000',
+                        label: 'Net Market Breadth (Advancing - Declining)',
+                        data: healthData.map(d => d.advancing - d.declining),
+                        backgroundColor: healthData.map(d => 
+                            d.advancing > d.declining ? 'rgba(0, 255, 0, 0.5)' : 'rgba(255, 0, 0, 0.5)'
+                        ),
+                        borderColor: healthData.map(d => 
+                            d.advancing > d.declining ? '#00ff00' : '#ff0000'
+                        ),
                         borderWidth: 1
                     }
                 ]
@@ -495,10 +492,7 @@ async function updateBreadthChart() {
                     y: {
                         ticks: {
                             color: '#00ff00',
-                            font: { family: 'Courier New' },
-                            callback: function(value) {
-                                return Math.abs(value);
-                            }
+                            font: { family: 'Courier New' }
                         },
                         grid: { color: '#003300' }
                     }

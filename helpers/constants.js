@@ -125,10 +125,15 @@ function getTaxRates(year = null) {
       longTermTaxRate: LONG_TERM_TAX_RATE,
       dividendTaxRate: DIVIDEND_TAX_RATE,
       wealthTaxRate: 0.01,  // 1% base wealth tax
-      wealthTaxThreshold: 50000  // $50,000 base threshold
+      wealthTaxThreshold: 500000  // $500,000 base threshold (increased from 50,000)
     };
   }
-  return dynamicRatesGenerator.generateTaxRates(year);
+  // For 2025 and beyond, use higher threshold
+  const rates = dynamicRatesGenerator.generateTaxRates(year);
+  if (year >= 2025) {
+    rates.wealthTaxThreshold = Math.max(1000000, rates.wealthTaxThreshold); // At least $1M for 2025+
+  }
+  return rates;
 }
 
 // Get initial margin requirement based on year (regulations changed over time)

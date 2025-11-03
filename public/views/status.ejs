@@ -108,6 +108,14 @@
             <span class="metric-label">Market Status:</span>
             <span class="metric-value" id="marketStatus">Loading...</span>
         </div>
+        <div class="metric">
+            <span class="metric-label">Memory Usage:</span>
+            <span class="metric-value" id="memoryUsage">Loading...</span>
+        </div>
+        <div class="metric">
+            <span class="metric-label">Memory Limit:</span>
+            <span class="metric-value" id="memoryLimit">Loading...</span>
+        </div>
     </div>
 
     <div class="status-card">
@@ -238,6 +246,25 @@ let autoRefresh = true;
                 
                 document.getElementById('marketStatus').textContent = timeData.isMarketOpen ? '🟢 Open' : '🔴 Closed';
                 document.getElementById('marketStatus').className = timeData.isMarketOpen ? 'metric-value status-good' : 'metric-value status-error';
+                
+                // Memory information (client-side approximation since server doesn't provide it yet)
+                if (performance && performance.memory) {
+                    const memUsedMB = (performance.memory.usedJSHeapSize / 1024 / 1024).toFixed(2);
+                    const memLimitMB = (performance.memory.jsHeapSizeLimit / 1024 / 1024).toFixed(2);
+                    const memPercent = ((performance.memory.usedJSHeapSize / performance.memory.jsHeapSizeLimit) * 100).toFixed(1);
+                    
+                    document.getElementById('memoryUsage').textContent = \`\${memUsedMB} MB (\${memPercent}%)\`;
+                    document.getElementById('memoryLimit').textContent = \`\${memLimitMB} MB\`;
+                    
+                    // Color code based on usage percentage
+                    const memClass = memPercent < 50 ? 'metric-value status-good' : 
+                                     memPercent < 80 ? 'metric-value status-warning' : 
+                                     'metric-value status-error';
+                    document.getElementById('memoryUsage').className = memClass;
+                } else {
+                    document.getElementById('memoryUsage').textContent = 'N/A';
+                    document.getElementById('memoryLimit').textContent = 'N/A';
+                }
                 
                 // Game Metrics
                 document.getElementById('stockCount').textContent = stocksData.length;
