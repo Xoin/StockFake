@@ -33,6 +33,16 @@ StockFake is a single-player financial simulation that lets you trade stocks usi
 - **Loan Terms**: 90 days to 10 years with origination fees and late payment penalties
 - **Margin Interest**: Daily compound interest on margin debt
 
+### 🏛️ Economic Indicators & Federal Reserve Policy
+- **Historical Data (1970-2024)**: Real Federal Funds Rate, QE programs, GDP growth, unemployment
+- **Dynamic Generation (2025+)**: Realistic economic modeling prevents excessive future growth
+- **Market Impact**: Interest rates, QE/QT, GDP, and inflation affect stock returns
+- **Business Cycles**: Periodic recessions (~12% annual probability) and expansions
+- **Fed Policy Response**: Rate adjustments based on inflation targeting
+- **Long-term Realism**: Constrained returns (~7% annualized) prevent unrealistic valuations
+
+See [ECONOMIC_INDICATORS_SUMMARY.md](ECONOMIC_INDICATORS_SUMMARY.md) for detailed documentation.
+
 ### 📈 Portfolio Management
 - **Dividend Tracking**: Quarterly dividend payments with automatic tax calculation
 - **Tax Center**: Comprehensive tax reporting for capital gains, dividends, and short sales
@@ -309,6 +319,13 @@ See [CORPORATE_EVENTS_SUMMARY.md](CORPORATE_EVENTS_SUMMARY.md) for detailed docu
 - `GET /api/companies/:symbol/status` - Check company status (active, bankrupt, acquired, private)
 - `GET /api/companies/:symbol/financials` - Get company financial data over time
 
+### Economic Indicators
+- `GET /api/economic/indicators/:year` - Get economic data (Fed funds rate, QE, GDP, unemployment)
+- `GET /api/economic/historical` - Get all historical economic data (1970-2024)
+- `GET /api/economic/impact/:year` - Calculate market impact from economic conditions
+- `GET /api/economic/config` - Get economic modeling configuration
+- `POST /api/economic/config` - Update economic modeling parameters
+
 
 ## 🗄️ Database Architecture
 
@@ -498,7 +515,7 @@ See [TESTING.md](TESTING.md) for detailed testing documentation.
 - Options trading (calls and puts)
 - Bonds and treasury securities
 - Cryptocurrency (post-2009)
-- Economic indicators and Federal Reserve policy
+- ~~Economic indicators and Federal Reserve policy~~ ✅ **Implemented**
 - ~~Corporate actions (stock splits, mergers, acquisitions)~~ ✅ **Implemented**
 - Spin-offs and stock distribution events
 - Dynamic IPO generation for new companies beyond 2025
