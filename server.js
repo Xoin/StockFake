@@ -800,6 +800,7 @@ let userAccount = {
 
 // Trading restrictions
 const TRADE_COOLDOWN_MS = 5 * 60 * 1000; // 5 minutes cooldown between trades for same stock
+const MS_PER_DAY = 24 * 60 * 60 * 1000; // Milliseconds in a day
 
 // Margin trading constants
 const INITIAL_MARGIN_REQUIREMENT = 0.50; // 50% initial margin (post-1974 regulation)
@@ -1291,6 +1292,9 @@ function checkPositionConcentration(symbol) {
 
 // Process margin interest (charged daily)
 function processMarginInterest() {
+  // Don't process margin interest when game is paused
+  if (isPaused) return;
+  
   if (userAccount.marginAccount.marginBalance <= 0) return;
   
   const currentDate = new Date(gameTime);
@@ -1301,23 +1305,28 @@ function processMarginInterest() {
   const daysSinceLastCharge = (currentDate - lastInterestDate) / (1000 * 60 * 60 * 24);
   
   // Charge interest daily with compound interest
+  // Only accrue for complete days to prevent repeated partial-day accruals
   if (daysSinceLastCharge >= 1) {
+    const daysToAccrue = Math.floor(daysSinceLastCharge);
     const dailyRate = userAccount.marginAccount.marginInterestRate / 365;
     const balanceBeforeInterest = userAccount.marginAccount.marginBalance;
     
     // Compound interest: P * (1 + r)^t - P
-    const interest = balanceBeforeInterest * (Math.pow(1 + dailyRate, daysSinceLastCharge) - 1);
+    const interest = balanceBeforeInterest * (Math.pow(1 + dailyRate, daysToAccrue) - 1);
     
     // Add interest to margin balance
     userAccount.marginAccount.marginBalance += interest;
-    userAccount.marginAccount.lastMarginInterestDate = new Date(gameTime);
+    
+    // Update last interest date by the number of days we accrued
+    const newInterestDate = new Date(lastInterestDate.getTime() + (daysToAccrue * MS_PER_DAY));
+    userAccount.marginAccount.lastMarginInterestDate = newInterestDate;
     
     // Record fee
     userAccount.fees.push({
       date: new Date(gameTime),
       type: 'margin-interest',
       amount: interest,
-      description: `Margin interest on $${balanceBeforeInterest.toFixed(2)} balance`
+      description: `Margin interest on $${balanceBeforeInterest.toFixed(2)} balance for ${daysToAccrue} day(s)`
     });
   }
 }
@@ -1429,6 +1438,9 @@ let loanIdCounter = 1;
 
 // Process loan interest accrual and check for missed payments
 function processLoans() {
+  // Don't process loans when game is paused
+  if (isPaused) return;
+  
   const currentDate = new Date(gameTime);
   
   for (const loan of userAccount.loans) {
@@ -1437,16 +1449,25 @@ function processLoans() {
     const company = loanCompanies.getCompany(loan.companyId);
     if (!company) continue;
     
-    // Calculate days since last payment
-    const lastPayment = loan.lastPaymentDate ? new Date(loan.lastPaymentDate) : new Date(loan.startDate);
-    const daysSinceLastPayment = (currentDate - lastPayment) / (1000 * 60 * 60 * 24);
+    // Calculate days since last interest accrual (not last payment!)
+    // Initialize lastInterestAccrual if not set
+    if (!loan.lastInterestAccrual) {
+      loan.lastInterestAccrual = loan.startDate;
+    }
     
-    // Accrue interest daily
-    if (daysSinceLastPayment >= 1) {
+    const lastAccrual = new Date(loan.lastInterestAccrual);
+    const daysSinceLastAccrual = (currentDate - lastAccrual) / (1000 * 60 * 60 * 24);
+    
+    // Only accrue interest if at least 1 day has passed since last accrual
+    if (daysSinceLastAccrual >= 1) {
       const dailyRate = loan.interestRate / 365;
-      const interest = loan.balance * dailyRate * daysSinceLastPayment;
+      const daysToAccrue = Math.floor(daysSinceLastAccrual); // Only accrue for complete days
+      const interest = loan.balance * dailyRate * daysToAccrue;
       loan.balance += interest;
-      loan.lastInterestAccrual = new Date(gameTime);
+      
+      // Update last accrual time by the number of days we just accrued
+      const newAccrualDate = new Date(lastAccrual.getTime() + (daysToAccrue * MS_PER_DAY));
+      loan.lastInterestAccrual = newAccrualDate.toISOString();
     }
     
     // Check if payment is overdue (30 days grace period)
@@ -2350,6 +2371,17 @@ app.post('/api/trade', (req, res) => {
       // Validate action
       if (!['buy', 'sell', 'short', 'cover', 'buy-margin'].includes(action)) {
         return res.status(400).json({ error: 'Invalid action' });
+      }
+      
+      // For buy orders, validate share availability before queueing
+      if (action === 'buy' || action === 'buy-margin') {
+        const availabilityCheck = shareAvailability.canPurchaseShares(symbol, shares);
+        if (!availabilityCheck.canPurchase) {
+          return res.status(400).json({ 
+            error: availabilityCheck.reason,
+            availableShares: availabilityCheck.availableShares
+          });
+        }
       }
       
       // Queue the order

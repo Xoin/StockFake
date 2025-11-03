@@ -17,7 +17,7 @@ const DYNAMIC_RATES_CONFIG = {
   baseLongTermTaxRate: 0.15,   // 15% long-term capital gains
   baseDividendTaxRate: 0.15,   // 15% dividend tax
   baseWealthTaxRate: 0.01,     // 1% wealth tax
-  baseWealthTaxThreshold: 50000, // $50,000 threshold
+  baseWealthTaxThreshold: 500000, // $500,000 threshold (increased from 50,000)
   
   // Variation parameters for realism
   inflationVolatility: 1.5,  // Standard deviation for inflation variation

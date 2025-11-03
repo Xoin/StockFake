@@ -630,11 +630,12 @@ let stocks = [];
                 
                 // Check concentration limit
                 if (futureConcentration > maxConcentration && futurePortfolioValue > 0) {
-                    messages.push(\`✗ Exceeds concentration limit: \${futureConcentration.toFixed(1)}% > \${maxConcentration.toFixed(0)}%\`);
-                    messages.push(\`Maximum allowed: \${maxConcentration.toFixed(0)}% of portfolio in single stock\`);
+                    messages.push(\`✗ ORDER WILL BE REJECTED: Exceeds concentration limit\`);
+                    messages.push(\`Position would be: \${futureConcentration.toFixed(1)}% > \${maxConcentration.toFixed(0)}% maximum\`);
+                    messages.push(\`The concentration limit cannot be overridden\`);
                     isError = true;
                 } else if (futureConcentration > warningConcentration && futurePortfolioValue > 0) {
-                    messages.push(\`⚠ High concentration: \${futureConcentration.toFixed(1)}% of portfolio\`);
+                    messages.push(\`⚠ High concentration warning: \${futureConcentration.toFixed(1)}% of portfolio\`);
                     messages.push(\`Warning threshold: \${warningConcentration.toFixed(0)}%\`);
                 }
                 
