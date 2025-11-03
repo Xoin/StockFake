@@ -345,9 +345,147 @@ WHERE id = 1;
 
 ## Future Enhancements
 
-Potential improvements:
-- Granular retention by symbol or category
-- Compression of old data instead of deletion
-- Export/archive functionality for old data
-- Analytics on pruning operations
-- UI for managing retention settings
+### High Priority
+
+1. **User Interface for Retention Management**
+   - Web-based settings page for configuring retention periods
+   - Visual dashboard showing database size and pruning statistics
+   - Real-time pruning progress indicators
+   - Historical charts of database growth and pruning operations
+
+2. **Granular Retention Policies**
+   - Per-symbol retention policies (keep important stocks longer)
+   - Category-based retention (e.g., different periods for tech vs. energy stocks)
+   - User-defined retention rules based on custom criteria
+   - VIP transaction preservation (large trades, significant events)
+
+3. **Data Archiving and Export**
+   - Export old data to JSON/CSV before deletion
+   - Compress and archive historical data to separate files
+   - Restore archived data on demand
+   - Cloud storage integration for archives (S3, Azure Blob, etc.)
+
+### Medium Priority
+
+4. **Smart Compression**
+   - Compress old data instead of deleting it
+   - Use SQLite compression extensions
+   - Store summarized/aggregated data for old records
+   - Reduce granularity over time (daily → weekly → monthly)
+
+5. **Advanced Analytics**
+   - Detailed pruning reports with statistics
+   - Database growth predictions and recommendations
+   - Cost/benefit analysis of different retention periods
+   - Impact analysis before pruning operations
+
+6. **Intelligent Pruning Strategies**
+   - Machine learning-based importance scoring for records
+   - Adaptive retention based on access patterns
+   - Preserve frequently accessed historical data
+   - Priority-based pruning during storage emergencies
+
+7. **Multi-Tier Storage**
+   - Hot storage (recent data, fast access)
+   - Warm storage (older data, moderate access)
+   - Cold storage (archived data, slow access)
+   - Automatic data migration between tiers
+
+### Low Priority
+
+8. **Backup and Recovery Enhancements**
+   - Automatic backups before pruning operations
+   - Point-in-time recovery for pruned data
+   - Undo functionality for recent pruning operations
+   - Differential backups to minimize storage overhead
+
+9. **Performance Optimizations**
+   - Incremental pruning to avoid long-running operations
+   - Background pruning with minimal performance impact
+   - Parallel pruning for multiple tables
+   - Smart scheduling based on system load
+
+10. **Compliance and Auditing**
+    - Audit trail for all pruning operations
+    - Compliance mode for regulatory requirements (SOX, GDPR)
+    - Tamper-proof pruning logs
+    - Data retention policy enforcement and verification
+
+11. **User Preferences**
+    - Individual user preferences for retention periods
+    - Opt-in/opt-out for specific data types
+    - Custom retention presets (conservative, balanced, aggressive)
+    - Import/export of retention configurations
+
+12. **Integration Features**
+    - Webhook notifications for pruning events
+    - Email alerts for storage thresholds
+    - Integration with monitoring tools (Grafana, Prometheus)
+    - API for third-party backup solutions
+
+### Advanced Features
+
+13. **Data Lifecycle Management**
+    - Complete lifecycle policies for data (creation → archival → deletion)
+    - Automatic data classification and tagging
+    - Retention based on data sensitivity and importance
+    - Scheduled review and re-evaluation of retention policies
+
+14. **Distributed Storage Support**
+    - Sharding old data across multiple databases
+    - Remote storage for archived data
+    - Content-addressable storage for deduplication
+    - Distributed query support across active and archived data
+
+15. **Data Minimization Techniques**
+    - Aggregate similar transactions into summaries
+    - Remove duplicate or redundant information
+    - Normalize data structure for efficiency
+    - Lossy compression for non-critical historical data
+
+### Example Use Cases
+
+**Use Case 1: Year-End Archive**
+```javascript
+// Archive all data older than 10 years to external storage
+const archiveConfig = {
+  cutoffDate: new Date('2010-01-01'),
+  exportFormat: 'json',
+  destination: 's3://my-bucket/archives/',
+  compress: true
+};
+await dataRetention.archiveAndPrune(archiveConfig);
+```
+
+**Use Case 2: Compliance Mode**
+```javascript
+// Enable 7-year retention for tax and regulatory compliance
+const complianceConfig = {
+  mode: 'compliance',
+  minimumRetentionYears: 7,
+  protectedCategories: ['taxes', 'loanHistory', 'transactions'],
+  immutableUntil: new Date('2028-01-01')
+};
+await dataRetention.enableComplianceMode(complianceConfig);
+```
+
+**Use Case 3: Storage Emergency**
+```javascript
+// Aggressive pruning to free up space immediately
+const emergencyConfig = {
+  mode: 'emergency',
+  targetSizeReduction: 0.5, // Reduce by 50%
+  preserveEssential: true,
+  createBackup: true
+};
+await dataRetention.emergencyPrune(emergencyConfig);
+```
+
+### Implementation Notes
+
+- Start with high-priority features based on user feedback
+- Maintain backward compatibility with existing API
+- Add feature flags for gradual rollout of new capabilities
+- Ensure all enhancements include comprehensive tests
+- Document performance implications of each enhancement
+- Consider security and privacy implications for all features
