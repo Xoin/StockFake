@@ -19,12 +19,14 @@ const tradeHalts = require('./data/trade-halts');
 const shareAvailability = require('./data/share-availability');
 const indexFunds = require('./data/index-funds');
 const historicalEvents = require('./data/historical-events');
+const economicIndicators = require('./data/economic-indicators');
 
 // Load helper modules
 const indexFundRebalancing = require('./helpers/indexFundRebalancing');
 const stockSplits = require('./helpers/stockSplits');
 const constants = require('./helpers/constants');
 const corporateEvents = require('./helpers/corporateEvents');
+const dynamicRates = require('./helpers/dynamicRatesGenerator');
 
 // Set up EJS as the view engine
 app.set('view engine', 'ejs');
@@ -4799,6 +4801,106 @@ app.get('/api/companies/:symbol/financials', (req, res) => {
   } catch (error) {
     console.error('Error fetching company financials:', error);
     res.status(500).json({ error: 'Failed to fetch company financials' });
+  }
+});
+
+// ============================================================================
+// Economic Indicators API Endpoints
+// ============================================================================
+
+// Get economic indicators for a specific year
+app.get('/api/economic/indicators/:year', (req, res) => {
+  try {
+    const year = parseInt(req.params.year);
+    
+    if (isNaN(year) || year < 1970 || year > 2100) {
+      return res.status(400).json({ error: 'Invalid year. Must be between 1970 and 2100.' });
+    }
+    
+    // Get inflation rate for the year
+    const inflationRate = dynamicRates.generateInflationRate(year);
+    
+    // Get economic indicators
+    const indicators = economicIndicators.getEconomicIndicators(year, inflationRate);
+    
+    res.json(indicators);
+  } catch (error) {
+    console.error('Error fetching economic indicators:', error);
+    res.status(500).json({ error: 'Failed to fetch economic indicators' });
+  }
+});
+
+// Get all historical economic data
+app.get('/api/economic/historical', (req, res) => {
+  try {
+    const historical = economicIndicators.getHistoricalData();
+    res.json(historical);
+  } catch (error) {
+    console.error('Error fetching historical economic data:', error);
+    res.status(500).json({ error: 'Failed to fetch historical economic data' });
+  }
+});
+
+// Calculate market impact from economic conditions for a year
+app.get('/api/economic/impact/:year', (req, res) => {
+  try {
+    const year = parseInt(req.params.year);
+    
+    if (isNaN(year) || year < 1970 || year > 2100) {
+      return res.status(400).json({ error: 'Invalid year. Must be between 1970 and 2100.' });
+    }
+    
+    // Get inflation rate for the year
+    const inflationRate = dynamicRates.generateInflationRate(year);
+    
+    // Get economic indicators
+    const indicators = economicIndicators.getEconomicIndicators(year, inflationRate);
+    
+    // Calculate market impact
+    const impact = economicIndicators.calculateMarketImpact(indicators);
+    
+    res.json({
+      year: year,
+      indicators: indicators,
+      marketImpact: impact,
+      marketImpactPercent: (impact * 100).toFixed(2) + '%'
+    });
+  } catch (error) {
+    console.error('Error calculating market impact:', error);
+    res.status(500).json({ error: 'Failed to calculate market impact' });
+  }
+});
+
+// Get economic modeling configuration
+app.get('/api/economic/config', (req, res) => {
+  try {
+    const config = economicIndicators.getConfiguration();
+    res.json(config);
+  } catch (error) {
+    console.error('Error fetching economic config:', error);
+    res.status(500).json({ error: 'Failed to fetch economic configuration' });
+  }
+});
+
+// Update economic modeling configuration
+app.post('/api/economic/config', (req, res) => {
+  try {
+    const newConfig = req.body;
+    
+    // Validate configuration update
+    economicIndicators.updateConfiguration(newConfig);
+    
+    res.json({
+      success: true,
+      message: 'Economic configuration updated',
+      config: economicIndicators.getConfiguration()
+    });
+  } catch (error) {
+    console.error('Error updating economic config:', error);
+    res.status(400).json({ 
+      error: 'Failed to update economic configuration',
+      message: error.message 
+    });
   }
 });
 
