@@ -23,12 +23,63 @@ const MINIMUM_BALANCE = 1000; // Minimum balance to avoid fees (starts in 1990s)
 const SHORT_BORROW_FEE_ANNUAL = 0.05; // 5% annual fee to borrow shares for shorting
 
 // Inflation tracking (CPI-based, annual rate)
-// Historical data up to 2024, dynamically generated after that
-const inflationRates = dynamicRatesGenerator.HISTORICAL_INFLATION;
+// Proxy object that returns historical data up to 2024, dynamically generated after that
+const inflationRates = new Proxy({}, {
+  get(target, prop) {
+    const year = parseInt(prop);
+    if (isNaN(year)) {
+      // Allow access to non-numeric properties (for Object.keys, etc.)
+      return undefined;
+    }
+    return dynamicRatesGenerator.generateInflationRate(year);
+  },
+  has(target, prop) {
+    const year = parseInt(prop);
+    return !isNaN(year) && year >= 1970;
+  },
+  ownKeys() {
+    // Return all historical years for Object.keys() and similar operations
+    return Object.keys(dynamicRatesGenerator.HISTORICAL_INFLATION);
+  },
+  getOwnPropertyDescriptor(target, prop) {
+    const year = parseInt(prop);
+    if (!isNaN(year) && year >= 1970) {
+      return {
+        enumerable: true,
+        configurable: true,
+        value: dynamicRatesGenerator.generateInflationRate(year)
+      };
+    }
+    return undefined;
+  }
+});
 
 // Dividend data (quarterly payouts per share)  
-// Historical data up to 2024, dynamically generated after that
-const dividendRates = dynamicRatesGenerator.HISTORICAL_DIVIDENDS;
+// Proxy object that returns historical data up to 2024, dynamically generated after that
+const dividendRates = new Proxy({}, {
+  get(target, prop) {
+    // For dividends, the key is a symbol (string), not a year
+    // We use the current historical data for all symbols
+    // Year-specific dividend rates should be accessed via getDividendRate(symbol, year)
+    return dynamicRatesGenerator.HISTORICAL_DIVIDENDS[prop] || 0;
+  },
+  has(target, prop) {
+    return prop in dynamicRatesGenerator.HISTORICAL_DIVIDENDS;
+  },
+  ownKeys() {
+    return Object.keys(dynamicRatesGenerator.HISTORICAL_DIVIDENDS);
+  },
+  getOwnPropertyDescriptor(target, prop) {
+    if (prop in dynamicRatesGenerator.HISTORICAL_DIVIDENDS) {
+      return {
+        enumerable: true,
+        configurable: true,
+        value: dynamicRatesGenerator.HISTORICAL_DIVIDENDS[prop]
+      };
+    }
+    return undefined;
+  }
+});
 
 /**
  * Get inflation rate for a given year
