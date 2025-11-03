@@ -570,3 +570,138 @@ body.era-2020s .portal-link:hover {
     border-color: #667eea !important;
     background-color: #f7fafc !important;
 }
+
+/* Fix hardcoded black backgrounds on panels/cards across all eras */
+
+/* 1990s (Web 1.0): Override terminal-style black backgrounds with Windows 95/98 style */
+body.era-1990s .credit-score,
+body.era-1990s .active-loans,
+body.era-1990s .available-companies,
+body.era-1990s .status-card,
+body.era-1990s .loan-item,
+body.era-1990s .company-card,
+body.era-1990s .loan-card,
+body.era-1990s div[style*="background-color: #000"],
+body.era-1990s div[style*="background-color:#000"] {
+    background-color: #ffffff !important;
+    border: 2px solid #000000 !important;
+}
+
+/* 2000s (Web 2.0): Override terminal styling with Frutiger Aero gradients */
+body.era-2000s .credit-score,
+body.era-2000s .active-loans,
+body.era-2000s .available-companies,
+body.era-2000s .status-card,
+body.era-2000s .loan-item,
+body.era-2000s .company-card,
+body.era-2000s .loan-card,
+body.era-2000s div[style*="background-color: #000"],
+body.era-2000s div[style*="background-color:#000"] {
+    background: linear-gradient(to bottom, #ffffff 0%, #f5f5f5 100%) !important;
+    border: 1px solid #cccccc !important;
+    border-radius: 10px !important;
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3) !important;
+}
+
+/* 2010s: Override terminal styling with Material Design */
+body.era-2010s .credit-score,
+body.era-2010s .active-loans,
+body.era-2010s .available-companies,
+body.era-2010s .status-card,
+body.era-2010s .loan-item,
+body.era-2010s .company-card,
+body.era-2010s .loan-card,
+body.era-2010s div[style*="background-color: #000"],
+body.era-2010s div[style*="background-color:#000"] {
+    background-color: #ffffff !important;
+    border: 1px solid #e0e0e0 !important;
+    border-radius: 4px !important;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12) !important;
+}
+
+/* 2020s: Override terminal styling with Fluent Design */
+body.era-2020s .credit-score,
+body.era-2020s .active-loans,
+body.era-2020s .available-companies,
+body.era-2020s .status-card,
+body.era-2020s .loan-item,
+body.era-2020s .company-card,
+body.era-2020s .loan-card,
+body.era-2020s div[style*="background-color: #000"],
+body.era-2020s div[style*="background-color:#000"] {
+    background-color: #ffffff !important;
+    border: 1px solid #e2e8f0 !important;
+    border-radius: 8px !important;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1) !important;
+}
+
+/* Fix text colors on overridden backgrounds for non-terminal eras */
+body.era-1990s .credit-score *,
+body.era-1990s .active-loans *,
+body.era-1990s .available-companies *,
+body.era-1990s .status-card *,
+body.era-1990s .loan-item *,
+body.era-1990s .company-card * {
+    color: #000000 !important;
+    border-color: #808080 !important;
+}
+
+body.era-2000s .credit-score *,
+body.era-2000s .active-loans *,
+body.era-2000s .available-companies *,
+body.era-2000s .status-card *,
+body.era-2000s .loan-item *,
+body.era-2000s .company-card * {
+    color: #333333 !important;
+}
+
+body.era-2010s .credit-score *,
+body.era-2010s .active-loans *,
+body.era-2010s .available-companies *,
+body.era-2010s .status-card *,
+body.era-2010s .loan-item *,
+body.era-2010s .company-card * {
+    color: #2c3e50 !important;
+}
+
+body.era-2020s .credit-score *,
+body.era-2020s .active-loans *,
+body.era-2020s .available-companies *,
+body.era-2020s .status-card *,
+body.era-2020s .loan-item *,
+body.era-2020s .company-card * {
+    color: #1a202c !important;
+}
+
+/* Fix buttons in overridden panels to match era themes */
+body.era-1990s .company-card button,
+body.era-1990s .loan-card button,
+body.era-1990s button {
+    background-color: #c0c0c0 !important;
+    color: #000000 !important;
+    border: 2px outset #808080 !important;
+}
+
+body.era-2000s .company-card button,
+body.era-2000s .loan-card button {
+    background: linear-gradient(to bottom, #ffffff 0%, #e0e0e0 100%) !important;
+    color: #333333 !important;
+    border: 1px solid #cccccc !important;
+    border-radius: 5px !important;
+}
+
+body.era-2010s .company-card button,
+body.era-2010s .loan-card button {
+    background-color: #3498db !important;
+    color: #ffffff !important;
+    border: none !important;
+    border-radius: 3px !important;
+}
+
+body.era-2020s .company-card button,
+body.era-2020s .loan-card button {
+    background-color: #667eea !important;
+    color: #ffffff !important;
+    border: none !important;
+    border-radius: 6px !important;
+}
