@@ -22,6 +22,7 @@ const historicalEvents = require('./data/historical-events');
 const economicIndicators = require('./data/economic-indicators');
 const bondsData = require('./data/bonds');
 const treasuryYields = require('./data/treasury-yields');
+const cryptoData = require('./data/cryptocurrencies');
 
 // Load helper modules
 const indexFundRebalancing = require('./helpers/indexFundRebalancing');
@@ -31,6 +32,7 @@ const corporateEvents = require('./helpers/corporateEvents');
 const dynamicRates = require('./helpers/dynamicRatesGenerator');
 const dataRetention = require('./helpers/dataRetention');
 const bondManager = require('./helpers/bondManager');
+const cryptoManager = require('./helpers/cryptoManager');
 
 // Set up EJS as the view engine
 app.set('view engine', 'ejs');
@@ -43,7 +45,7 @@ app.use(express.json());
 // Whitelist of known pages to prevent open redirects
 const validPages = new Set([
   '/index', '/bank', '/trading', '/news', '/email', '/graphs', 
-  '/loans', '/bonds', '/taxes', '/cheat', '/indexfunds', '/indexfund', '/company', '/pendingorders', '/status'
+  '/loans', '/bonds', '/crypto', '/taxes', '/cheat', '/indexfunds', '/indexfund', '/company', '/pendingorders', '/status'
 ]);
 
 app.use((req, res, next) => {
@@ -320,6 +322,10 @@ app.get('/loans', (req, res) => {
 
 app.get('/bonds', (req, res) => {
   res.render('bonds');
+});
+
+app.get('/crypto', (req, res) => {
+  res.render('crypto');
 });
 
 app.get('/taxes', (req, res) => {
@@ -5398,6 +5404,423 @@ app.post('/api/bonds/sell', (req, res) => {
   } catch (error) {
     console.error('Error selling bond:', error);
     res.status(500).json({ error: 'Failed to sell bond', message: error.message });
+  }
+});
+
+// Crypto API endpoints
+
+// Get all available cryptocurrencies
+app.get('/api/crypto', (req, res) => {
+  try {
+    const cryptos = cryptoManager.getAllCryptoPrices(gameTime);
+    res.json(cryptos);
+  } catch (error) {
+    console.error('Error fetching crypto prices:', error);
+    res.status(500).json({ error: 'Failed to fetch cryptocurrency data' });
+  }
+});
+
+// Get specific cryptocurrency price
+app.get('/api/crypto/:symbol', (req, res) => {
+  try {
+    const { symbol } = req.params;
+    const crypto = cryptoData.getCrypto(symbol);
+    
+    if (!crypto) {
+      return res.status(404).json({ error: 'Cryptocurrency not found' });
+    }
+    
+    if (!cryptoData.isCryptoAvailable(symbol, gameTime)) {
+      return res.status(400).json({ 
+        error: `${crypto.name} is not available yet`,
+        launchDate: crypto.launchDate
+      });
+    }
+    
+    const price = cryptoManager.getCryptoPrice(symbol, gameTime);
+    
+    res.json({
+      symbol,
+      name: crypto.name,
+      price,
+      type: 'cryptocurrency',
+      baseVolatility: crypto.baseVolatility,
+      tradingFee: crypto.tradingFee,
+      hasStaking: crypto.stakingRewards && crypto.stakingRewards.enabled,
+      maxSupply: crypto.maxSupply,
+      description: crypto.description
+    });
+  } catch (error) {
+    console.error('Error fetching crypto price:', error);
+    res.status(500).json({ error: 'Failed to fetch cryptocurrency price' });
+  }
+});
+
+// Get user's crypto holdings
+app.get('/api/crypto/holdings/all', (req, res) => {
+  try {
+    const holdings = dbModule.getCryptoHoldings.all();
+    
+    const holdingsWithPrices = holdings.map(holding => {
+      const price = cryptoManager.getCryptoPrice(holding.symbol, gameTime);
+      const crypto = cryptoData.getCrypto(holding.symbol);
+      
+      return {
+        ...holding,
+        currentPrice: price,
+        totalValue: price * holding.quantity,
+        name: crypto ? crypto.name : holding.symbol,
+        hasStaking: crypto && crypto.stakingRewards && crypto.stakingRewards.enabled
+      };
+    });
+    
+    res.json(holdingsWithPrices);
+  } catch (error) {
+    console.error('Error fetching crypto holdings:', error);
+    res.status(500).json({ error: 'Failed to fetch crypto holdings' });
+  }
+});
+
+// Buy cryptocurrency
+app.post('/api/crypto/buy', (req, res) => {
+  try {
+    const { symbol, quantity } = req.body;
+    
+    if (!symbol || !quantity || quantity <= 0) {
+      return res.status(400).json({ error: 'Invalid cryptocurrency symbol or quantity' });
+    }
+    
+    const crypto = cryptoData.getCrypto(symbol);
+    if (!crypto) {
+      return res.status(404).json({ error: 'Cryptocurrency not found' });
+    }
+    
+    if (!cryptoData.isCryptoAvailable(symbol, gameTime)) {
+      return res.status(400).json({ 
+        error: `${crypto.name} is not available yet`,
+        launchDate: crypto.launchDate
+      });
+    }
+    
+    const price = cryptoManager.getCryptoPrice(symbol, gameTime);
+    if (!price) {
+      return res.status(500).json({ error: 'Failed to get cryptocurrency price' });
+    }
+    
+    const totalCost = price * quantity;
+    const tradingFee = cryptoManager.getCryptoTradingFee(symbol, totalCost);
+    const totalAmount = totalCost + tradingFee;
+    
+    // Check if user has enough cash
+    const account = dbModule.getUserAccount.get();
+    if (account.cash < totalAmount) {
+      return res.status(400).json({ 
+        error: 'Insufficient funds',
+        required: totalAmount,
+        available: account.cash
+      });
+    }
+    
+    // Get current holding
+    const currentHolding = dbModule.getCryptoHolding.get(symbol);
+    const newQuantity = (currentHolding ? currentHolding.quantity : 0) + quantity;
+    
+    // Update or insert holding
+    dbModule.upsertCryptoHolding.run(
+      symbol,
+      newQuantity,
+      currentHolding ? currentHolding.last_staking_reward_date : null,
+      gameTime.toISOString()
+    );
+    
+    // Record transaction
+    dbModule.insertCryptoTransaction.run(
+      symbol,
+      'buy',
+      quantity,
+      price,
+      tradingFee,
+      totalAmount,
+      gameTime.toISOString()
+    );
+    
+    // Update user's cash
+    dbModule.updateUserAccount.run(
+      account.cash - totalAmount,
+      account.credit_score
+    );
+    
+    // Record in general transactions table
+    dbModule.insertTransaction.run(
+      gameTime.toISOString(),
+      'crypto_buy',
+      symbol,
+      quantity,
+      price,
+      tradingFee,
+      0, // no tax on purchase
+      -totalAmount,
+      JSON.stringify({ cryptocurrency: crypto.name })
+    );
+    
+    res.json({
+      success: true,
+      symbol,
+      name: crypto.name,
+      quantity,
+      price,
+      totalCost,
+      tradingFee,
+      totalAmount,
+      newQuantity,
+      remainingCash: account.cash - totalAmount
+    });
+  } catch (error) {
+    console.error('Error buying crypto:', error);
+    res.status(500).json({ error: 'Failed to buy cryptocurrency', message: error.message });
+  }
+});
+
+// Sell cryptocurrency
+app.post('/api/crypto/sell', (req, res) => {
+  try {
+    const { symbol, quantity } = req.body;
+    
+    if (!symbol || !quantity || quantity <= 0) {
+      return res.status(400).json({ error: 'Invalid cryptocurrency symbol or quantity' });
+    }
+    
+    const crypto = cryptoData.getCrypto(symbol);
+    if (!crypto) {
+      return res.status(404).json({ error: 'Cryptocurrency not found' });
+    }
+    
+    // Check if user has enough crypto
+    const holding = dbModule.getCryptoHolding.get(symbol);
+    if (!holding || holding.quantity < quantity) {
+      return res.status(400).json({ 
+        error: 'Insufficient cryptocurrency balance',
+        available: holding ? holding.quantity : 0
+      });
+    }
+    
+    const price = cryptoManager.getCryptoPrice(symbol, gameTime);
+    if (!price) {
+      return res.status(500).json({ error: 'Failed to get cryptocurrency price' });
+    }
+    
+    const totalProceeds = price * quantity;
+    const tradingFee = cryptoManager.getCryptoTradingFee(symbol, totalProceeds);
+    
+    // Calculate capital gains tax (simplified - 20% on gains)
+    const avgCostBasis = calculateCryptoCostBasis(symbol);
+    const costBasis = avgCostBasis * quantity;
+    const capitalGain = totalProceeds - costBasis;
+    const capitalGainsTax = capitalGain > 0 ? capitalGain * 0.20 : 0;
+    
+    const finalProceeds = totalProceeds - tradingFee - capitalGainsTax;
+    
+    // Update holding
+    const newQuantity = holding.quantity - quantity;
+    if (newQuantity > MIN_HOLDING_THRESHOLD) {
+      dbModule.upsertCryptoHolding.run(
+        symbol,
+        newQuantity,
+        holding.last_staking_reward_date,
+        gameTime.toISOString()
+      );
+    } else {
+      // Quantity too small to keep - delete holding
+      dbModule.deleteCryptoHolding.run(symbol);
+    }
+    
+    // Record transaction
+    dbModule.insertCryptoTransaction.run(
+      symbol,
+      'sell',
+      quantity,
+      price,
+      tradingFee,
+      finalProceeds,
+      gameTime.toISOString()
+    );
+    
+    // Update user's cash
+    const account = dbModule.getUserAccount.get();
+    dbModule.updateUserAccount.run(
+      account.cash + finalProceeds,
+      account.credit_score
+    );
+    
+    // Record tax if applicable
+    if (capitalGainsTax > 0) {
+      dbModule.insertTax.run(
+        gameTime.toISOString(),
+        'capital-gains',
+        capitalGainsTax,
+        `Capital gains tax on ${quantity} ${symbol}`
+      );
+    }
+    
+    // Record in general transactions table
+    dbModule.insertTransaction.run(
+      gameTime.toISOString(),
+      'crypto_sell',
+      symbol,
+      quantity,
+      price,
+      tradingFee,
+      capitalGainsTax,
+      finalProceeds,
+      JSON.stringify({ 
+        cryptocurrency: crypto.name,
+        capitalGain: capitalGain
+      })
+    );
+    
+    res.json({
+      success: true,
+      symbol,
+      name: crypto.name,
+      quantity,
+      price,
+      totalProceeds,
+      tradingFee,
+      capitalGainsTax,
+      finalProceeds,
+      gainLoss: capitalGain,
+      newQuantity,
+      remainingCash: account.cash + finalProceeds
+    });
+  } catch (error) {
+    console.error('Error selling crypto:', error);
+    res.status(500).json({ error: 'Failed to sell cryptocurrency', message: error.message });
+  }
+});
+
+// Constants for crypto trading
+const MIN_HOLDING_THRESHOLD = 0.0001; // Minimum quantity threshold for keeping a crypto holding
+
+// Helper function to calculate average cost basis for crypto
+/**
+ * Calculate the average cost basis for a cryptocurrency holding.
+ * Uses average cost method: tracks total cost and quantity across all purchases,
+ * adjusting proportionally for sales. This is a simplified tax calculation method.
+ * 
+ * @param {string} symbol - The cryptocurrency symbol (BTC, ETH, etc.)
+ * @returns {number} The average cost per unit, or 0 if no holdings
+ */
+function calculateCryptoCostBasis(symbol) {
+  try {
+    const transactions = dbModule.getCryptoTransactions.all(symbol, 1000);
+    let totalCost = 0;
+    let totalQuantity = 0;
+    
+    for (const tx of transactions) {
+      if (tx.transaction_type === 'buy') {
+        totalCost += tx.price_per_unit * tx.quantity;
+        totalQuantity += tx.quantity;
+      } else if (tx.transaction_type === 'sell') {
+        // Reduce proportionally using average cost method
+        if (totalQuantity > 0) {
+          const proportion = tx.quantity / totalQuantity;
+          totalCost -= totalCost * proportion;
+          totalQuantity -= tx.quantity;
+        }
+      }
+    }
+    
+    return totalQuantity > 0 ? totalCost / totalQuantity : 0;
+  } catch (error) {
+    console.error('Error calculating cost basis:', error);
+    return 0;
+  }
+}
+
+// Get blockchain events
+app.get('/api/crypto/events', (req, res) => {
+  try {
+    // Get events from the past year
+    const oneYearAgo = new Date(gameTime);
+    oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
+    
+    const events = cryptoData.getBlockchainEvents(oneYearAgo, gameTime);
+    const activeCrashes = cryptoData.getActiveCryptoCrashes(gameTime);
+    
+    res.json({
+      recentEvents: events,
+      activeCrashes: activeCrashes
+    });
+  } catch (error) {
+    console.error('Error fetching crypto events:', error);
+    res.status(500).json({ error: 'Failed to fetch blockchain events' });
+  }
+});
+
+// Process staking rewards (should be called periodically)
+app.post('/api/crypto/process-staking', (req, res) => {
+  try {
+    const holdings = dbModule.getCryptoHoldings.all();
+    let totalRewards = 0;
+    const rewardDetails = [];
+    
+    for (const holding of holdings) {
+      const crypto = cryptoData.getCrypto(holding.symbol);
+      if (!crypto || !crypto.stakingRewards || !crypto.stakingRewards.enabled) {
+        continue;
+      }
+      
+      const lastRewardDate = holding.last_staking_reward_date 
+        ? new Date(holding.last_staking_reward_date)
+        : null;
+      
+      const rewards = cryptoManager.calculateStakingRewards(
+        holding.symbol,
+        holding.quantity,
+        gameTime,
+        lastRewardDate
+      );
+      
+      if (rewards > 0) {
+        const price = cryptoManager.getCryptoPrice(holding.symbol, gameTime);
+        const rewardValue = rewards * price;
+        
+        // Update holding quantity
+        const newQuantity = holding.quantity + rewards;
+        dbModule.upsertCryptoHolding.run(
+          holding.symbol,
+          newQuantity,
+          gameTime.toISOString(),
+          gameTime.toISOString()
+        );
+        
+        // Record staking reward
+        dbModule.insertStakingReward.run(
+          holding.symbol,
+          rewards,
+          gameTime.toISOString(),
+          price,
+          rewardValue
+        );
+        
+        totalRewards += rewardValue;
+        rewardDetails.push({
+          symbol: holding.symbol,
+          name: crypto.name,
+          quantity: rewards,
+          value: rewardValue
+        });
+      }
+    }
+    
+    res.json({
+      success: true,
+      totalRewards,
+      rewardDetails
+    });
+  } catch (error) {
+    console.error('Error processing staking rewards:', error);
+    res.status(500).json({ error: 'Failed to process staking rewards', message: error.message });
   }
 });
 

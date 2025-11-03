@@ -1,81 +1,315 @@
 <%- include('partials/header', { 
     title: 'Portal',
-    pageTitle: '⚡ STOCKFAKE ⚡'
+    pageTitle: '⚡ STOCKFAKE TERMINAL ⚡',
+    pageStyles: `
+        .hero-section {
+            background: linear-gradient(180deg, #001100 0%, #000000 100%);
+            border: 2px solid #00ff00;
+            padding: 30px;
+            margin-bottom: 30px;
+            text-align: center;
+            box-shadow: 0 0 20px rgba(0, 255, 0, 0.3);
+        }
+        .hero-section h1 {
+            font-size: 2.5em;
+            margin: 0 0 10px 0;
+            color: #00ff00;
+            text-shadow: 0 0 10px rgba(0, 255, 0, 0.5);
+        }
+        .hero-section .tagline {
+            font-size: 1.2em;
+            color: #00aa00;
+            margin-bottom: 20px;
+        }
+        .account-overview {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+        .stat-card {
+            background: #000;
+            border: 1px solid #00ff00;
+            padding: 15px;
+            text-align: center;
+        }
+        .stat-card .label {
+            color: #00aa00;
+            font-size: 0.9em;
+            margin-bottom: 5px;
+        }
+        .stat-card .value {
+            color: #00ff00;
+            font-size: 1.5em;
+            font-weight: bold;
+        }
+        .controls {
+            background: #000;
+            border: 2px solid #00ff00;
+            padding: 20px;
+            margin-bottom: 30px;
+        }
+        .controls h3 {
+            margin: 0 0 15px 0;
+            color: #00ff00;
+            border-bottom: 1px solid #003300;
+            padding-bottom: 10px;
+        }
+        .controls-grid {
+            display: grid;
+            grid-template-columns: 1fr 2fr;
+            gap: 20px;
+            align-items: start;
+        }
+        .controls-status {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .status-indicator {
+            padding: 10px;
+            border: 1px solid #00ff00;
+            background: #001100;
+            font-weight: bold;
+        }
+        .paused-indicator { color: #ff8800; border-color: #ff8800; }
+        .running-indicator { color: #00ff00; border-color: #00ff00; }
+        .speed-indicator { color: #00aaff; border-color: #00aaff; }
+        .controls-buttons {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+        }
+        .controls button {
+            padding: 12px;
+            font-size: 0.95em;
+        }
+        .section-header {
+            color: #00ff00;
+            font-size: 1.8em;
+            margin: 30px 0 20px 0;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #00ff00;
+            text-shadow: 0 0 5px rgba(0, 255, 0, 0.5);
+        }
+        .portal-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        .portal-link {
+            background: #000;
+            border: 2px solid #00ff00;
+            padding: 20px;
+            text-decoration: none;
+            color: #00ff00;
+            display: flex;
+            flex-direction: column;
+            transition: all 0.3s ease;
+            position: relative;
+        }
+        .portal-link:hover {
+            background: #001100;
+            border-color: #00ff00;
+            box-shadow: 0 0 15px rgba(0, 255, 0, 0.4);
+            transform: translateY(-2px);
+        }
+        .portal-link h2 {
+            margin: 0 0 10px 0;
+            font-size: 1.3em;
+        }
+        .portal-link p {
+            margin: 0;
+            color: #00aa00;
+            font-size: 0.9em;
+        }
+        .portal-link.featured {
+            border-color: #00ffff;
+            background: #000033;
+        }
+        .portal-link.featured:hover {
+            background: #001144;
+            box-shadow: 0 0 15px rgba(0, 255, 255, 0.4);
+        }
+        .portal-link.featured h2 {
+            color: #00ffff;
+        }
+        .portal-link.debug {
+            border-color: #ff00ff;
+            background: #110011;
+        }
+        .portal-link.debug:hover {
+            background: #220022;
+            box-shadow: 0 0 15px rgba(255, 0, 255, 0.4);
+        }
+        .notification-badge {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: #ff0000;
+            color: #fff;
+            border-radius: 50%;
+            width: 28px;
+            height: 28px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.8em;
+            font-weight: bold;
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.6; }
+        }
+        .category-section {
+            margin-bottom: 40px;
+        }
+    `
 }) %>
 
-        <div class="controls">
-            <div class="controls-status">
-                <span id="pauseStatus" class="status-indicator">...</span>
-                <span id="speedStatus" class="status-indicator speed-indicator">...</span>
-            </div>
-            <button onclick="togglePause()">⏯ Pause/Resume</button>
-            <button onclick="setSpeed(1)">🕐 Realtime (1s = 1s)</button>
-            <button onclick="setSpeed(60)">🐌 Slow (1s = 1min)</button>
-            <button onclick="setSpeed(3600)">⚡ Normal (1s = 1hr)</button>
-            <button onclick="setSpeed(86400)">🚀 Fast (1s = 1day)</button>
-            <button onclick="setSpeed(2592000)">📅 Monthly (1s = 1month)</button>
+<div class="hero-section">
+    <h1>⚡ STOCKFAKE TERMINAL ⚡</h1>
+    <p class="tagline">Historical Stock Market Simulation • 1970 - Present</p>
+    <div class="account-overview" id="accountOverview">
+        <div class="stat-card">
+            <div class="label">CASH BALANCE</div>
+            <div class="value" id="cashBalance">Loading...</div>
         </div>
-        <div class="portal-links">
+        <div class="stat-card">
+            <div class="label">PORTFOLIO VALUE</div>
+            <div class="value" id="portfolioValue">Loading...</div>
+        </div>
+        <div class="stat-card">
+            <div class="label">TOTAL NET WORTH</div>
+            <div class="value" id="netWorth">Loading...</div>
+        </div>
+        <div class="stat-card">
+            <div class="label">CREDIT SCORE</div>
+            <div class="value" id="creditScore">Loading...</div>
+        </div>
+    </div>
+</div>
+
+<div class="controls">
+    <h3>⏱ TIME CONTROL SYSTEM</h3>
+    <div class="controls-grid">
+        <div class="controls-status">
+            <span id="pauseStatus" class="status-indicator">...</span>
+            <span id="speedStatus" class="status-indicator speed-indicator">...</span>
+        </div>
+        <div class="controls-buttons">
+            <button onclick="togglePause()">⏯ Pause/Resume</button>
+            <button onclick="setSpeed(1)">🕐 Realtime</button>
+            <button onclick="setSpeed(60)">🐌 Slow</button>
+            <button onclick="setSpeed(3600)">⚡ Normal</button>
+            <button onclick="setSpeed(86400)">🚀 Fast</button>
+            <button onclick="setSpeed(2592000)">📅 Monthly</button>
+        </div>
+    </div>
+</div>
+
+<div class="category-section">
+    <div class="section-header">📊 TRADING & INVESTMENTS</div>
+    <div class="portal-grid">
             <a href="/trading" class="portal-link">
                 <h2>📈 Stocks</h2>
-                <p>Buy and sell individual stocks</p>
+                <p>Trade individual stocks • NYSE hours</p>
             </a>
             <a href="/indexfunds" class="portal-link">
                 <h2>📊 Index Funds</h2>
-                <p>Diversified fund investments</p>
+                <p>Diversified portfolios • S&P 500, NASDAQ</p>
+            </a>
+            <a href="/crypto" class="portal-link featured">
+                <h2>₿ Cryptocurrency</h2>
+                <p>Digital assets • 24/7 trading • High volatility</p>
             </a>
             <a href="/bonds" class="portal-link">
                 <h2>💰 Bonds</h2>
-                <p>Fixed-income securities and treasuries</p>
+                <p>Fixed income • Treasuries & corporate bonds</p>
             </a>
+        </div>
+    </div>
+
+    <div class="category-section">
+        <div class="section-header">🏦 ACCOUNT & FINANCES</div>
+        <div class="portal-grid">
             <a href="/bank" class="portal-link">
                 <h2>🏦 Bank Account</h2>
-                <p>View your balance and portfolio</p>
+                <p>View balance, portfolio & transaction history</p>
             </a>
             <a href="/loans" class="portal-link">
-                <h2>💰 Loans</h2>
-                <p>Borrow money and manage credit</p>
+                <h2>💳 Loans</h2>
+                <p>Borrow money • Manage credit & debt</p>
             </a>
             <a href="/taxes" class="portal-link">
-                <h2>📋 Tax Center</h2>
-                <p>View tax obligations and history</p>
-            </a>
-            <a href="/graphs" class="portal-link">
-                <h2>📉 Market Graphs</h2>
-                <p>Charts and trends</p>
-            </a>
-            <a href="/status" class="portal-link">
-                <h2>🖥️ Server Status</h2>
-                <p>Performance & monitoring</p>
+                <h2>📑 Tax Center</h2>
+                <p>Capital gains • Tax obligations & history</p>
             </a>
             <a href="/pendingorders" class="portal-link">
                 <h2>📋 Pending Orders</h2>
-                <p>View and manage pending orders</p>
+                <p>Queued trades • After-hours orders</p>
+            </a>
+        </div>
+    </div>
+
+    <div class="category-section">
+        <div class="section-header">📰 INFORMATION & MONITORING</div>
+        <div class="portal-grid">
+            <a href="/graphs" class="portal-link">
+                <h2>📉 Market Charts</h2>
+                <p>Price trends • Technical analysis</p>
             </a>
             <a href="/events" class="portal-link">
-                <h2>⚡ Events</h2>
-                <p>Market events and crash scenarios</p>
+                <h2>⚡ Market Events</h2>
+                <p>Crashes • Corporate actions • Economic data</p>
             </a>
             <a href="/news" class="portal-link" id="newsLink">
                 <h2>📰 News</h2>
-                <p>Historical events and market news</p>
+                <p>Historical events • Breaking market news</p>
                 <span id="newsBadge" class="notification-badge" style="display: none;">0</span>
             </a>
             <a href="/email" class="portal-link" id="emailLink">
                 <h2>📧 Email</h2>
-                <p>Messages and notifications</p>
+                <p>System messages • Trade confirmations</p>
                 <span id="emailBadge" class="notification-badge" style="display: none;">0</span>
             </a>
-            <a href="/cheat" class="portal-link" style="border-color: #ff00ff;">
+        </div>
+    </div>
+
+    <div class="category-section">
+        <div class="section-header">🔧 SYSTEM & UTILITIES</div>
+        <div class="portal-grid">
+            <a href="/status" class="portal-link">
+                <h2>🖥️ Server Status</h2>
+                <p>Performance metrics • System monitoring</p>
+            </a>
+            <a href="/cheat" class="portal-link debug">
                 <h2>🔧 Debug Console</h2>
-                <p style="color: #ff00ff;">Cheat & testing tools</p>
+                <p style="color: #ff00ff;">Developer tools • Testing utilities</p>
             </a>
         </div>
+    </div>
 
 <%- include('partials/footer', {
     pageScripts: `
     <script>
-async function updateTime() {
+    async function loadAccountOverview() {
+        try {
+            const response = await fetch('/api/account');
+            const data = await response.json();
+            
+            document.getElementById('cashBalance').textContent = '$' + data.cash.toFixed(2);
+            document.getElementById('portfolioValue').textContent = '$' + data.portfolioValue.toFixed(2);
+            document.getElementById('netWorth').textContent = '$' + (data.cash + data.portfolioValue).toFixed(2);
+            document.getElementById('creditScore').textContent = data.creditScore;
+        } catch (error) {
+            console.error('Error loading account overview:', error);
+        }
+    }
+    
+    async function updateTime() {
             const response = await fetch('/api/time');
             const data = await response.json();
             const date = new Date(data.currentTime);
@@ -204,8 +438,10 @@ async function updateTime() {
         
         updateTime();
         updateNotifications();
+        loadAccountOverview();
         setInterval(updateTime, 1000);
         setInterval(updateNotifications, 3000); // Check every 3 seconds
+        setInterval(loadAccountOverview, 5000); // Update account every 5 seconds
     </script>
     <script>
 async function updateEraTheme() {

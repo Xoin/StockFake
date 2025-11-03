@@ -25,11 +25,12 @@ StockFake is a single-player financial simulation that lets you trade stocks usi
 ## ✨ Key Features
 
 - **Historical Accuracy**: Real stock data for 200+ companies (1970-present)
+- **Cryptocurrency Trading**: Bitcoin, Ethereum, and major altcoins (2009-present, 24/7 trading)
 - **Realistic Trading**: NYSE hours, margin trading, short selling, index funds
 - **Economic Simulation**: Federal Reserve policy, GDP, unemployment, inflation
-- **Market Events**: Crashes, corporate actions, trading halts
+- **Market Events**: Crashes, corporate actions, trading halts, blockchain events
 - **Financial Management**: Loans, credit scoring, tax calculations
-- **Portfolio Tools**: Dividends, transaction history, risk metrics
+- **Portfolio Tools**: Dividends, staking rewards, transaction history, risk metrics
 
 **See full feature list in [docs/README_FULL.md](docs/README_FULL.md)**
 
@@ -81,6 +82,7 @@ All documentation has been organized in the `docs/` folder:
 ### Feature Documentation
 - **[CRASH_SIMULATION.md](docs/CRASH_SIMULATION.md)** - Market crash system
 - **[CORPORATE_EVENTS_SUMMARY.md](docs/CORPORATE_EVENTS_SUMMARY.md)** - Mergers, bankruptcies, IPOs
+- **[CRYPTOCURRENCY.md](docs/CRYPTOCURRENCY.md)** - Cryptocurrency trading and blockchain events
 - **[ECONOMIC_INDICATORS_SUMMARY.md](docs/ECONOMIC_INDICATORS_SUMMARY.md)** - Fed policy and economic data
 - **[LOAN_VS_SELL_LOGIC.md](docs/LOAN_VS_SELL_LOGIC.md)** - Smart financial decision-making
 - **[REBALANCING_SUMMARY.md](docs/REBALANCING_SUMMARY.md)** - Index fund rebalancing
