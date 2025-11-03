@@ -1,0 +1,528 @@
+<%- include('partials/header', { 
+    title: 'Cryptocurrency',
+    pageTitle: '₿ CRYPTOCURRENCY MARKET',
+    pageStyles: `
+        .content-wrapper {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        #filterSidebar {
+            flex: 0 0 250px;
+        }
+        .crypto-container {
+            flex: 1;
+            background-color: #000;
+            border: 2px solid #00ff00;
+            padding: 15px;
+        }
+        .crypto-container table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 15px 0;
+        }
+        .crypto-container th {
+            background-color: #001100;
+            color: #00ff00;
+            padding: 10px;
+            text-align: left;
+            border: 1px solid #003300;
+        }
+        .crypto-container td {
+            padding: 8px 10px;
+            border: 1px solid #003300;
+        }
+        .crypto-container tr:hover {
+            background-color: #002200;
+        }
+        .trade-form {
+            background-color: #000;
+            border: 2px solid #00ff00;
+            padding: 20px;
+            margin-top: 20px;
+        }
+        .trade-form select, .trade-form input {
+            background-color: #000;
+            color: #00ff00;
+            border: 1px solid #00ff00;
+            padding: 8px;
+            margin: 5px 0;
+            width: 100%;
+            font-family: 'Courier New', monospace;
+        }
+        .trade-form button {
+            background-color: #000;
+            color: #00ff00;
+            border: 2px solid #00ff00;
+            padding: 10px 20px;
+            cursor: pointer;
+            margin: 10px 5px 0 0;
+            font-family: 'Courier New', monospace;
+        }
+        .trade-form button:hover {
+            background-color: #002200;
+        }
+        .holdings-section {
+            background-color: #000;
+            border: 2px solid #00ff00;
+            padding: 15px;
+            margin-top: 20px;
+        }
+        .positive { color: #00ff00; }
+        .negative { color: #ff0000; }
+        .warning { color: #ffff00; }
+        .staking-badge {
+            color: #00ccff;
+            font-size: 0.8em;
+        }
+        #filterSidebar select {
+            width: 100%;
+            padding: 8px;
+            margin: 10px 0;
+            background-color: #000;
+            color: #00ff00;
+            border: 1px solid #00ff00;
+            font-family: 'Courier New', monospace;
+        }
+        .stats-box {
+            background-color: #001100;
+            border: 1px solid #003300;
+            padding: 10px;
+            margin: 10px 0;
+        }
+        .event-box {
+            background-color: #110000;
+            border: 1px solid #330000;
+            padding: 10px;
+            margin: 10px 0;
+            color: #ff8800;
+        }
+        .crypto-btc { color: #ff9900; }
+        .crypto-eth { color: #00ccff; }
+        .crypto-other { color: #00ff00; }
+        .alert {
+            padding: 10px;
+            margin: 10px 0;
+            border: 1px solid;
+        }
+        .alert-info {
+            background-color: #000033;
+            border-color: #0066ff;
+            color: #00aaff;
+        }
+        .alert-warning {
+            background-color: #331100;
+            border-color: #ff8800;
+            color: #ffaa00;
+        }
+    `
+}) %>
+
+<div class="container">
+    <div class="alert alert-info">
+        ⚠️ NOTICE: Cryptocurrency markets are open 24/7. Trading is available at all times.
+        All cryptos have high volatility - prices can swing ±20% or more in a single day!
+    </div>
+
+    <div class="content-wrapper">
+        <div id="filterSidebar">
+            <div class="stats-box">
+                <h3>MARKET STATUS</h3>
+                <p><strong>Status:</strong> <span class="positive">OPEN 24/7</span></p>
+                <p><strong>Total Assets:</strong> <span id="totalAssets">Loading...</span></p>
+            </div>
+
+            <div class="stats-box">
+                <h3>YOUR WALLET</h3>
+                <p><strong>Holdings:</strong> <span id="totalHoldings">Loading...</span></p>
+                <p><strong>Value:</strong> $<span id="totalValue">0.00</span></p>
+            </div>
+
+            <div class="event-box" id="blockchainEvents" style="display:none;">
+                <h3>RECENT EVENTS</h3>
+                <div id="eventsList"></div>
+            </div>
+        </div>
+
+        <div class="crypto-container">
+            <h2>AVAILABLE CRYPTOCURRENCIES</h2>
+            <table id="cryptoTable">
+                <thead>
+                    <tr>
+                        <th>Symbol</th>
+                        <th>Name</th>
+                        <th>Price</th>
+                        <th>Features</th>
+                        <th>Max Supply</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody id="cryptoList">
+                    <tr>
+                        <td colspan="6" style="text-align: center;">Loading cryptocurrencies...</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="trade-form">
+        <h2>TRADE CRYPTOCURRENCY</h2>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+            <div>
+                <label for="cryptoSymbol">Cryptocurrency:</label>
+                <select id="cryptoSymbol">
+                    <option value="">-- Select Crypto --</option>
+                </select>
+                
+                <label for="quantity">Quantity:</label>
+                <input type="number" id="quantity" min="0.00000001" step="0.00000001" placeholder="0.00000000">
+                
+                <div id="tradeInfo" style="margin: 10px 0; color: #ffff00;">
+                    <!-- Trade calculation will appear here -->
+                </div>
+            </div>
+            <div>
+                <div id="cryptoDetails" style="color: #00ff00;">
+                    <p>Select a cryptocurrency to see details</p>
+                </div>
+            </div>
+        </div>
+        
+        <button id="buyBtn" onclick="buyCrypto()">BUY</button>
+        <button id="sellBtn" onclick="sellCrypto()">SELL</button>
+        <button onclick="processStakingRewards()" style="background-color: #001133; border-color: #00aaff; color: #00aaff;">CLAIM STAKING REWARDS</button>
+    </div>
+
+    <div class="holdings-section">
+        <h2>YOUR CRYPTO HOLDINGS</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Symbol</th>
+                    <th>Name</th>
+                    <th>Quantity</th>
+                    <th>Current Price</th>
+                    <th>Total Value</th>
+                    <th>Features</th>
+                </tr>
+            </thead>
+            <tbody id="holdingsList">
+                <tr>
+                    <td colspan="6" style="text-align: center;">No holdings</td>
+                </tr>
+            </tbody>
+        </table>
+        <div id="holdingsTotal" style="text-align: right; margin-top: 10px; font-weight: bold;">
+            Total Portfolio Value: $<span id="portfolioValue">0.00</span>
+        </div>
+    </div>
+</div>
+
+<script>
+let cryptoData = [];
+let holdings = [];
+
+async function loadCryptos() {
+    try {
+        const response = await fetch('/api/crypto');
+        cryptoData = await response.json();
+        
+        document.getElementById('totalAssets').textContent = cryptoData.length;
+        
+        const cryptoSelect = document.getElementById('cryptoSymbol');
+        cryptoSelect.innerHTML = '<option value="">-- Select Crypto --</option>';
+        
+        const cryptoList = document.getElementById('cryptoList');
+        cryptoList.innerHTML = '';
+        
+        if (cryptoData.length === 0) {
+            cryptoList.innerHTML = '<tr><td colspan="6" style="text-align: center;">No cryptocurrencies available at this time</td></tr>';
+            return;
+        }
+        
+        cryptoData.forEach(crypto => {
+            const option = document.createElement('option');
+            option.value = crypto.symbol;
+            option.textContent = `${crypto.symbol} - ${crypto.name}`;
+            cryptoSelect.appendChild(option);
+            
+            const row = document.createElement('tr');
+            
+            const colorClass = crypto.symbol === 'BTC' ? 'crypto-btc' : 
+                              crypto.symbol === 'ETH' ? 'crypto-eth' : 'crypto-other';
+            
+            const features = [];
+            if (crypto.hasStaking) features.push('<span class="staking-badge">⚡ Staking</span>');
+            if (crypto.baseVolatility > 0.1) features.push('<span class="warning">High Vol</span>');
+            
+            row.innerHTML = `
+                <td class="${colorClass}"><strong>${crypto.symbol}</strong></td>
+                <td>${crypto.name}</td>
+                <td>$${crypto.price.toFixed(8)}</td>
+                <td>${features.join(' ')}</td>
+                <td>${crypto.maxSupply ? crypto.maxSupply.toLocaleString() : 'Unlimited'}</td>
+                <td><button onclick="selectCrypto('${crypto.symbol}')">SELECT</button></td>
+            `;
+            cryptoList.appendChild(row);
+        });
+    } catch (error) {
+        console.error('Error loading cryptos:', error);
+        document.getElementById('cryptoList').innerHTML = 
+            '<tr><td colspan="6" style="text-align: center; color: #ff0000;">Error loading cryptocurrencies</td></tr>';
+    }
+}
+
+async function loadHoldings() {
+    try {
+        const response = await fetch('/api/crypto/holdings/all');
+        holdings = await response.json();
+        
+        const holdingsList = document.getElementById('holdingsList');
+        
+        if (holdings.length === 0) {
+            holdingsList.innerHTML = '<tr><td colspan="6" style="text-align: center;">No holdings</td></tr>';
+            document.getElementById('portfolioValue').textContent = '0.00';
+            document.getElementById('totalHoldings').textContent = '0';
+            document.getElementById('totalValue').textContent = '0.00';
+            return;
+        }
+        
+        holdingsList.innerHTML = '';
+        let totalValue = 0;
+        
+        holdings.forEach(holding => {
+            const row = document.createElement('tr');
+            const colorClass = holding.symbol === 'BTC' ? 'crypto-btc' : 
+                              holding.symbol === 'ETH' ? 'crypto-eth' : 'crypto-other';
+            
+            const features = [];
+            if (holding.hasStaking) features.push('<span class="staking-badge">⚡ Stakable</span>');
+            
+            row.innerHTML = `
+                <td class="${colorClass}"><strong>${holding.symbol}</strong></td>
+                <td>${holding.name}</td>
+                <td>${holding.quantity.toFixed(8)}</td>
+                <td>$${holding.currentPrice.toFixed(8)}</td>
+                <td class="positive">$${holding.totalValue.toFixed(2)}</td>
+                <td>${features.join(' ')}</td>
+            `;
+            holdingsList.appendChild(row);
+            totalValue += holding.totalValue;
+        });
+        
+        document.getElementById('portfolioValue').textContent = totalValue.toFixed(2);
+        document.getElementById('totalHoldings').textContent = holdings.length;
+        document.getElementById('totalValue').textContent = totalValue.toFixed(2);
+    } catch (error) {
+        console.error('Error loading holdings:', error);
+    }
+}
+
+async function loadBlockchainEvents() {
+    try {
+        const response = await fetch('/api/crypto/events');
+        const data = await response.json();
+        
+        const eventBox = document.getElementById('blockchainEvents');
+        const eventsList = document.getElementById('eventsList');
+        
+        if (data.recentEvents.length > 0 || data.activeCrashes.length > 0) {
+            eventBox.style.display = 'block';
+            eventsList.innerHTML = '';
+            
+            if (data.activeCrashes.length > 0) {
+                data.activeCrashes.forEach(crash => {
+                    const div = document.createElement('div');
+                    div.innerHTML = `<p><strong class="negative">${crash.name}</strong><br>${crash.description}</p>`;
+                    eventsList.appendChild(div);
+                });
+            }
+            
+            if (data.recentEvents.length > 0) {
+                data.recentEvents.slice(0, 3).forEach(event => {
+                    const div = document.createElement('div');
+                    div.innerHTML = `<p><strong>${event.event}</strong> (${event.date})<br>${event.description}</p>`;
+                    eventsList.appendChild(div);
+                });
+            }
+        }
+    } catch (error) {
+        console.error('Error loading events:', error);
+    }
+}
+
+function selectCrypto(symbol) {
+    document.getElementById('cryptoSymbol').value = symbol;
+    updateCryptoDetails();
+}
+
+function updateCryptoDetails() {
+    const symbol = document.getElementById('cryptoSymbol').value;
+    const detailsDiv = document.getElementById('cryptoDetails');
+    
+    if (!symbol) {
+        detailsDiv.innerHTML = '<p>Select a cryptocurrency to see details</p>';
+        return;
+    }
+    
+    const crypto = cryptoData.find(c => c.symbol === symbol);
+    if (!crypto) return;
+    
+    const colorClass = crypto.symbol === 'BTC' ? 'crypto-btc' : 
+                      crypto.symbol === 'ETH' ? 'crypto-eth' : 'crypto-other';
+    
+    detailsDiv.innerHTML = `
+        <p><strong class="${colorClass}">${crypto.name} (${crypto.symbol})</strong></p>
+        <p>Current Price: <span class="positive">$${crypto.price.toFixed(8)}</span></p>
+        <p>Trading Fee: ${(crypto.tradingFee * 100).toFixed(2)}%</p>
+        <p>Volatility: ${(crypto.baseVolatility * 100).toFixed(0)}% daily</p>
+        ${crypto.hasStaking ? '<p class="staking-badge">⚡ Staking Available</p>' : ''}
+        ${crypto.maxSupply ? `<p>Max Supply: ${crypto.maxSupply.toLocaleString()}</p>` : '<p>Max Supply: Unlimited</p>'}
+    `;
+    
+    updateTradeInfo();
+}
+
+function updateTradeInfo() {
+    const symbol = document.getElementById('cryptoSymbol').value;
+    const quantity = parseFloat(document.getElementById('quantity').value) || 0;
+    const infoDiv = document.getElementById('tradeInfo');
+    
+    if (!symbol || quantity <= 0) {
+        infoDiv.innerHTML = '';
+        return;
+    }
+    
+    const crypto = cryptoData.find(c => c.symbol === symbol);
+    if (!crypto) return;
+    
+    const totalCost = crypto.price * quantity;
+    const fee = totalCost * crypto.tradingFee;
+    const total = totalCost + fee;
+    
+    infoDiv.innerHTML = `
+        <p>Cost: $${totalCost.toFixed(2)}</p>
+        <p>Fee (${(crypto.tradingFee * 100).toFixed(2)}%): $${fee.toFixed(2)}</p>
+        <p><strong>Total: $${total.toFixed(2)}</strong></p>
+    `;
+}
+
+async function buyCrypto() {
+    const symbol = document.getElementById('cryptoSymbol').value;
+    const quantity = parseFloat(document.getElementById('quantity').value);
+    
+    if (!symbol) {
+        alert('Please select a cryptocurrency');
+        return;
+    }
+    
+    if (!quantity || quantity <= 0) {
+        alert('Please enter a valid quantity');
+        return;
+    }
+    
+    try {
+        const response = await fetch('/api/crypto/buy', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ symbol, quantity })
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok) {
+            alert(`Successfully purchased ${quantity} ${symbol}!\nTotal cost: $${data.totalAmount.toFixed(2)}\nRemaining cash: $${data.remainingCash.toFixed(2)}`);
+            document.getElementById('quantity').value = '';
+            loadHoldings();
+        } else {
+            alert(`Error: ${data.error}`);
+        }
+    } catch (error) {
+        alert('Failed to buy cryptocurrency: ' + error.message);
+    }
+}
+
+async function sellCrypto() {
+    const symbol = document.getElementById('cryptoSymbol').value;
+    const quantity = parseFloat(document.getElementById('quantity').value);
+    
+    if (!symbol) {
+        alert('Please select a cryptocurrency');
+        return;
+    }
+    
+    if (!quantity || quantity <= 0) {
+        alert('Please enter a valid quantity');
+        return;
+    }
+    
+    try {
+        const response = await fetch('/api/crypto/sell', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ symbol, quantity })
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok) {
+            const gainLossText = data.gainLoss >= 0 ? 
+                `Gain: $${data.gainLoss.toFixed(2)}` : 
+                `Loss: $${Math.abs(data.gainLoss).toFixed(2)}`;
+            alert(`Successfully sold ${quantity} ${symbol}!\n${gainLossText}\nProceeds: $${data.finalProceeds.toFixed(2)}\nRemaining cash: $${data.remainingCash.toFixed(2)}`);
+            document.getElementById('quantity').value = '';
+            loadHoldings();
+        } else {
+            alert(`Error: ${data.error}`);
+        }
+    } catch (error) {
+        alert('Failed to sell cryptocurrency: ' + error.message);
+    }
+}
+
+async function processStakingRewards() {
+    try {
+        const response = await fetch('/api/crypto/process-staking', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok) {
+            if (data.totalRewards > 0) {
+                let message = `Staking rewards claimed!\nTotal value: $${data.totalRewards.toFixed(2)}\n\nDetails:\n`;
+                data.rewardDetails.forEach(reward => {
+                    message += `${reward.symbol}: ${reward.quantity.toFixed(8)} ($${reward.value.toFixed(2)})\n`;
+                });
+                alert(message);
+                loadHoldings();
+            } else {
+                alert('No staking rewards available at this time.');
+            }
+        } else {
+            alert(`Error: ${data.error}`);
+        }
+    } catch (error) {
+        alert('Failed to process staking rewards: ' + error.message);
+    }
+}
+
+// Event listeners
+document.getElementById('cryptoSymbol').addEventListener('change', updateCryptoDetails);
+document.getElementById('quantity').addEventListener('input', updateTradeInfo);
+
+// Load data on page load
+loadCryptos();
+loadHoldings();
+loadBlockchainEvents();
+
+// Refresh data every 30 seconds
+setInterval(() => {
+    loadCryptos();
+    loadHoldings();
+}, 30000);
+</script>
+
+<%- include('partials/footer') %>
