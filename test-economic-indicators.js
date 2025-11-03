@@ -118,10 +118,11 @@ for (let year = startYear + 1; year <= endYear; year++) {
   // Print milestone years
   if (year === 2025 || year === 2030 || year === 2035 || year === 2040 || year === 2050) {
     // Calculate real value by compounding inflation backwards from current year
+    // inflationRate is a percentage (e.g., 2.1 for 2.1%), so divide by 100 for decimal
     let inflationAdjustment = 1.0;
     for (let y = startYear + 1; y <= year; y++) {
       const yearInflation = dynamicRates.generateInflationRate(y);
-      inflationAdjustment *= (1 + yearInflation / 100); // inflationRate is percentage, convert to decimal
+      inflationAdjustment *= (1 + yearInflation / 100);
     }
     const realValue = portfolioValue / inflationAdjustment;
     

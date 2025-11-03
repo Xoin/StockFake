@@ -76,9 +76,14 @@ const rateScenarios = [
 ];
 
 rateScenarios.forEach(scenario => {
-  const inflationRate = scenario.year <= 2024 ? 
-    dynamicRates.getHistoricalInflation()[scenario.year] :
-    dynamicRates.generateInflationRate(scenario.year);
+  // Get inflation rate - use historical data for years <= 2024, generated for future
+  let inflationRate;
+  if (scenario.year <= 2024) {
+    const historical = dynamicRates.getHistoricalInflation();
+    inflationRate = historical[scenario.year] || 2.0;
+  } else {
+    inflationRate = dynamicRates.generateInflationRate(scenario.year);
+  }
   
   const economics = economicIndicators.getEconomicIndicators(scenario.year, inflationRate);
   const impact = economicIndicators.calculateMarketImpact(economics);
@@ -133,9 +138,14 @@ console.log('Year | Policy      | QE/QT    | Fed Rate | Market Impact');
 console.log('-----|-------------|----------|----------|---------------');
 
 qeYears.forEach(year => {
-  const inflationRate = year <= 2024 ? 
-    (dynamicRates.getHistoricalInflation()[year] || 2.0) :
-    dynamicRates.generateInflationRate(year);
+  // Get inflation rate - use historical data for years <= 2024, generated for future
+  let inflationRate;
+  if (year <= 2024) {
+    const historical = dynamicRates.getHistoricalInflation();
+    inflationRate = historical[year] || 2.0;
+  } else {
+    inflationRate = dynamicRates.generateInflationRate(year);
+  }
   
   const economics = economicIndicators.getEconomicIndicators(year, inflationRate);
   const impact = economicIndicators.calculateMarketImpact(economics);
