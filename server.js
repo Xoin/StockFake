@@ -24,6 +24,7 @@ const historicalEvents = require('./data/historical-events');
 const indexFundRebalancing = require('./helpers/indexFundRebalancing');
 const stockSplits = require('./helpers/stockSplits');
 const constants = require('./helpers/constants');
+const corporateEvents = require('./helpers/corporateEvents');
 
 // Set up EJS as the view engine
 app.set('view engine', 'ejs');
@@ -67,6 +68,10 @@ console.log(`  Time multiplier: ${timeMultiplier}`);
 // Initialize rebalancing configurations for all index funds
 indexFundRebalancing.initializeRebalancingConfigs(indexFunds.indexFunds, gameTime);
 console.log('Index fund rebalancing configurations initialized');
+
+// Initialize corporate events
+corporateEvents.initializeCorporateEvents();
+console.log('Corporate events initialized');
 
 // Save game state to database periodically (every 5 seconds)
 function saveGameState() {
@@ -346,15 +351,17 @@ app.get('/', (req, res) => {
 app.get('/api/stocks', (req, res) => {
   const stockData = stocks.getStockData(gameTime, timeMultiplier, isPaused);
   
-  // Add share availability info to each stock
-  const stocksWithAvailability = stockData.map(stock => {
-    const availability = shareAvailability.getAvailableShares(stock.symbol);
-    return {
-      ...stock,
-      sharesAvailable: availability ? availability.availableForTrading : 0,
-      ownershipPercent: availability ? shareAvailability.getOwnershipPercentage(stock.symbol) : 0
-    };
-  });
+  // Add share availability info to each stock and filter out unavailable companies
+  const stocksWithAvailability = stockData
+    .filter(stock => corporateEvents.isCompanyAvailable(stock.symbol, gameTime))
+    .map(stock => {
+      const availability = shareAvailability.getAvailableShares(stock.symbol);
+      return {
+        ...stock,
+        sharesAvailable: availability ? availability.availableForTrading : 0,
+        ownershipPercent: availability ? shareAvailability.getOwnershipPercentage(stock.symbol) : 0
+      };
+    });
   
   res.json(stocksWithAvailability);
 });
@@ -1001,6 +1008,24 @@ function checkStockSplits() {
 
 // Call this periodically
 setInterval(checkStockSplits, STOCK_SPLIT_CHECK_INTERVAL_MS);
+
+// Check and process corporate events (mergers, bankruptcies, IPOs, going private)
+function checkCorporateEvents() {
+  if (!isPaused) {
+    try {
+      const processedEvents = corporateEvents.processCorporateEvents(gameTime);
+      if (processedEvents.length > 0) {
+        console.log(`Processed ${processedEvents.length} corporate event(s) at ${gameTime.toISOString()}`);
+      }
+    } catch (error) {
+      console.error('Error processing corporate events:', error);
+    }
+  }
+}
+
+// Check for corporate events every 10 seconds
+const CORPORATE_EVENTS_CHECK_INTERVAL_MS = 10000;
+setInterval(checkCorporateEvents, CORPORATE_EVENTS_CHECK_INTERVAL_MS);
 
 // Calculate trading fee based on year (fees decreased over time)
 function getTradingFee(tradeValue, currentTime) {
@@ -4624,6 +4649,83 @@ app.get('/api/splits/:symbol', (req, res) => {
   } catch (error) {
     console.error('Error getting splits for symbol:', error);
     res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Corporate Events API endpoints
+app.get('/api/corporate-events', (req, res) => {
+  try {
+    const limit = parseInt(req.query.limit) || 100;
+    const events = dbModule.getAllCorporateEvents.all(limit);
+    
+    // Parse event_data JSON for each event
+    const parsedEvents = events.map(event => ({
+      ...event,
+      event_data: JSON.parse(event.event_data)
+    }));
+    
+    res.json({ events: parsedEvents });
+  } catch (error) {
+    console.error('Error fetching corporate events:', error);
+    res.status(500).json({ error: 'Failed to fetch corporate events' });
+  }
+});
+
+app.get('/api/corporate-events/pending', (req, res) => {
+  try {
+    const events = dbModule.getPendingCorporateEvents.all(gameTime.toISOString());
+    
+    const parsedEvents = events.map(event => ({
+      ...event,
+      event_data: JSON.parse(event.event_data)
+    }));
+    
+    res.json({ events: parsedEvents });
+  } catch (error) {
+    console.error('Error fetching pending corporate events:', error);
+    res.status(500).json({ error: 'Failed to fetch pending corporate events' });
+  }
+});
+
+app.get('/api/companies/:symbol/status', (req, res) => {
+  try {
+    const { symbol } = req.params;
+    const status = dbModule.getCompanyStatus.get(symbol);
+    
+    if (!status) {
+      return res.json({
+        symbol,
+        status: 'active',
+        available: true,
+        message: 'Company is available for trading'
+      });
+    }
+    
+    const available = status.status === 'active';
+    
+    res.json({
+      symbol,
+      status: status.status,
+      available,
+      statusDate: status.status_date,
+      reason: status.reason,
+      message: available ? 'Company is available for trading' : `Company is ${status.status}: ${status.reason}`
+    });
+  } catch (error) {
+    console.error('Error fetching company status:', error);
+    res.status(500).json({ error: 'Failed to fetch company status' });
+  }
+});
+
+app.get('/api/companies/:symbol/financials', (req, res) => {
+  try {
+    const { symbol } = req.params;
+    const financials = dbModule.getCompanyFinancials.all(symbol);
+    
+    res.json({ symbol, financials });
+  } catch (error) {
+    console.error('Error fetching company financials:', error);
+    res.status(500).json({ error: 'Failed to fetch company financials' });
   }
 });
 
