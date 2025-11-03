@@ -338,6 +338,51 @@ function initializeDatabase() {
     )
   `);
 
+  // Create corporate_events table for tracking mergers, bankruptcies, IPOs, and going private
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS corporate_events (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      event_type TEXT NOT NULL,
+      event_date TEXT NOT NULL,
+      primary_symbol TEXT NOT NULL,
+      secondary_symbol TEXT,
+      event_data TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'pending',
+      applied_at TEXT,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(event_type, event_date, primary_symbol)
+    )
+  `);
+
+  // Create company_status table to track active/inactive companies
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS company_status (
+      symbol TEXT PRIMARY KEY,
+      status TEXT NOT NULL DEFAULT 'active',
+      status_date TEXT NOT NULL,
+      reason TEXT,
+      related_event_id INTEGER,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+
+  // Create company_financials table for dynamic financial data
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS company_financials (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      symbol TEXT NOT NULL,
+      year INTEGER NOT NULL,
+      revenue REAL,
+      net_income REAL,
+      assets REAL,
+      employees INTEGER,
+      patents INTEGER,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(symbol, year)
+    )
+  `);
+
   // Insert default market state if not exists
   const marketStateCount = db.prepare('SELECT COUNT(*) as count FROM market_state').get();
   if (marketStateCount.count === 0) {
@@ -620,6 +665,52 @@ const updateMarketState = db.prepare(`
   WHERE id = 1
 `);
 
+// Corporate events functions
+const getPendingCorporateEvents = db.prepare(`
+  SELECT * FROM corporate_events 
+  WHERE status = 'pending' AND event_date <= ?
+  ORDER BY event_date ASC
+`);
+const getAllCorporateEvents = db.prepare('SELECT * FROM corporate_events ORDER BY event_date DESC LIMIT ?');
+const getCorporateEvent = db.prepare('SELECT * FROM corporate_events WHERE id = ?');
+const insertCorporateEvent = db.prepare(`
+  INSERT INTO corporate_events (event_type, event_date, primary_symbol, secondary_symbol, event_data, status)
+  VALUES (?, ?, ?, ?, ?, ?)
+`);
+const updateCorporateEventStatus = db.prepare(`
+  UPDATE corporate_events 
+  SET status = ?, applied_at = ?
+  WHERE id = ?
+`);
+
+// Company status functions
+const getCompanyStatus = db.prepare('SELECT * FROM company_status WHERE symbol = ?');
+const getAllCompanyStatuses = db.prepare('SELECT * FROM company_status');
+const upsertCompanyStatus = db.prepare(`
+  INSERT INTO company_status (symbol, status, status_date, reason, related_event_id)
+  VALUES (?, ?, ?, ?, ?)
+  ON CONFLICT(symbol) DO UPDATE SET 
+    status = excluded.status,
+    status_date = excluded.status_date,
+    reason = excluded.reason,
+    related_event_id = excluded.related_event_id,
+    updated_at = CURRENT_TIMESTAMP
+`);
+
+// Company financials functions
+const getCompanyFinancials = db.prepare('SELECT * FROM company_financials WHERE symbol = ? ORDER BY year ASC');
+const getCompanyFinancialByYear = db.prepare('SELECT * FROM company_financials WHERE symbol = ? AND year = ?');
+const insertCompanyFinancial = db.prepare(`
+  INSERT INTO company_financials (symbol, year, revenue, net_income, assets, employees, patents)
+  VALUES (?, ?, ?, ?, ?, ?, ?)
+  ON CONFLICT(symbol, year) DO UPDATE SET
+    revenue = excluded.revenue,
+    net_income = excluded.net_income,
+    assets = excluded.assets,
+    employees = excluded.employees,
+    patents = excluded.patents
+`);
+
 module.exports = {
   db,
   initializeDatabase,
@@ -736,5 +827,22 @@ module.exports = {
   
   // Market crash state
   getCrashMarketState: getMarketState,
-  updateCrashMarketState: updateMarketState
+  updateCrashMarketState: updateMarketState,
+  
+  // Corporate events
+  getPendingCorporateEvents,
+  getAllCorporateEvents,
+  getCorporateEvent,
+  insertCorporateEvent,
+  updateCorporateEventStatus,
+  
+  // Company status
+  getCompanyStatus,
+  getAllCompanyStatuses,
+  upsertCompanyStatus,
+  
+  // Company financials
+  getCompanyFinancials,
+  getCompanyFinancialByYear,
+  insertCompanyFinancial
 };
