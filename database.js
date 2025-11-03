@@ -383,6 +383,18 @@ function initializeDatabase() {
     )
   `);
 
+  // Create data_retention_config table for managing data pruning settings
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS data_retention_config (
+      id INTEGER PRIMARY KEY CHECK (id = 1),
+      retention_periods TEXT NOT NULL DEFAULT '{}',
+      last_pruning_date TEXT,
+      auto_pruning_enabled INTEGER NOT NULL DEFAULT 1,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+
   // Insert default market state if not exists
   const marketStateCount = db.prepare('SELECT COUNT(*) as count FROM market_state').get();
   if (marketStateCount.count === 0) {
@@ -426,6 +438,29 @@ function initializeDatabase() {
       INSERT INTO risk_controls (id, max_leverage, max_position_size, maintenance_margin_ratio, concentration_warning_threshold)
       VALUES (1, 2.0, 0.30, 0.30, 0.20)
     `).run();
+  }
+
+  // Insert default data retention config if not exists
+  const retentionCount = db.prepare('SELECT COUNT(*) as count FROM data_retention_config').get();
+  if (retentionCount.count === 0) {
+    const defaultRetention = {
+      transactions: 365 * 5,
+      emails: 365 * 2,
+      dividends: 365 * 5,
+      taxes: 365 * 7,
+      fees: 365 * 5,
+      loanHistory: 365 * 7,
+      corporateEvents: 365 * 10,
+      rebalancingEvents: 365 * 3,
+      marketCrashEvents: 365 * 10,
+      stockSplits: 365 * 10,
+      pendingOrders: 30,
+      companyFinancials: 365 * 10
+    };
+    db.prepare(`
+      INSERT INTO data_retention_config (id, retention_periods, auto_pruning_enabled)
+      VALUES (1, ?, 1)
+    `).run(JSON.stringify(defaultRetention));
   }
 }
 
@@ -711,6 +746,14 @@ const insertCompanyFinancial = db.prepare(`
     patents = excluded.patents
 `);
 
+// Data retention config functions
+const getDataRetentionConfig = db.prepare('SELECT * FROM data_retention_config WHERE id = 1');
+const updateDataRetentionConfig = db.prepare(`
+  UPDATE data_retention_config
+  SET retention_periods = ?, auto_pruning_enabled = ?, last_pruning_date = ?, updated_at = CURRENT_TIMESTAMP
+  WHERE id = 1
+`);
+
 module.exports = {
   db,
   initializeDatabase,
@@ -844,5 +887,9 @@ module.exports = {
   // Company financials
   getCompanyFinancials,
   getCompanyFinancialByYear,
-  insertCompanyFinancial
+  insertCompanyFinancial,
+  
+  // Data retention config
+  getDataRetentionConfig,
+  updateDataRetentionConfig
 };
