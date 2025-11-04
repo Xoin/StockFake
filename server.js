@@ -657,9 +657,13 @@ app.get('/api/market/events', (req, res) => {
   
   const events = [];
   
-  // Get market crash events
-  const crashEvents = historicalEvents.getEventsInRange(startDate, endDate)
-    .filter(e => e.type === 'crash' || e.severity === 'major');
+  // Get market events (crashes, major events)
+  const allEvents = historicalEvents.getEventsUpToDate(endDate);
+  const crashEvents = allEvents.filter(e => {
+    const eventDate = new Date(e.date);
+    return eventDate >= startDate && eventDate <= endDate && 
+           (e.type === 'crash' || e.severity === 'major' || e.category === 'Market Crash');
+  });
   
   crashEvents.forEach(event => {
     events.push({
@@ -674,20 +678,26 @@ app.get('/api/market/events', (req, res) => {
   
   // Get corporate events if symbol specified
   if (symbol) {
-    const corpEvents = corporateEvents.getEventsForSymbol(symbol, startDate, endDate);
-    corpEvents.forEach(event => {
-      events.push({
-        date: event.date,
-        type: event.type,
-        title: event.type === 'merger' ? `Merger: ${event.acquirer}` : 
-               event.type === 'bankruptcy' ? 'Bankruptcy' :
-               event.type === 'ipo' ? 'IPO' :
-               event.type === 'split' ? `Stock Split ${event.ratio}` : event.type,
-        description: event.description || '',
-        impact: event.type === 'bankruptcy' ? 'negative' : 
-                event.type === 'ipo' ? 'positive' : 'neutral'
-      });
-    });
+    try {
+      const corpEvents = corporateEvents.getEventsForSymbol(symbol, startDate, endDate);
+      if (corpEvents && corpEvents.length > 0) {
+        corpEvents.forEach(event => {
+          events.push({
+            date: event.date,
+            type: event.type,
+            title: event.type === 'merger' ? `Merger: ${event.acquirer}` : 
+                   event.type === 'bankruptcy' ? 'Bankruptcy' :
+                   event.type === 'ipo' ? 'IPO' :
+                   event.type === 'split' ? `Stock Split ${event.ratio}` : event.type,
+            description: event.description || '',
+            impact: event.type === 'bankruptcy' ? 'negative' : 
+                    event.type === 'ipo' ? 'positive' : 'neutral'
+          });
+        });
+      }
+    } catch (err) {
+      console.error('Error getting corporate events:', err);
+    }
   }
   
   // Sort by date

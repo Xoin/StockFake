@@ -237,11 +237,57 @@
         <select id="stockSelect">
             <option value="">Loading...</option>
         </select>
+        
+        <button onclick="toggleIndicators()" style="margin-left: 15px;">Toggle Indicators</button>
+        <button onclick="toggleAutoRefresh()" id="autoRefreshBtn" style="margin-left: 15px;">Auto-Refresh: OFF</button>
+    </div>
+    
+    <!-- Indicator Controls -->
+    <div id="indicatorControls" style="display: none; background-color: #001100; border: 1px solid #00ff00; padding: 10px; margin: 10px 0;">
+        <div style="display: flex; flex-wrap: wrap; gap: 15px;">
+            <label style="color: #00ff00;">
+                <input type="checkbox" id="indSMA20" onchange="updateStockChart()"> SMA 20
+            </label>
+            <label style="color: #00ff00;">
+                <input type="checkbox" id="indSMA50" onchange="updateStockChart()"> SMA 50
+            </label>
+            <label style="color: #00ff00;">
+                <input type="checkbox" id="indEMA12" onchange="updateStockChart()"> EMA 12
+            </label>
+            <label style="color: #00ff00;">
+                <input type="checkbox" id="indBollinger" onchange="updateStockChart()"> Bollinger Bands
+            </label>
+            <label style="color: #00ff00;">
+                <input type="checkbox" id="showEvents" checked onchange="updateStockChart()"> Market Events
+            </label>
+        </div>
     </div>
     
     <div class="chart-container">
         <h2>Stock Price History</h2>
         <canvas id="stockChart"></canvas>
+    </div>
+    
+    <!-- Additional Indicator Charts -->
+    <div id="rsiChartContainer" class="chart-container" style="display: none;">
+        <h2>RSI (14) <button onclick="document.getElementById('rsiChartContainer').style.display='none'; document.getElementById('indRSI').checked=false;" style="float: right; padding: 5px;">✕</button></h2>
+        <canvas id="rsiChart"></canvas>
+    </div>
+    
+    <div id="macdChartContainer" class="chart-container" style="display: none;">
+        <h2>MACD <button onclick="document.getElementById('macdChartContainer').style.display='none'; document.getElementById('indMACD').checked=false;" style="float: right; padding: 5px;">✕</button></h2>
+        <canvas id="macdChart"></canvas>
+    </div>
+    
+    <!-- Additional Oscillator Controls -->
+    <div id="oscillatorControls" style="display: none; background-color: #001100; border: 1px solid #00ff00; padding: 10px; margin: 10px 0;">
+        <strong style="color: #00ff00;">Oscillators (separate panels):</strong><br>
+        <label style="color: #00ff00; margin-right: 15px;">
+            <input type="checkbox" id="indRSI" onchange="toggleOscillator('rsi')"> RSI
+        </label>
+        <label style="color: #00ff00;">
+            <input type="checkbox" id="indMACD" onchange="toggleOscillator('macd')"> MACD
+        </label>
     </div>
 </div>
 
@@ -258,7 +304,9 @@ let charts = {
     volatility: null,
     breadthRatio: null,
     indexFund: null,
-    stock: null
+    stock: null,
+    rsi: null,
+    macd: null
 };
 
 // Constants
@@ -930,6 +978,7 @@ async function updateStockChart() {
     if (!symbol) return;
     
     try {
+        // Fetch price data
         const response = await fetch(\`/api/stocks/\${symbol}/history?days=\${days}\`);
         const stockData = await response.json();
         
@@ -946,18 +995,148 @@ async function updateStockChart() {
             return;
         }
         
+        const datasets = [{
+            label: \`\${symbol} Price\`,
+            data: stockData.map(d => d.price),
+            borderColor: '#00ff00',
+            backgroundColor: 'rgba(0, 255, 0, 0.1)',
+            tension: 0.1,
+            fill: true,
+            order: 1
+        }];
+        
+        // Fetch and add technical indicators if enabled
+        const indicators = ['sma', 'ema', 'bollinger'];
+        const indicatorParams = indicators.join(',');
+        
+        const indResponse = await fetch(\`/api/stocks/\${symbol}/indicators?days=\${days}&indicators=\${indicatorParams}\`);
+        const indData = await indResponse.json();
+        
+        // Add SMA 20
+        if (document.getElementById('indSMA20')?.checked && indData.sma20) {
+            datasets.push({
+                label: 'SMA 20',
+                data: indData.sma20,
+                borderColor: '#00ffff',
+                backgroundColor: 'transparent',
+                borderWidth: 1,
+                pointRadius: 0,
+                fill: false,
+                order: 2
+            });
+        }
+        
+        // Add SMA 50
+        if (document.getElementById('indSMA50')?.checked && indData.sma50) {
+            datasets.push({
+                label: 'SMA 50',
+                data: indData.sma50,
+                borderColor: '#ffff00',
+                backgroundColor: 'transparent',
+                borderWidth: 1,
+                pointRadius: 0,
+                fill: false,
+                order: 2
+            });
+        }
+        
+        // Add EMA 12
+        if (document.getElementById('indEMA12')?.checked && indData.ema12) {
+            datasets.push({
+                label: 'EMA 12',
+                data: indData.ema12,
+                borderColor: '#ff00ff',
+                backgroundColor: 'transparent',
+                borderWidth: 1,
+                pointRadius: 0,
+                fill: false,
+                order: 2
+            });
+        }
+        
+        // Add Bollinger Bands
+        if (document.getElementById('indBollinger')?.checked && indData.bollingerUpper) {
+            datasets.push({
+                label: 'BB Upper',
+                data: indData.bollingerUpper,
+                borderColor: '#ffaa00',
+                backgroundColor: 'transparent',
+                borderWidth: 1,
+                borderDash: [5, 5],
+                pointRadius: 0,
+                fill: false,
+                order: 3
+            });
+            datasets.push({
+                label: 'BB Middle',
+                data: indData.bollingerMiddle,
+                borderColor: '#ffaa00',
+                backgroundColor: 'transparent',
+                borderWidth: 1,
+                pointRadius: 0,
+                fill: false,
+                order: 3
+            });
+            datasets.push({
+                label: 'BB Lower',
+                data: indData.bollingerLower,
+                borderColor: '#ffaa00',
+                backgroundColor: 'transparent',
+                borderWidth: 1,
+                borderDash: [5, 5],
+                pointRadius: 0,
+                fill: false,
+                order: 3
+            });
+        }
+        
+        // Fetch market events if enabled
+        let annotations = {};
+        if (document.getElementById('showEvents')?.checked) {
+            try {
+                const eventsResponse = await fetch(\`/api/market/events?days=\${days}&symbol=\${symbol}\`);
+                const events = await eventsResponse.json();
+                
+                if (events && events.length > 0) {
+                    annotations = events.reduce((acc, event, idx) => {
+                        const eventDate = new Date(event.date);
+                        const label = stockData.findIndex(d => {
+                            const dataDate = new Date(d.date);
+                            return Math.abs(dataDate - eventDate) < 24 * 60 * 60 * 1000;
+                        });
+                        
+                        if (label >= 0) {
+                            acc[\`event\${idx}\`] = {
+                                type: 'line',
+                                xMin: label,
+                                xMax: label,
+                                borderColor: event.impact === 'negative' ? '#ff0000' : 
+                                            event.impact === 'positive' ? '#00ff00' : '#ffff00',
+                                borderWidth: 2,
+                                borderDash: [5, 5],
+                                label: {
+                                    display: true,
+                                    content: event.title,
+                                    position: 'start',
+                                    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                                    color: '#00ff00',
+                                    font: { size: 10 }
+                                }
+                            };
+                        }
+                        return acc;
+                    }, {});
+                }
+            } catch (err) {
+                console.error('Failed to load events:', err);
+            }
+        }
+        
         charts.stock = new Chart(ctx, {
             type: 'line',
             data: {
                 labels: stockData.map(d => new Date(d.date).toLocaleDateString()),
-                datasets: [{
-                    label: \`\${symbol} Price\`,
-                    data: stockData.map(d => d.price),
-                    borderColor: '#00ff00',
-                    backgroundColor: 'rgba(0, 255, 0, 0.1)',
-                    tension: 0.1,
-                    fill: true
-                }]
+                datasets: datasets
             },
             options: {
                 responsive: true,
@@ -968,6 +1147,9 @@ async function updateStockChart() {
                             color: '#00ff00',
                             font: { family: 'Courier New' }
                         }
+                    },
+                    annotation: {
+                        annotations: annotations
                     }
                 },
                 scales: {
@@ -992,8 +1174,216 @@ async function updateStockChart() {
                 }
             }
         });
+        
+        // Update oscillator charts if enabled
+        updateOscillators(symbol, days, indData);
+        
     } catch (error) {
         console.error('Failed to update stock chart:', error);
+    }
+}
+
+// Update oscillator charts (RSI, MACD)
+async function updateOscillators(symbol, days, indData) {
+    // Update RSI chart if enabled
+    if (document.getElementById('indRSI')?.checked) {
+        const rsiResponse = await fetch(\`/api/stocks/\${symbol}/indicators?days=\${days}&indicators=rsi\`);
+        const rsiData = await rsiResponse.json();
+        
+        if (rsiData.rsi && charts.rsi) {
+            charts.rsi.destroy();
+        }
+        
+        if (rsiData.rsi) {
+            const ctx = document.getElementById('rsiChart').getContext('2d');
+            charts.rsi = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: rsiData.dates.map(d => new Date(d).toLocaleDateString()),
+                    datasets: [{
+                        label: 'RSI',
+                        data: rsiData.rsi,
+                        borderColor: '#00ffff',
+                        backgroundColor: 'rgba(0, 255, 255, 0.1)',
+                        tension: 0.1,
+                        fill: true
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    plugins: {
+                        legend: {
+                            labels: {
+                                color: '#00ff00',
+                                font: { family: 'Courier New' }
+                            }
+                        },
+                        annotation: {
+                            annotations: {
+                                line1: {
+                                    type: 'line',
+                                    yMin: 70,
+                                    yMax: 70,
+                                    borderColor: '#ff0000',
+                                    borderWidth: 1,
+                                    borderDash: [5, 5]
+                                },
+                                line2: {
+                                    type: 'line',
+                                    yMin: 30,
+                                    yMax: 30,
+                                    borderColor: '#00ff00',
+                                    borderWidth: 1,
+                                    borderDash: [5, 5]
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            ticks: {
+                                color: '#00ff00',
+                                font: { family: 'Courier New' },
+                                maxTicksLimit: 10
+                            },
+                            grid: { color: '#003300' }
+                        },
+                        y: {
+                            min: 0,
+                            max: 100,
+                            ticks: {
+                                color: '#00ff00',
+                                font: { family: 'Courier New' }
+                            },
+                            grid: { color: '#003300' }
+                        }
+                    }
+                }
+            });
+        }
+    }
+    
+    // Update MACD chart if enabled
+    if (document.getElementById('indMACD')?.checked) {
+        const macdResponse = await fetch(\`/api/stocks/\${symbol}/indicators?days=\${days}&indicators=macd\`);
+        const macdData = await macdResponse.json();
+        
+        if (macdData.macd && charts.macd) {
+            charts.macd.destroy();
+        }
+        
+        if (macdData.macd) {
+            const ctx = document.getElementById('macdChart').getContext('2d');
+            charts.macd = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: macdData.dates.map(d => new Date(d).toLocaleDateString()),
+                    datasets: [{
+                        label: 'MACD',
+                        data: macdData.macd,
+                        borderColor: '#00ffff',
+                        backgroundColor: 'transparent',
+                        type: 'line',
+                        borderWidth: 2,
+                        pointRadius: 0,
+                        order: 1
+                    }, {
+                        label: 'Signal',
+                        data: macdData.macdSignal,
+                        borderColor: '#ff0000',
+                        backgroundColor: 'transparent',
+                        type: 'line',
+                        borderWidth: 2,
+                        pointRadius: 0,
+                        order: 1
+                    }, {
+                        label: 'Histogram',
+                        data: macdData.macdHistogram,
+                        backgroundColor: macdData.macdHistogram.map(v => v >= 0 ? 'rgba(0, 255, 0, 0.5)' : 'rgba(255, 0, 0, 0.5)'),
+                        order: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    plugins: {
+                        legend: {
+                            labels: {
+                                color: '#00ff00',
+                                font: { family: 'Courier New' }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            ticks: {
+                                color: '#00ff00',
+                                font: { family: 'Courier New' },
+                                maxTicksLimit: 10
+                            },
+                            grid: { color: '#003300' }
+                        },
+                        y: {
+                            ticks: {
+                                color: '#00ff00',
+                                font: { family: 'Courier New' }
+                            },
+                            grid: { color: '#003300' }
+                        }
+                    }
+                }
+            });
+        }
+    }
+}
+
+// Toggle indicator controls
+function toggleIndicators() {
+    const controls = document.getElementById('indicatorControls');
+    const oscControls = document.getElementById('oscillatorControls');
+    if (controls.style.display === 'none') {
+        controls.style.display = 'block';
+        oscControls.style.display = 'block';
+    } else {
+        controls.style.display = 'none';
+        oscControls.style.display = 'none';
+    }
+}
+
+// Toggle oscillator panels
+function toggleOscillator(type) {
+    const checkbox = document.getElementById(\`ind\${type.toUpperCase()}\`);
+    const container = document.getElementById(\`\${type}ChartContainer\`);
+    
+    if (checkbox.checked) {
+        container.style.display = 'block';
+        updateStockChart();
+    } else {
+        container.style.display = 'none';
+        if (charts[type]) {
+            charts[type].destroy();
+            charts[type] = null;
+        }
+    }
+}
+
+// Auto-refresh functionality
+let autoRefreshInterval = null;
+function toggleAutoRefresh() {
+    if (autoRefreshInterval) {
+        clearInterval(autoRefreshInterval);
+        autoRefreshInterval = null;
+        document.getElementById('autoRefreshBtn').textContent = 'Auto-Refresh: OFF';
+    } else {
+        autoRefreshInterval = setInterval(() => {
+            if (currentTab === 'stocks') {
+                updateStockChart();
+            } else {
+                updateAllCharts();
+            }
+        }, 10000); // Refresh every 10 seconds
+        document.getElementById('autoRefreshBtn').textContent = 'Auto-Refresh: ON';
     }
 }
 
