@@ -226,6 +226,21 @@
                         <button class="timeframe-btn" onclick="loadStockHistory(18250, this)">All Time</button>
                     </div>
                     
+                    <div style="background-color: #001100; border: 1px solid #00ff00; padding: 10px; margin: 10px 0; display: flex; flex-wrap: wrap; gap: 15px;">
+                        <label style="color: #00ff00;">
+                            <input type="checkbox" id="showSMA20" onchange="loadStockHistory(currentTimeframe)"> SMA 20
+                        </label>
+                        <label style="color: #00ff00;">
+                            <input type="checkbox" id="showSMA50" onchange="loadStockHistory(currentTimeframe)"> SMA 50
+                        </label>
+                        <label style="color: #00ff00;">
+                            <input type="checkbox" id="showEMA12" onchange="loadStockHistory(currentTimeframe)"> EMA 12
+                        </label>
+                        <label style="color: #00ff00;">
+                            <input type="checkbox" id="showEvents" checked onchange="loadStockHistory(currentTimeframe)"> Market Events
+                        </label>
+                    </div>
+                    
                     <div class="stock-chart-container">
                         <canvas id="stockChart" class="chart-canvas"></canvas>
                     </div>
