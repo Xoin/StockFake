@@ -29,6 +29,14 @@ try {
   console.warn('Dynamic rates generator not loaded:', err.message);
 }
 
+// Load market average controls for preventing extreme post-2024 movements
+let marketAverageControls = null;
+try {
+  marketAverageControls = require('../helpers/marketAverageControls');
+} catch (err) {
+  console.warn('Market average controls module not loaded:', err.message);
+}
+
 // Load historical stock data
 const historicalStockData = JSON.parse(
   fs.readFileSync(path.join(__dirname, 'historical-stock-data.json'), 'utf8')
@@ -138,13 +146,28 @@ function getAnnualGrowthRate(year, sector = null) {
     // This constrains growth based on Fed policy, interest rates, QE, etc.
     annualReturn += economicImpact;
     
-    // Additional constraint: gradually reduce max growth cap in future years
-    // to prevent runaway valuations while still allowing reasonable returns
-    const yearsSince2024 = year - 2024;
-    const capReduction = Math.min(0.03, yearsSince2024 * 0.002); // Reduce cap by 0.2% per year, max 3%
-    const maxReturn = 0.40 - capReduction; // Start at 40%, reduce gradually
-    
-    annualReturn = Math.max(-0.30, Math.min(maxReturn, annualReturn));
+    // Apply market average controls to prevent extreme movements
+    // Reference: helpers/marketAverageControls.js for academic citations
+    if (marketAverageControls) {
+      const controlResult = marketAverageControls.applyMarketAverageControls(
+        annualReturn, 
+        year
+      );
+      annualReturn = controlResult.adjustedReturn;
+      
+      // Log significant adjustments for transparency (optional)
+      const totalAdjustment = controlResult.originalReturn - controlResult.adjustedReturn;
+      if (Math.abs(totalAdjustment) > 0.05) { // 5% threshold
+        // Significant control applied - could log this for debugging
+        // console.log(`Year ${year}: Market controls reduced return from ${(controlResult.originalReturn*100).toFixed(1)}% to ${(annualReturn*100).toFixed(1)}%`);
+      }
+    } else {
+      // Fallback: use simple capping if controls module unavailable
+      const yearsSince2024 = year - 2024;
+      const capReduction = Math.min(0.03, yearsSince2024 * 0.002);
+      const maxReturn = 0.40 - capReduction;
+      annualReturn = Math.max(-0.30, Math.min(maxReturn, annualReturn));
+    }
   } else {
     // Pre-2025: use original bounds
     annualReturn = Math.max(-0.30, Math.min(0.40, annualReturn)); // -30% to +40%
