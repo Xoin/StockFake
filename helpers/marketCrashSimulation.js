@@ -315,16 +315,16 @@ function calculateStockPriceImpact(symbol, sector, basePrice, currentTime) {
   
   if (activeEvents.length > 0 && volatilityFactor > 1.0) {
     // During crash: apply volatility shock and generate larger returns
-    // Allow higher volatility during crashes, but still cap at realistic levels (±25%)
+    // Allow higher volatility during crashes, but still cap at realistic levels (±20%)
     garchModel.applyVolatilityShock(volatilityFactor);
-    volatilityReturn = garchModel.generateReturn(5, 0, 0.25);
+    volatilityReturn = garchModel.generateReturn(5, 0, 0.20);
   } else {
     // Normal times: use moderate drift and volatility (daily scale)
     // Typical daily drift ~0.0003 (about 8% annualized)
     // Typical daily vol ~0.01 (about 15% annualized)
-    // Cap at ±15% for realistic daily movements
+    // Cap at ±12% for realistic daily movements (reduced to prevent compound effects)
     const dailyDrift = 0.0003;
-    volatilityReturn = garchModel.generateReturn(5, dailyDrift, 0.15);
+    volatilityReturn = garchModel.generateReturn(5, dailyDrift, 0.12);
   }
   
   // Combine crash impact with stochastic volatility

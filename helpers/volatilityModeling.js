@@ -104,10 +104,10 @@ class GARCHModel {
    * 
    * @param {number} degreesOfFreedom - Lower = fatter tails (typical: 3-7)
    * @param {number} drift - Expected return (default: 0)
-   * @param {number} maxReturn - Maximum absolute return (default: 0.15 for ±15%)
+   * @param {number} maxReturn - Maximum absolute return (default: 0.12 for ±12%)
    * @returns {number} Random return
    */
-  generateReturn(degreesOfFreedom = 5, drift = 0, maxReturn = 0.15) {
+  generateReturn(degreesOfFreedom = 5, drift = 0, maxReturn = 0.12) {
     const volatility = this.getCurrentVolatility();
     
     // Generate Student's t sample
@@ -115,7 +115,7 @@ class GARCHModel {
     
     // Scale by volatility and add drift
     // Cap return at realistic levels to prevent unrealistic price movements
-    // Default ±15% for normal market conditions, can be increased during crashes
+    // Default ±12% for normal market conditions, can be increased during crashes
     const rawReturn = drift + volatility * tSample;
     return Math.max(-maxReturn, Math.min(maxReturn, rawReturn));
   }
