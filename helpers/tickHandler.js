@@ -39,8 +39,22 @@ let onMarketCloseCallback = null;
  * @param {Date} initialGameTime - Starting game time
  * @param {number} initialTimeMultiplier - Time multiplier (seconds of game time per real second)
  * @param {Function} marketOpenChecker - Function to check if market is open
+ * @throws {TypeError} If parameters are invalid
  */
 function initialize(initialGameTime, initialTimeMultiplier, marketOpenChecker) {
+  // Validate parameters
+  if (!(initialGameTime instanceof Date) || isNaN(initialGameTime.getTime())) {
+    throw new TypeError('initialGameTime must be a valid Date object');
+  }
+  
+  if (typeof initialTimeMultiplier !== 'number' || initialTimeMultiplier <= 0) {
+    throw new TypeError('initialTimeMultiplier must be a positive number');
+  }
+  
+  if (marketOpenChecker && typeof marketOpenChecker !== 'function') {
+    throw new TypeError('marketOpenChecker must be a function');
+  }
+  
   gameTime = initialGameTime;
   timeMultiplier = initialTimeMultiplier;
   isMarketOpenFn = marketOpenChecker;
@@ -86,11 +100,15 @@ function getTimeMultiplier() {
 /**
  * Set time multiplier
  * @param {number} multiplier - New time multiplier
+ * @returns {boolean} True if multiplier was set, false if invalid
  */
 function setTimeMultiplier(multiplier) {
   if (multiplier && typeof multiplier === 'number' && multiplier > 0) {
     timeMultiplier = multiplier;
+    return true;
   }
+  console.warn('setTimeMultiplier: Invalid multiplier', multiplier);
+  return false;
 }
 
 /**

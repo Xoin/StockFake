@@ -40,8 +40,12 @@ function getIsPaused() {
 /**
  * Set the pause state
  * @param {boolean} paused - true to pause, false to unpause
+ * @throws {TypeError} If paused is not a boolean
  */
 function setIsPaused(paused) {
+  if (typeof paused !== 'boolean') {
+    console.warn('setIsPaused: Expected boolean, got', typeof paused, '- coercing to boolean');
+  }
   isPaused = Boolean(paused);
 }
 
