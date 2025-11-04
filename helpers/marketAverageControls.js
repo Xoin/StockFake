@@ -130,7 +130,8 @@ function applyMeanReversion(proposedReturn, year) {
     return proposedReturn;
   }
   
-  const mu = year > 2024 ? CONFIG.meanReversion.muPostRegime : CONFIG.meanReversion.muHistorical;
+  // For post-2024, use post-regime parameters
+  const mu = CONFIG.meanReversion.muPostRegime;
   const theta = CONFIG.meanReversion.theta;
   
   // Calculate current deviation from long-term mean

@@ -52,14 +52,11 @@ function simulatePortfolio(startYear, endYear, withControls) {
   
   for (let year = startYear; year <= endYear; year++) {
     // Get market return for the year
+    // Note: Controls are already integrated into getYearMarketStats for post-2024 years
     const marketReturn = stocks.getYearMarketStats(year).marketReturn;
     
-    // If simulating without controls, use raw return
-    // If with controls, they're already applied in getYearMarketStats
-    const actualReturn = marketReturn;
-    
-    value *= (1 + actualReturn);
-    yearlyReturns.push(actualReturn);
+    value *= (1 + marketReturn);
+    yearlyReturns.push(marketReturn);
   }
   
   const years = endYear - startYear + 1;
