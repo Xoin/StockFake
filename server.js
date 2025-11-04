@@ -25,6 +25,8 @@ const treasuryYields = require('./data/treasury-yields');
 const cryptoData = require('./data/cryptocurrencies');
 
 // Load helper modules
+const pauseHandler = require('./helpers/pauseHandler');
+const tickHandler = require('./helpers/tickHandler');
 const indexFundRebalancing = require('./helpers/indexFundRebalancing');
 const stockSplits = require('./helpers/stockSplits');
 const constants = require('./helpers/constants');
@@ -67,6 +69,18 @@ const savedGameState = dbModule.getGameState.get();
 let gameTime = savedGameState ? new Date(savedGameState.game_time) : new Date('1970-01-01T09:30:00');
 let isPaused = savedGameState ? Boolean(savedGameState.is_paused) : true;
 let timeMultiplier = savedGameState ? savedGameState.time_multiplier : 3600;
+
+// Initialize centralized pause handler with loaded state
+pauseHandler.setIsPaused(isPaused);
+
+// Initialize centralized tick handler
+tickHandler.initialize(gameTime, timeMultiplier, isMarketOpen);
+tickHandler.setProcessPendingOrdersCallback(processPendingOrders);
+
+// Keep server gameTime in sync with tick handler
+tickHandler.setOnTimeAdvancedCallback((oldTime, newTime) => {
+  gameTime = newTime;
+});
 
 // Log loaded state
 console.log(`Loaded game state from database:`);
@@ -143,11 +157,11 @@ function isMarketOpen(date) {
   return currentMinutes >= openMinutes && currentMinutes < closeMinutes;
 }
 
-// Track last market state to detect transitions
-let wasMarketOpen = isMarketOpen(gameTime);
-
 // Process pending orders when market opens
 function processPendingOrders() {
+  // Get current game time from tick handler
+  const currentGameTime = tickHandler.getGameTime();
+  
   const pendingOrders = dbModule.getPendingOrders.all('pending');
   
   if (pendingOrders.length === 0) return;
@@ -161,7 +175,7 @@ function processPendingOrders() {
       let errorMessage = null;
       
       if (order.order_type === 'stock') {
-        const stockPrice = stocks.getStockPrice(order.symbol, gameTime, timeMultiplier, isPaused);
+        const stockPrice = stocks.getStockPrice(order.symbol, currentGameTime, timeMultiplier, isPaused);
         if (!stockPrice) {
           errorMessage = 'Stock not found or not available';
         } else {
@@ -177,7 +191,7 @@ function processPendingOrders() {
         if (!fund) {
           errorMessage = 'Index fund not found';
         } else {
-          const fundPrice = indexFunds.calculateIndexPrice(fund, gameTime, timeMultiplier, isPaused);
+          const fundPrice = indexFunds.calculateIndexPrice(fund, currentGameTime, timeMultiplier, isPaused);
           if (!fundPrice) {
             errorMessage = 'Unable to calculate fund price';
           } else {
@@ -193,7 +207,7 @@ function processPendingOrders() {
       if (success) {
         dbModule.updatePendingOrderStatus.run(
           'executed',
-          gameTime.toISOString(),
+          currentGameTime.toISOString(),
           executionPrice,
           null,
           order.id
@@ -202,7 +216,7 @@ function processPendingOrders() {
       } else {
         dbModule.updatePendingOrderStatus.run(
           'failed',
-          gameTime.toISOString(),
+          currentGameTime.toISOString(),
           null,
           errorMessage,
           order.id
@@ -213,7 +227,7 @@ function processPendingOrders() {
       console.error(`Error processing pending order #${order.id}:`, error);
       dbModule.updatePendingOrderStatus.run(
         'failed',
-        gameTime.toISOString(),
+        currentGameTime.toISOString(),
         null,
         error.message,
         order.id
@@ -222,50 +236,8 @@ function processPendingOrders() {
   }
 }
 
-// Time simulation
-setInterval(() => {
-  if (!isPaused) {
-    const oldTime = new Date(gameTime.getTime());
-    const newTime = new Date(gameTime.getTime() + (timeMultiplier * 1000));
-    
-    // If market is currently closed and we're using fast speed (1s = 1day)
-    // Check if we would skip over market open hours
-    if (!isMarketOpen(gameTime) && timeMultiplier >= 86400) {
-      // Advance time in smaller increments to avoid skipping market hours
-      let checkTime = new Date(gameTime.getTime());
-      const increment = 3600 * 1000; // 1 hour increments
-      const maxAdvance = timeMultiplier * 1000;
-      let totalAdvanced = 0;
-      
-      while (totalAdvanced < maxAdvance && !isMarketOpen(checkTime)) {
-        checkTime = new Date(checkTime.getTime() + increment);
-        totalAdvanced += increment;
-        
-        // Stop if we hit market open time
-        if (isMarketOpen(checkTime)) {
-          gameTime = checkTime;
-          return;
-        }
-      }
-      
-      // If we still haven't found market open, use the calculated time
-      if (totalAdvanced >= maxAdvance) {
-        gameTime = newTime;
-      }
-      return;
-    }
-    
-    gameTime = newTime;
-    
-    // Check if market just opened (transition from closed to open)
-    const isMarketCurrentlyOpen = isMarketOpen(gameTime);
-    if (!wasMarketOpen && isMarketCurrentlyOpen) {
-      console.log(`Market just opened at ${gameTime.toISOString()}. Processing pending orders...`);
-      processPendingOrders();
-    }
-    wasMarketOpen = isMarketCurrentlyOpen;
-  }
-}, 1000);
+// Start centralized tick handler
+tickHandler.start(1000); // Tick every 1 second
 
 // API Routes
 app.get('/api/time', (req, res) => {
@@ -281,6 +253,7 @@ app.get('/api/time', (req, res) => {
 
 app.post('/api/time/pause', (req, res) => {
   isPaused = !isPaused;
+  pauseHandler.setIsPaused(isPaused); // Update centralized pause handler
   saveGameState(); // Save state when pause changes
   res.json({ isPaused });
 });
@@ -291,6 +264,7 @@ app.post('/api/time/speed', (req, res) => {
   // Allow up to 2592000 (30 days) for monthly speed
   if (multiplier && typeof multiplier === 'number' && multiplier > 0 && multiplier <= 2592000) {
     timeMultiplier = multiplier;
+    tickHandler.setTimeMultiplier(multiplier); // Update centralized tick handler
     saveGameState(); // Save state when speed changes
   }
   res.json({ timeMultiplier });
@@ -1053,6 +1027,11 @@ let lastDividendQuarter = null;
 
 // Check and pay dividends (quarterly)
 function checkAndPayDividends() {
+  // Only process if game is not paused
+  if (!pauseHandler.shouldProcessGameState()) {
+    return;
+  }
+  
   const currentDate = new Date(gameTime);
   const currentQuarter = Math.floor(currentDate.getMonth() / 3);
   const currentYear = currentDate.getFullYear();
@@ -1166,18 +1145,22 @@ const REBALANCING_CHECK_INTERVAL_MS = 30000;
 
 // Check and process index fund rebalancing
 function checkIndexFundRebalancing() {
-  if (!isPaused) {
-    const results = indexFundRebalancing.processAutoRebalancing(
-      indexFunds.indexFunds,
-      gameTime,
-      timeMultiplier,
-      isPaused
-    );
-    
-    if (results.length > 0) {
-      console.log(`Rebalanced ${results.length} index fund(s)`);
-      for (const result of results) {
-        console.log(`  - ${result.fundName}: ${result.changes.adjusted.length} constituents adjusted, ${result.changes.added.length} added, ${result.changes.removed.length} removed`);
+  // Only process if game is not paused
+  if (!pauseHandler.shouldProcessGameState()) {
+    return;
+  }
+  
+  const results = indexFundRebalancing.processAutoRebalancing(
+    indexFunds.indexFunds,
+    gameTime,
+    timeMultiplier,
+    isPaused
+  );
+  
+  if (results.length > 0) {
+    console.log(`Rebalanced ${results.length} index fund(s)`);
+    for (const result of results) {
+      console.log(`  - ${result.fundName}: ${result.changes.adjusted.length} constituents adjusted, ${result.changes.added.length} added, ${result.changes.removed.length} removed`);
       }
     }
   }
@@ -1191,26 +1174,29 @@ const STOCK_SPLIT_CHECK_INTERVAL_MS = 1800000; // 30 minutes
 
 // Check and process stock splits
 function checkStockSplits() {
-  if (!isPaused && isMarketOpen(gameTime)) {
-    try {
-      // Get current stock prices
-      const currentStocks = stocks.getStockData(gameTime, timeMultiplier, isPaused, true);
-      
-      // Check for splits
-      const result = stockSplits.checkAndApplySplits(gameTime.toISOString(), currentStocks);
-      
-      if (result.splitsApplied && result.splitsApplied.length > 0) {
-        console.log(`Applied ${result.splitsApplied.length} stock split(s):`);
-        for (const split of result.splitsApplied) {
-          console.log(`  - ${split.symbol}: ${split.ratio}:1 split ($${split.priceBeforeSplit.toFixed(2)} → $${split.priceAfterSplit.toFixed(2)})`);
-          if (split.portfolioAffected) {
-            console.log(`    User portfolio adjusted`);
-          }
+  // Only process if game is not paused and market is open
+  if (!pauseHandler.shouldProcessGameState() || !isMarketOpen(gameTime)) {
+    return;
+  }
+  
+  try {
+    // Get current stock prices
+    const currentStocks = stocks.getStockData(gameTime, timeMultiplier, isPaused, true);
+    
+    // Check for splits
+    const result = stockSplits.checkAndApplySplits(gameTime.toISOString(), currentStocks);
+    
+    if (result.splitsApplied && result.splitsApplied.length > 0) {
+      console.log(`Applied ${result.splitsApplied.length} stock split(s):`);
+      for (const split of result.splitsApplied) {
+        console.log(`  - ${split.symbol}: ${split.ratio}:1 split ($${split.priceBeforeSplit.toFixed(2)} → $${split.priceAfterSplit.toFixed(2)})`);
+        if (split.portfolioAffected) {
+          console.log(`    User portfolio adjusted`);
         }
       }
-    } catch (error) {
-      console.error('Error checking stock splits:', error);
     }
+  } catch (error) {
+    console.error('Error checking stock splits:', error);
   }
 }
 
@@ -1219,15 +1205,18 @@ setInterval(checkStockSplits, STOCK_SPLIT_CHECK_INTERVAL_MS);
 
 // Check and process corporate events (mergers, bankruptcies, IPOs, going private)
 function checkCorporateEvents() {
-  if (!isPaused) {
-    try {
-      const processedEvents = corporateEvents.processCorporateEvents(gameTime);
-      if (processedEvents.length > 0) {
-        console.log(`Processed ${processedEvents.length} corporate event(s) at ${gameTime.toISOString()}`);
-      }
-    } catch (error) {
-      console.error('Error processing corporate events:', error);
+  // Only process if game is not paused
+  if (!pauseHandler.shouldProcessGameState()) {
+    return;
+  }
+  
+  try {
+    const processedEvents = corporateEvents.processCorporateEvents(gameTime);
+    if (processedEvents.length > 0) {
+      console.log(`Processed ${processedEvents.length} corporate event(s) at ${gameTime.toISOString()}`);
     }
+  } catch (error) {
+    console.error('Error processing corporate events:', error);
   }
 }
 
@@ -1253,6 +1242,11 @@ function getTradingFee(tradeValue, currentTime) {
 
 // Check and charge monthly account fees
 function checkAndChargeMonthlyFee() {
+  // Only process if game is not paused
+  if (!pauseHandler.shouldProcessGameState()) {
+    return;
+  }
+  
   const currentDate = new Date(gameTime);
   const currentMonth = `${currentDate.getFullYear()}-${currentDate.getMonth()}`;
   
@@ -1278,6 +1272,11 @@ function checkAndChargeMonthlyFee() {
 
 // Track inflation and purchasing power
 function trackInflation() {
+  // Only process if game is not paused
+  if (!pauseHandler.shouldProcessGameState()) {
+    return;
+  }
+  
   const currentYear = gameTime.getFullYear();
   const yearKey = `${currentYear}`;
   
@@ -1293,6 +1292,11 @@ function trackInflation() {
 
 // Assess and collect yearly wealth tax
 function assessWealthTax() {
+  // Only process if game is not paused
+  if (!pauseHandler.shouldProcessGameState()) {
+    return;
+  }
+  
   const currentYear = gameTime.getFullYear();
   const yearKey = `${currentYear}`;
   
@@ -1371,6 +1375,11 @@ function assessWealthTax() {
 
 // Update short positions (charge borrowing fees)
 function updateShortPositions() {
+  // Only process if game is not paused
+  if (!pauseHandler.shouldProcessGameState()) {
+    return;
+  }
+  
   const currentTime = new Date(gameTime);
   
   for (const [symbol, position] of Object.entries(userAccount.shortPositions)) {
@@ -1405,7 +1414,10 @@ let lastBondInterestCheck = null;
 let lastBondMaturityCheck = null;
 
 function checkBondInterestPayments() {
-  if (isPaused) return;
+  // Only process if game is not paused
+  if (!pauseHandler.shouldProcessGameState()) {
+    return;
+  }
   
   try {
     const currentCheck = `${gameTime.getFullYear()}-${gameTime.getMonth() + 1}`;
@@ -1423,7 +1435,10 @@ function checkBondInterestPayments() {
 }
 
 function checkBondMaturities() {
-  if (isPaused) return;
+  // Only process if game is not paused
+  if (!pauseHandler.shouldProcessGameState()) {
+    return;
+  }
   
   try {
     const currentCheck = gameTime.toISOString().split('T')[0];
@@ -1582,8 +1597,10 @@ function checkPositionConcentration(symbol) {
 
 // Process margin interest (charged daily)
 function processMarginInterest() {
-  // Don't process margin interest when game is paused
-  if (isPaused) return;
+  // Only process if game is not paused
+  if (!pauseHandler.shouldProcessGameState()) {
+    return;
+  }
   
   if (userAccount.marginAccount.marginBalance <= 0) return;
   
@@ -1623,6 +1640,11 @@ function processMarginInterest() {
 
 // Check and issue margin calls
 function processMarginCalls() {
+  // Only process if game is not paused
+  if (!pauseHandler.shouldProcessGameState()) {
+    return;
+  }
+  
   const marginCallStatus = checkMarginCall();
   
   if (marginCallStatus.isMarginCall) {
@@ -1728,8 +1750,10 @@ let loanIdCounter = 1;
 
 // Process loan interest accrual and check for missed payments
 function processLoans() {
-  // Don't process loans when game is paused
-  if (isPaused) return;
+  // Only process if game is not paused
+  if (!pauseHandler.shouldProcessGameState()) {
+    return;
+  }
   
   const currentDate = new Date(gameTime);
   
@@ -1923,6 +1947,11 @@ function shouldSellAssetsInsteadOfLoan(negativeAmount) {
 
 // Process negative balance penalties
 function processNegativeBalance() {
+  // Only process if game is not paused
+  if (!pauseHandler.shouldProcessGameState()) {
+    return;
+  }
+  
   if (userAccount.cash >= 0) {
     // Reset counter when balance becomes positive
     if (userAccount.daysWithNegativeBalance > 0) {
@@ -4487,43 +4516,46 @@ marketCrashSim.initializeMarketState();
 // Update crash events periodically
 // Periodically update crash events and generate dynamic events
 setInterval(() => {
-  if (!isPaused) {
-    marketCrashSim.updateCrashEvents(gameTime);
-    
-    // Check for and generate dynamic events
-    const newEvents = dynamicEventGenerator.generateDynamicEvents(gameTime);
-    
-    // Auto-trigger the generated events
-    for (const event of newEvents) {
-      const result = marketCrashSim.triggerCrashEvent(event, gameTime);
-      if (result.success) {
-        console.log(`Auto-triggered dynamic crash event: ${event.name} (${event.type})`);
-      }
+  // Only process if game is not paused
+  if (!pauseHandler.shouldProcessGameState()) {
+    return;
+  }
+  
+  marketCrashSim.updateCrashEvents(gameTime);
+  
+  // Check for and generate dynamic events
+  const newEvents = dynamicEventGenerator.generateDynamicEvents(gameTime);
+  
+  // Auto-trigger the generated events
+  for (const event of newEvents) {
+    const result = marketCrashSim.triggerCrashEvent(event, gameTime);
+    if (result.success) {
+      console.log(`Auto-triggered dynamic crash event: ${event.name} (${event.type})`);
     }
-    
-    // Process share buybacks based on market sentiment
-    const marketState = marketCrashSim.getMarketState();
-    const marketSentiment = marketState.sentimentScore || 0;
-    
-    // Convert sentiment from -1..1 to 0..1 scale for buyback function
-    const normalizedSentiment = (marketSentiment + 1) / 2;
-    
-    const buybackEvents = shareAvailability.processBuybacks(gameTime, normalizedSentiment);
-    if (buybackEvents.length > 0) {
-      console.log(`Processed ${buybackEvents.length} stock buyback(s):`);
-      buybackEvents.forEach(event => {
-        console.log(`  - ${event.symbol}: Bought back ${event.sharesBoughtBack.toLocaleString()} shares (${event.percentageOfFloat}% of float)`);
-      });
-    }
-    
-    // Process share issuance (less frequent)
-    const issuanceEvents = shareAvailability.processShareIssuance(gameTime, marketSentiment);
-    if (issuanceEvents.length > 0) {
-      console.log(`Processed ${issuanceEvents.length} share issuance(s):`);
-      issuanceEvents.forEach(event => {
-        console.log(`  - ${event.symbol}: Issued ${event.sharesIssued.toLocaleString()} shares (${event.percentageIncrease}% increase)`);
-      });
-    }
+  }
+  
+  // Process share buybacks based on market sentiment
+  const marketState = marketCrashSim.getMarketState();
+  const marketSentiment = marketState.sentimentScore || 0;
+  
+  // Convert sentiment from -1..1 to 0..1 scale for buyback function
+  const normalizedSentiment = (marketSentiment + 1) / 2;
+  
+  const buybackEvents = shareAvailability.processBuybacks(gameTime, normalizedSentiment);
+  if (buybackEvents.length > 0) {
+    console.log(`Processed ${buybackEvents.length} stock buyback(s):`);
+    buybackEvents.forEach(event => {
+      console.log(`  - ${event.symbol}: Bought back ${event.sharesBoughtBack.toLocaleString()} shares (${event.percentageOfFloat}% of float)`);
+    });
+  }
+  
+  // Process share issuance (less frequent)
+  const issuanceEvents = shareAvailability.processShareIssuance(gameTime, marketSentiment);
+  if (issuanceEvents.length > 0) {
+    console.log(`Processed ${issuanceEvents.length} share issuance(s):`);
+    issuanceEvents.forEach(event => {
+      console.log(`  - ${event.symbol}: Issued ${event.sharesIssued.toLocaleString()} shares (${event.percentageIncrease}% increase)`);
+    });
   }
 }, 10000);  // Update every 10 seconds
 
@@ -4746,8 +4778,7 @@ app.post('/api/debug/settime', (req, res) => {
   
   try {
     gameTime = new Date(time);
-    // Update market state tracker to prevent false transitions
-    wasMarketOpen = isMarketOpen(gameTime);
+    tickHandler.setGameTime(gameTime); // Update tick handler
     saveGameState(); // Save state after time change
     res.json({ success: true, newTime: gameTime });
   } catch (error) {
@@ -4776,8 +4807,7 @@ app.post('/api/debug/skiptime', (req, res) => {
   }
   
   gameTime = new Date(gameTime.getTime() + (amount * multipliers[unit]));
-  // Update market state tracker to prevent false transitions
-  wasMarketOpen = isMarketOpen(gameTime);
+  tickHandler.setGameTime(gameTime); // Update tick handler
   saveGameState(); // Save state after time skip
   res.json({ success: true, newTime: gameTime });
 });
