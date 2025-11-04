@@ -4507,13 +4507,33 @@ app.get('/api/historical-events', (req, res) => {
         }
         
         if (impacts.length === 0) {
-          impactText = 'Market participants adjusting positions in response to changing economic conditions. Volatility and uncertainty affecting trading across all asset classes. Investors reassessing risk tolerance and portfolio allocations. Flight to quality potentially benefiting defensive sectors and safe-haven assets. Long-term investors may find opportunities amid short-term turbulence.';
+          impactText = [
+            'Market participants adjusting positions in response to changing economic conditions.',
+            'Volatility and uncertainty affecting trading across all asset classes.',
+            'Investors reassessing risk tolerance and portfolio allocations.',
+            'Flight to quality potentially benefiting defensive sectors and safe-haven assets.',
+            'Long-term investors may find opportunities amid short-term turbulence.'
+          ].join(' ');
         } else {
           impactText = impacts.join('. ') + '. ';
-          impactText += 'Investors advised to review portfolio positioning and risk management strategies. Consider rebalancing to maintain target allocations. Long-term fundamentals remain important despite near-term volatility.';
+          impactText += [
+            'Investors advised to review portfolio positioning and risk management strategies.',
+            'Consider rebalancing to maintain target allocations.',
+            'Long-term fundamentals remain important despite near-term volatility.'
+          ].join(' ');
         }
       } else {
-        impactText = 'Markets experiencing increased volatility and uncertainty. All sectors affected to varying degrees with correlations rising during stress periods. Trading volumes elevated as investors reposition portfolios. Risk assets like stocks showing heightened price swings. Safe-haven assets such as government bonds and gold may benefit. Dividend-paying stocks and defensive sectors potentially offering relative stability. Market timing challenging; long-term investors maintaining discipline often rewarded. Opportunities may emerge for value-oriented investors. Portfolio diversification remains critical risk management tool.';
+        impactText = [
+          'Markets experiencing increased volatility and uncertainty.',
+          'All sectors affected to varying degrees with correlations rising during stress periods.',
+          'Trading volumes elevated as investors reposition portfolios.',
+          'Risk assets like stocks showing heightened price swings.',
+          'Safe-haven assets such as government bonds and gold may benefit.',
+          'Dividend-paying stocks and defensive sectors potentially offering relative stability.',
+          'Market timing challenging; long-term investors maintaining discipline often rewarded.',
+          'Opportunities may emerge for value-oriented investors.',
+          'Portfolio diversification remains critical risk management tool.'
+        ].join(' ');
       }
       
       return {
