@@ -38,6 +38,53 @@
         .chart-controls button.active {
             background-color: #005500;
         }
+        .button-group {
+            display: flex;
+            gap: 5px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+        .button-group label {
+            margin-right: 10px;
+        }
+        .stock-search-container {
+            position: relative;
+            display: inline-block;
+            width: 300px;
+        }
+        .stock-search-input {
+            width: 100%;
+            background-color: #001100;
+            border: 1px solid #00ff00;
+            color: #00ff00;
+            padding: 8px;
+            font-family: 'Courier New', monospace;
+        }
+        .stock-search-dropdown {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background-color: #001100;
+            border: 1px solid #00ff00;
+            border-top: none;
+            max-height: 300px;
+            overflow-y: auto;
+            z-index: 1000;
+            display: none;
+        }
+        .stock-search-item {
+            padding: 8px;
+            cursor: pointer;
+            color: #00ff00;
+            border-bottom: 1px solid #003300;
+        }
+        .stock-search-item:hover {
+            background-color: #002200;
+        }
+        .stock-search-item.selected {
+            background-color: #003300;
+        }
         .main-chart-container {
             background-color: #000;
             border: 2px solid #00ff00;
@@ -146,31 +193,36 @@
 
 <!-- Stock Selection -->
 <div class="chart-controls">
-    <label for="stockSelect">Stock:</label>
-    <select id="stockSelect">
-        <option value="">Loading...</option>
-    </select>
+    <label for="stockSearchInput">Stock:</label>
+    <div class="stock-search-container">
+        <input type="text" id="stockSearchInput" class="stock-search-input" placeholder="Search by symbol or name..." autocomplete="off">
+        <div id="stockSearchDropdown" class="stock-search-dropdown"></div>
+    </div>
+</div>
+
+<div class="chart-controls">
+    <div class="button-group">
+        <label>Time Range:</label>
+        <button class="time-range-btn" data-days="7" onclick="setTimeRange(7)">7 Days</button>
+        <button class="time-range-btn active" data-days="30" onclick="setTimeRange(30)">30 Days</button>
+        <button class="time-range-btn" data-days="90" onclick="setTimeRange(90)">90 Days</button>
+        <button class="time-range-btn" data-days="180" onclick="setTimeRange(180)">6 Months</button>
+        <button class="time-range-btn" data-days="365" onclick="setTimeRange(365)">1 Year</button>
+        <button class="time-range-btn" data-days="730" onclick="setTimeRange(730)">2 Years</button>
+        <button class="time-range-btn" data-days="1825" onclick="setTimeRange(1825)">5 Years</button>
+        <button class="time-range-btn" data-days="18250" onclick="setTimeRange(18250)">All Time</button>
+    </div>
+</div>
+
+<div class="chart-controls">
+    <div class="button-group">
+        <label>Chart Type:</label>
+        <button class="chart-type-btn" data-type="line" onclick="setChartType('line')">Line</button>
+        <button class="chart-type-btn active" data-type="candlestick" onclick="setChartType('candlestick')">Candlestick</button>
+        <button class="chart-type-btn" data-type="area" onclick="setChartType('area')">Area</button>
+        <button class="chart-type-btn" data-type="bar" onclick="setChartType('bar')">Bar (OHLC)</button>
+    </div>
     
-    <label for="timeRangeSelect">Time Range:</label>
-    <select id="timeRangeSelect">
-        <option value="7">7 Days</option>
-        <option value="30" selected>30 Days</option>
-        <option value="90">90 Days</option>
-        <option value="180">6 Months</option>
-        <option value="365">1 Year</option>
-        <option value="730">2 Years</option>
-        <option value="1825">5 Years</option>
-    </select>
-    
-    <label for="chartTypeSelect">Chart Type:</label>
-    <select id="chartTypeSelect">
-        <option value="line">Line</option>
-        <option value="candlestick" selected>Candlestick</option>
-        <option value="area">Area</option>
-        <option value="bar">Bar (OHLC)</option>
-    </select>
-    
-    <button onclick="updateChart()" id="updateBtn">Update Chart</button>
     <button onclick="toggleAutoRefresh()" id="autoRefreshBtn">Auto-Refresh: OFF</button>
     <span class="auto-refresh-indicator" id="refreshIndicator"></span>
 </div>
@@ -310,10 +362,13 @@ let barSeries = null;
 let volumeSeries = null;
 let currentSymbol = '';
 let currentChartType = 'candlestick';
+let currentTimeRange = 30;
 let indicatorSeries = {};
 let indicatorCharts = {};
 let autoRefreshInterval = null;
 let marketEvents = [];
+let allStocks = [];
+let selectedStockIndex = -1;
 
 // Color scheme
 const colors = {
@@ -404,19 +459,45 @@ function createIndicatorChart(containerId, title, minValue = undefined, maxValue
     return indicatorChart;
 }
 
+// Set time range from buttons
+function setTimeRange(days) {
+    currentTimeRange = days;
+    
+    // Update button states
+    document.querySelectorAll('.time-range-btn').forEach(btn => {
+        btn.classList.remove('active');
+        if (parseInt(btn.dataset.days) === days) {
+            btn.classList.add('active');
+        }
+    });
+    
+    updateChart();
+}
+
+// Set chart type from buttons
+function setChartType(type) {
+    currentChartType = type;
+    
+    // Update button states
+    document.querySelectorAll('.chart-type-btn').forEach(btn => {
+        btn.classList.remove('active');
+        if (btn.dataset.type === type) {
+            btn.classList.add('active');
+        }
+    });
+    
+    updateChart();
+}
+
 // Load stocks list
 async function loadStocks() {
     try {
         const response = await fetch('/api/stocks');
-        const stocks = await response.json();
+        allStocks = await response.json();
         
-        const select = document.getElementById('stockSelect');
-        select.innerHTML = '<option value="">Select Stock</option>' + 
-            stocks.map(s => \`<option value="\${s.symbol}">\${s.symbol} - \${s.name}</option>\`).join('');
-        
-        if (stocks.length > 0) {
-            select.value = stocks[0].symbol;
-            currentSymbol = stocks[0].symbol;
+        if (allStocks.length > 0) {
+            currentSymbol = allStocks[0].symbol;
+            document.getElementById('stockSearchInput').value = allStocks[0].symbol + ' - ' + allStocks[0].name;
             updateChart();
         }
     } catch (error) {
@@ -424,11 +505,57 @@ async function loadStocks() {
     }
 }
 
+// Filter and display stock suggestions
+function filterStocks(query) {
+    if (!query) {
+        document.getElementById('stockSearchDropdown').style.display = 'none';
+        return;
+    }
+    
+    const lowerQuery = query.toLowerCase();
+    const filtered = allStocks.filter(s => 
+        s.symbol.toLowerCase().includes(lowerQuery) || 
+        s.name.toLowerCase().includes(lowerQuery)
+    );
+    
+    const dropdown = document.getElementById('stockSearchDropdown');
+    
+    if (filtered.length === 0) {
+        dropdown.style.display = 'none';
+        return;
+    }
+    
+    dropdown.innerHTML = filtered.slice(0, 20).map((stock, idx) => 
+        '<div class="stock-search-item" data-symbol="' + stock.symbol + '" data-index="' + idx + '">' +
+            '<strong>' + stock.symbol + '</strong> - ' + stock.name +
+        '</div>'
+    ).join('');
+    
+    dropdown.style.display = 'block';
+    selectedStockIndex = -1;
+    
+    // Add click handlers
+    dropdown.querySelectorAll('.stock-search-item').forEach(item => {
+        item.addEventListener('click', () => selectStock(item.dataset.symbol));
+    });
+}
+
+// Select a stock
+function selectStock(symbol) {
+    const stock = allStocks.find(s => s.symbol === symbol);
+    if (stock) {
+        currentSymbol = symbol;
+        document.getElementById('stockSearchInput').value = stock.symbol + ' - ' + stock.name;
+        document.getElementById('stockSearchDropdown').style.display = 'none';
+        updateChart();
+    }
+}
+
 // Update chart with current settings
 async function updateChart() {
-    const symbol = document.getElementById('stockSelect').value;
-    const days = document.getElementById('timeRangeSelect').value;
-    const chartType = document.getElementById('chartTypeSelect').value;
+    const symbol = currentSymbol;
+    const days = currentTimeRange;
+    const chartType = currentChartType;
     
     if (!symbol) return;
     
@@ -624,7 +751,7 @@ function updateStockInfo(data) {
 // Update indicators
 async function updateIndicators() {
     const symbol = currentSymbol;
-    const days = document.getElementById('timeRangeSelect').value;
+    const days = currentTimeRange;
     
     if (!symbol) return;
     
@@ -904,7 +1031,7 @@ function addOscillatorPanels(indicators) {
         indicatorCharts.volume = volChart;
         
         // Fetch OHLC data for volume
-        const days = document.getElementById('timeRangeSelect').value;
+        const days = currentTimeRange;
         fetch(\`/api/stocks/\${currentSymbol}/ohlc?days=\${days}\`)
             .then(res => res.json())
             .then(data => {
@@ -989,17 +1116,50 @@ function toggleAutoRefresh() {
 }
 
 // Event listeners
-document.getElementById('stockSelect').addEventListener('change', () => {
-    updateChart();
+const searchInput = document.getElementById('stockSearchInput');
+searchInput.addEventListener('input', (e) => {
+    filterStocks(e.target.value);
 });
 
-document.getElementById('timeRangeSelect').addEventListener('change', () => {
-    updateChart();
+searchInput.addEventListener('keydown', (e) => {
+    const dropdown = document.getElementById('stockSearchDropdown');
+    const items = dropdown.querySelectorAll('.stock-search-item');
+    
+    if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        selectedStockIndex = Math.min(selectedStockIndex + 1, items.length - 1);
+        updateSelection(items);
+    } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        selectedStockIndex = Math.max(selectedStockIndex - 1, -1);
+        updateSelection(items);
+    } else if (e.key === 'Enter') {
+        e.preventDefault();
+        if (selectedStockIndex >= 0 && items[selectedStockIndex]) {
+            selectStock(items[selectedStockIndex].dataset.symbol);
+        }
+    } else if (e.key === 'Escape') {
+        dropdown.style.display = 'none';
+    }
 });
 
-document.getElementById('chartTypeSelect').addEventListener('change', () => {
-    updateChart();
+// Close dropdown when clicking outside
+document.addEventListener('click', (e) => {
+    if (!e.target.closest('.stock-search-container')) {
+        document.getElementById('stockSearchDropdown').style.display = 'none';
+    }
 });
+
+function updateSelection(items) {
+    items.forEach((item, idx) => {
+        if (idx === selectedStockIndex) {
+            item.classList.add('selected');
+            item.scrollIntoView({ block: 'nearest' });
+        } else {
+            item.classList.remove('selected');
+        }
+    });
+}
 
 // Initialize
 initChart();
