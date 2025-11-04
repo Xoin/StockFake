@@ -252,10 +252,19 @@
                 <input type="checkbox" id="indSMA50" onchange="updateStockChart()"> SMA 50
             </label>
             <label style="color: #00ff00;">
+                <input type="checkbox" id="indSMA200" onchange="updateStockChart()"> SMA 200
+            </label>
+            <label style="color: #00ff00;">
                 <input type="checkbox" id="indEMA12" onchange="updateStockChart()"> EMA 12
             </label>
             <label style="color: #00ff00;">
+                <input type="checkbox" id="indEMA26" onchange="updateStockChart()"> EMA 26
+            </label>
+            <label style="color: #00ff00;">
                 <input type="checkbox" id="indBollinger" onchange="updateStockChart()"> Bollinger Bands
+            </label>
+            <label style="color: #00ff00;">
+                <input type="checkbox" id="indVWAP" onchange="updateStockChart()"> VWAP
             </label>
             <label style="color: #00ff00;">
                 <input type="checkbox" id="showEvents" checked onchange="updateStockChart()"> Market Events
@@ -279,14 +288,38 @@
         <canvas id="macdChart"></canvas>
     </div>
     
+    <div id="stochasticChartContainer" class="chart-container" style="display: none;">
+        <h2>Stochastic <button onclick="document.getElementById('stochasticChartContainer').style.display='none'; document.getElementById('indStochastic').checked=false;" style="float: right; padding: 5px;">✕</button></h2>
+        <canvas id="stochasticChart"></canvas>
+    </div>
+    
+    <div id="volumeChartContainer" class="chart-container" style="display: none;">
+        <h2>Volume <button onclick="document.getElementById('volumeChartContainer').style.display='none'; document.getElementById('indVolume').checked=false;" style="float: right; padding: 5px;">✕</button></h2>
+        <canvas id="volumeChart"></canvas>
+    </div>
+    
+    <div id="atrChartContainer" class="chart-container" style="display: none;">
+        <h2>ATR (14) <button onclick="document.getElementById('atrChartContainer').style.display='none'; document.getElementById('indATR').checked=false;" style="float: right; padding: 5px;">✕</button></h2>
+        <canvas id="atrChart"></canvas>
+    </div>
+    
     <!-- Additional Oscillator Controls -->
     <div id="oscillatorControls" style="display: none; background-color: #001100; border: 1px solid #00ff00; padding: 10px; margin: 10px 0;">
         <strong style="color: #00ff00;">Oscillators (separate panels):</strong><br>
         <label style="color: #00ff00; margin-right: 15px;">
             <input type="checkbox" id="indRSI" onchange="toggleOscillator('rsi')"> RSI
         </label>
-        <label style="color: #00ff00;">
+        <label style="color: #00ff00; margin-right: 15px;">
             <input type="checkbox" id="indMACD" onchange="toggleOscillator('macd')"> MACD
+        </label>
+        <label style="color: #00ff00; margin-right: 15px;">
+            <input type="checkbox" id="indStochastic" onchange="toggleOscillator('stochastic')"> Stochastic
+        </label>
+        <label style="color: #00ff00; margin-right: 15px;">
+            <input type="checkbox" id="indVolume" onchange="toggleOscillator('volume')"> Volume
+        </label>
+        <label style="color: #00ff00;">
+            <input type="checkbox" id="indATR" onchange="toggleOscillator('atr')"> ATR
         </label>
     </div>
 </div>
@@ -306,7 +339,10 @@ let charts = {
     indexFund: null,
     stock: null,
     rsi: null,
-    macd: null
+    macd: null,
+    stochastic: null,
+    volume: null,
+    atr: null
 };
 
 // Constants
@@ -1006,7 +1042,7 @@ async function updateStockChart() {
         }];
         
         // Fetch and add technical indicators if enabled
-        const indicators = ['sma', 'ema', 'bollinger'];
+        const indicators = ['sma', 'ema', 'bollinger', 'vwap'];
         const indicatorParams = indicators.join(',');
         
         const indResponse = await fetch(\`/api/stocks/\${symbol}/indicators?days=\${days}&indicators=\${indicatorParams}\`);
@@ -1040,12 +1076,54 @@ async function updateStockChart() {
             });
         }
         
+        // Add SMA 200
+        if (document.getElementById('indSMA200')?.checked && indData.sma200) {
+            datasets.push({
+                label: 'SMA 200',
+                data: indData.sma200,
+                borderColor: '#ff00ff',
+                backgroundColor: 'transparent',
+                borderWidth: 1,
+                pointRadius: 0,
+                fill: false,
+                order: 2
+            });
+        }
+        
         // Add EMA 12
         if (document.getElementById('indEMA12')?.checked && indData.ema12) {
             datasets.push({
                 label: 'EMA 12',
                 data: indData.ema12,
-                borderColor: '#ff00ff',
+                borderColor: '#00aaff',
+                backgroundColor: 'transparent',
+                borderWidth: 1,
+                pointRadius: 0,
+                fill: false,
+                order: 2
+            });
+        }
+        
+        // Add EMA 26
+        if (document.getElementById('indEMA26')?.checked && indData.ema26) {
+            datasets.push({
+                label: 'EMA 26',
+                data: indData.ema26,
+                borderColor: '#aa00ff',
+                backgroundColor: 'transparent',
+                borderWidth: 1,
+                pointRadius: 0,
+                fill: false,
+                order: 2
+            });
+        }
+        
+        // Add VWAP
+        if (document.getElementById('indVWAP')?.checked && indData.vwap) {
+            datasets.push({
+                label: 'VWAP',
+                data: indData.vwap,
+                borderColor: '#ffffff',
                 backgroundColor: 'transparent',
                 borderWidth: 1,
                 pointRadius: 0,
@@ -1302,6 +1380,205 @@ async function updateOscillators(symbol, days, indData) {
                         data: macdData.macdHistogram,
                         backgroundColor: macdData.macdHistogram.map(v => v >= 0 ? 'rgba(0, 255, 0, 0.5)' : 'rgba(255, 0, 0, 0.5)'),
                         order: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    plugins: {
+                        legend: {
+                            labels: {
+                                color: '#00ff00',
+                                font: { family: 'Courier New' }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            ticks: {
+                                color: '#00ff00',
+                                font: { family: 'Courier New' },
+                                maxTicksLimit: 10
+                            },
+                            grid: { color: '#003300' }
+                        },
+                        y: {
+                            ticks: {
+                                color: '#00ff00',
+                                font: { family: 'Courier New' }
+                            },
+                            grid: { color: '#003300' }
+                        }
+                    }
+                }
+            });
+        }
+    }
+    
+    // Update Stochastic chart if enabled
+    if (document.getElementById('indStochastic')?.checked) {
+        const stochResponse = await fetch(\`/api/stocks/\${symbol}/indicators?days=\${days}&indicators=stochastic\`);
+        const stochData = await stochResponse.json();
+        
+        if (stochData.stochasticK && charts.stochastic) {
+            charts.stochastic.destroy();
+        }
+        
+        if (stochData.stochasticK) {
+            const ctx = document.getElementById('stochasticChart').getContext('2d');
+            charts.stochastic = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: stochData.dates.map(d => new Date(d).toLocaleDateString()),
+                    datasets: [{
+                        label: '%K',
+                        data: stochData.stochasticK,
+                        borderColor: '#00ffff',
+                        backgroundColor: 'rgba(0, 255, 255, 0.1)',
+                        tension: 0.1,
+                        fill: false
+                    }, {
+                        label: '%D',
+                        data: stochData.stochasticD,
+                        borderColor: '#ff0000',
+                        backgroundColor: 'rgba(255, 0, 0, 0.1)',
+                        tension: 0.1,
+                        fill: false
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    plugins: {
+                        legend: {
+                            labels: {
+                                color: '#00ff00',
+                                font: { family: 'Courier New' }
+                            }
+                        },
+                        annotation: {
+                            annotations: {
+                                line1: {
+                                    type: 'line',
+                                    yMin: 80,
+                                    yMax: 80,
+                                    borderColor: '#ff0000',
+                                    borderWidth: 1,
+                                    borderDash: [5, 5]
+                                },
+                                line2: {
+                                    type: 'line',
+                                    yMin: 20,
+                                    yMax: 20,
+                                    borderColor: '#00ff00',
+                                    borderWidth: 1,
+                                    borderDash: [5, 5]
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            ticks: {
+                                color: '#00ff00',
+                                font: { family: 'Courier New' },
+                                maxTicksLimit: 10
+                            },
+                            grid: { color: '#003300' }
+                        },
+                        y: {
+                            min: 0,
+                            max: 100,
+                            ticks: {
+                                color: '#00ff00',
+                                font: { family: 'Courier New' }
+                            },
+                            grid: { color: '#003300' }
+                        }
+                    }
+                }
+            });
+        }
+    }
+    
+    // Update Volume chart if enabled
+    if (document.getElementById('indVolume')?.checked) {
+        const ohlcResponse = await fetch(\`/api/stocks/\${symbol}/ohlc?days=\${days}\`);
+        const ohlcData = await ohlcResponse.json();
+        
+        if (charts.volume) {
+            charts.volume.destroy();
+        }
+        
+        if (ohlcData && ohlcData.length > 0) {
+            const ctx = document.getElementById('volumeChart').getContext('2d');
+            charts.volume = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: ohlcData.map(d => new Date(d.date).toLocaleDateString()),
+                    datasets: [{
+                        label: 'Volume',
+                        data: ohlcData.map(d => d.volume),
+                        backgroundColor: ohlcData.map(d => d.close >= d.open ? 'rgba(0, 255, 0, 0.5)' : 'rgba(255, 0, 0, 0.5)'),
+                        borderColor: ohlcData.map(d => d.close >= d.open ? '#00ff00' : '#ff0000'),
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    plugins: {
+                        legend: {
+                            labels: {
+                                color: '#00ff00',
+                                font: { family: 'Courier New' }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            ticks: {
+                                color: '#00ff00',
+                                font: { family: 'Courier New' },
+                                maxTicksLimit: 10
+                            },
+                            grid: { color: '#003300' }
+                        },
+                        y: {
+                            ticks: {
+                                color: '#00ff00',
+                                font: { family: 'Courier New' }
+                            },
+                            grid: { color: '#003300' }
+                        }
+                    }
+                }
+            });
+        }
+    }
+    
+    // Update ATR chart if enabled
+    if (document.getElementById('indATR')?.checked) {
+        const atrResponse = await fetch(\`/api/stocks/\${symbol}/indicators?days=\${days}&indicators=atr\`);
+        const atrData = await atrResponse.json();
+        
+        if (atrData.atr && charts.atr) {
+            charts.atr.destroy();
+        }
+        
+        if (atrData.atr) {
+            const ctx = document.getElementById('atrChart').getContext('2d');
+            charts.atr = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: atrData.dates.map(d => new Date(d).toLocaleDateString()),
+                    datasets: [{
+                        label: 'ATR',
+                        data: atrData.atr,
+                        borderColor: '#ffff00',
+                        backgroundColor: 'rgba(255, 255, 0, 0.1)',
+                        tension: 0.1,
+                        fill: true
                     }]
                 },
                 options: {
