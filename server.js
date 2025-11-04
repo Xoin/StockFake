@@ -26,6 +26,7 @@ const cryptoData = require('./data/cryptocurrencies');
 
 // Load helper modules
 const pauseHandler = require('./helpers/pauseHandler');
+const tickHandler = require('./helpers/tickHandler');
 const indexFundRebalancing = require('./helpers/indexFundRebalancing');
 const stockSplits = require('./helpers/stockSplits');
 const constants = require('./helpers/constants');
@@ -71,6 +72,15 @@ let timeMultiplier = savedGameState ? savedGameState.time_multiplier : 3600;
 
 // Initialize centralized pause handler with loaded state
 pauseHandler.setIsPaused(isPaused);
+
+// Initialize centralized tick handler
+tickHandler.initialize(gameTime, timeMultiplier, isMarketOpen);
+tickHandler.setProcessPendingOrdersCallback(processPendingOrders);
+
+// Keep server gameTime in sync with tick handler
+tickHandler.setOnTimeAdvancedCallback((oldTime, newTime) => {
+  gameTime = newTime;
+});
 
 // Log loaded state
 console.log(`Loaded game state from database:`);
@@ -147,11 +157,11 @@ function isMarketOpen(date) {
   return currentMinutes >= openMinutes && currentMinutes < closeMinutes;
 }
 
-// Track last market state to detect transitions
-let wasMarketOpen = isMarketOpen(gameTime);
-
 // Process pending orders when market opens
 function processPendingOrders() {
+  // Get current game time from tick handler
+  const currentGameTime = tickHandler.getGameTime();
+  
   const pendingOrders = dbModule.getPendingOrders.all('pending');
   
   if (pendingOrders.length === 0) return;
@@ -165,7 +175,7 @@ function processPendingOrders() {
       let errorMessage = null;
       
       if (order.order_type === 'stock') {
-        const stockPrice = stocks.getStockPrice(order.symbol, gameTime, timeMultiplier, isPaused);
+        const stockPrice = stocks.getStockPrice(order.symbol, currentGameTime, timeMultiplier, isPaused);
         if (!stockPrice) {
           errorMessage = 'Stock not found or not available';
         } else {
@@ -181,7 +191,7 @@ function processPendingOrders() {
         if (!fund) {
           errorMessage = 'Index fund not found';
         } else {
-          const fundPrice = indexFunds.calculateIndexPrice(fund, gameTime, timeMultiplier, isPaused);
+          const fundPrice = indexFunds.calculateIndexPrice(fund, currentGameTime, timeMultiplier, isPaused);
           if (!fundPrice) {
             errorMessage = 'Unable to calculate fund price';
           } else {
@@ -197,7 +207,7 @@ function processPendingOrders() {
       if (success) {
         dbModule.updatePendingOrderStatus.run(
           'executed',
-          gameTime.toISOString(),
+          currentGameTime.toISOString(),
           executionPrice,
           null,
           order.id
@@ -206,7 +216,7 @@ function processPendingOrders() {
       } else {
         dbModule.updatePendingOrderStatus.run(
           'failed',
-          gameTime.toISOString(),
+          currentGameTime.toISOString(),
           null,
           errorMessage,
           order.id
@@ -217,7 +227,7 @@ function processPendingOrders() {
       console.error(`Error processing pending order #${order.id}:`, error);
       dbModule.updatePendingOrderStatus.run(
         'failed',
-        gameTime.toISOString(),
+        currentGameTime.toISOString(),
         null,
         error.message,
         order.id
@@ -226,50 +236,8 @@ function processPendingOrders() {
   }
 }
 
-// Time simulation
-setInterval(() => {
-  if (!isPaused) {
-    const oldTime = new Date(gameTime.getTime());
-    const newTime = new Date(gameTime.getTime() + (timeMultiplier * 1000));
-    
-    // If market is currently closed and we're using fast speed (1s = 1day)
-    // Check if we would skip over market open hours
-    if (!isMarketOpen(gameTime) && timeMultiplier >= 86400) {
-      // Advance time in smaller increments to avoid skipping market hours
-      let checkTime = new Date(gameTime.getTime());
-      const increment = 3600 * 1000; // 1 hour increments
-      const maxAdvance = timeMultiplier * 1000;
-      let totalAdvanced = 0;
-      
-      while (totalAdvanced < maxAdvance && !isMarketOpen(checkTime)) {
-        checkTime = new Date(checkTime.getTime() + increment);
-        totalAdvanced += increment;
-        
-        // Stop if we hit market open time
-        if (isMarketOpen(checkTime)) {
-          gameTime = checkTime;
-          return;
-        }
-      }
-      
-      // If we still haven't found market open, use the calculated time
-      if (totalAdvanced >= maxAdvance) {
-        gameTime = newTime;
-      }
-      return;
-    }
-    
-    gameTime = newTime;
-    
-    // Check if market just opened (transition from closed to open)
-    const isMarketCurrentlyOpen = isMarketOpen(gameTime);
-    if (!wasMarketOpen && isMarketCurrentlyOpen) {
-      console.log(`Market just opened at ${gameTime.toISOString()}. Processing pending orders...`);
-      processPendingOrders();
-    }
-    wasMarketOpen = isMarketCurrentlyOpen;
-  }
-}, 1000);
+// Start centralized tick handler
+tickHandler.start(1000); // Tick every 1 second
 
 // API Routes
 app.get('/api/time', (req, res) => {
@@ -296,6 +264,7 @@ app.post('/api/time/speed', (req, res) => {
   // Allow up to 2592000 (30 days) for monthly speed
   if (multiplier && typeof multiplier === 'number' && multiplier > 0 && multiplier <= 2592000) {
     timeMultiplier = multiplier;
+    tickHandler.setTimeMultiplier(multiplier); // Update centralized tick handler
     saveGameState(); // Save state when speed changes
   }
   res.json({ timeMultiplier });
@@ -4809,8 +4778,7 @@ app.post('/api/debug/settime', (req, res) => {
   
   try {
     gameTime = new Date(time);
-    // Update market state tracker to prevent false transitions
-    wasMarketOpen = isMarketOpen(gameTime);
+    tickHandler.setGameTime(gameTime); // Update tick handler
     saveGameState(); // Save state after time change
     res.json({ success: true, newTime: gameTime });
   } catch (error) {
@@ -4839,8 +4807,7 @@ app.post('/api/debug/skiptime', (req, res) => {
   }
   
   gameTime = new Date(gameTime.getTime() + (amount * multipliers[unit]));
-  // Update market state tracker to prevent false transitions
-  wasMarketOpen = isMarketOpen(gameTime);
+  tickHandler.setGameTime(gameTime); // Update tick handler
   saveGameState(); // Save state after time skip
   res.json({ success: true, newTime: gameTime });
 });
