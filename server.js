@@ -649,7 +649,7 @@ app.get('/api/stocks/:symbol/indicators', (req, res) => {
 
 // Market events API for chart annotations
 app.get('/api/market/events', (req, res) => {
-  const { days, symbol } = req.query;
+  const { days } = req.query;
   const daysToFetch = parseInt(days) || 365;
   
   const startDate = new Date(gameTime.getTime() - (daysToFetch * 24 * 60 * 60 * 1000));
@@ -676,29 +676,8 @@ app.get('/api/market/events', (req, res) => {
     });
   });
   
-  // Get corporate events if symbol specified
-  if (symbol) {
-    try {
-      const corpEvents = corporateEvents.getEventsForSymbol(symbol, startDate, endDate);
-      if (corpEvents && corpEvents.length > 0) {
-        corpEvents.forEach(event => {
-          events.push({
-            date: event.date,
-            type: event.type,
-            title: event.type === 'merger' ? `Merger: ${event.acquirer}` : 
-                   event.type === 'bankruptcy' ? 'Bankruptcy' :
-                   event.type === 'ipo' ? 'IPO' :
-                   event.type === 'split' ? `Stock Split ${event.ratio}` : event.type,
-            description: event.description || '',
-            impact: event.type === 'bankruptcy' ? 'negative' : 
-                    event.type === 'ipo' ? 'positive' : 'neutral'
-          });
-        });
-      }
-    } catch (err) {
-      console.error('Error getting corporate events:', err);
-    }
-  }
+  // Note: Corporate events (IPOs, mergers, etc.) could be added here in the future
+  // when a getEventsForSymbol method is available in the corporateEvents module
   
   // Sort by date
   events.sort((a, b) => new Date(a.date) - new Date(b.date));
