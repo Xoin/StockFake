@@ -423,6 +423,19 @@ function getStockPrice(symbol, currentTime, timeMultiplier, isPaused, bypassCach
         prevFinalPrice = crashSimModule.calculateStockPriceImpact(symbol, sector, prevBasePrice, previousDay);
       }
       
+      // Safety cap: Prevent unrealistic daily price movements (>20% in normal conditions)
+      // This is a final safeguard to ensure game balance
+      const MAX_DAILY_CHANGE = 0.20; // ±20%
+      const minAllowedPrice = prevFinalPrice * (1 - MAX_DAILY_CHANGE);
+      const maxAllowedPrice = prevFinalPrice * (1 + MAX_DAILY_CHANGE);
+      
+      // Only apply cap if crash simulation is not active
+      // During crashes, allow larger movements for realism
+      const hasCrash = crashSimModule && crashSimModule.hasActiveEvents && crashSimModule.hasActiveEvents();
+      if (!hasCrash) {
+        finalPrice = Math.max(minAllowedPrice, Math.min(maxAllowedPrice, finalPrice));
+      }
+      
       // Calculate percentage change
       change = ((finalPrice - prevFinalPrice) / prevFinalPrice) * 100;
     }
