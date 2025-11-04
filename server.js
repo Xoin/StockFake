@@ -70,6 +70,29 @@ let gameTime = savedGameState ? new Date(savedGameState.game_time) : new Date('1
 let isPaused = savedGameState ? Boolean(savedGameState.is_paused) : true;
 let timeMultiplier = savedGameState ? savedGameState.time_multiplier : 3600;
 
+// Stock market hours (NYSE)
+const MARKET_OPEN_HOUR = 9;
+const MARKET_OPEN_MINUTE = 30;
+const MARKET_CLOSE_HOUR = 16;
+const MARKET_CLOSE_MINUTE = 0;
+
+// Check if market is open
+function isMarketOpen(date) {
+  const day = date.getDay();
+  const hours = date.getHours();
+  const minutes = date.getMinutes();
+  
+  // Weekend check
+  if (day === 0 || day === 6) return false;
+  
+  // Time check
+  const currentMinutes = hours * 60 + minutes;
+  const openMinutes = MARKET_OPEN_HOUR * 60 + MARKET_OPEN_MINUTE;
+  const closeMinutes = MARKET_CLOSE_HOUR * 60 + MARKET_CLOSE_MINUTE;
+  
+  return currentMinutes >= openMinutes && currentMinutes < closeMinutes;
+}
+
 // Initialize centralized pause handler with loaded state
 pauseHandler.setIsPaused(isPaused);
 
@@ -133,29 +156,6 @@ process.on('SIGTERM', () => {
   saveGameState();
   process.exit(0);
 });
-
-// Stock market hours (NYSE)
-const MARKET_OPEN_HOUR = 9;
-const MARKET_OPEN_MINUTE = 30;
-const MARKET_CLOSE_HOUR = 16;
-const MARKET_CLOSE_MINUTE = 0;
-
-// Check if market is open
-function isMarketOpen(date) {
-  const day = date.getDay();
-  const hours = date.getHours();
-  const minutes = date.getMinutes();
-  
-  // Weekend check
-  if (day === 0 || day === 6) return false;
-  
-  // Time check
-  const currentMinutes = hours * 60 + minutes;
-  const openMinutes = MARKET_OPEN_HOUR * 60 + MARKET_OPEN_MINUTE;
-  const closeMinutes = MARKET_CLOSE_HOUR * 60 + MARKET_CLOSE_MINUTE;
-  
-  return currentMinutes >= openMinutes && currentMinutes < closeMinutes;
-}
 
 // Process pending orders when market opens
 function processPendingOrders() {
