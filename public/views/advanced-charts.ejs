@@ -38,6 +38,15 @@
         .chart-controls button.active {
             background-color: #005500;
         }
+        .button-group {
+            display: flex;
+            gap: 5px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+        .button-group label {
+            margin-right: 10px;
+        }
         .main-chart-container {
             background-color: #000;
             border: 2px solid #00ff00;
@@ -150,28 +159,31 @@
     <select id="stockSelect">
         <option value="">Loading...</option>
     </select>
+</div>
+
+<div class="chart-controls">
+    <div class="button-group">
+        <label>Time Range:</label>
+        <button class="time-range-btn" data-days="7" onclick="setTimeRange(7)">7 Days</button>
+        <button class="time-range-btn active" data-days="30" onclick="setTimeRange(30)">30 Days</button>
+        <button class="time-range-btn" data-days="90" onclick="setTimeRange(90)">90 Days</button>
+        <button class="time-range-btn" data-days="180" onclick="setTimeRange(180)">6 Months</button>
+        <button class="time-range-btn" data-days="365" onclick="setTimeRange(365)">1 Year</button>
+        <button class="time-range-btn" data-days="730" onclick="setTimeRange(730)">2 Years</button>
+        <button class="time-range-btn" data-days="1825" onclick="setTimeRange(1825)">5 Years</button>
+        <button class="time-range-btn" data-days="18250" onclick="setTimeRange(18250)">All Time</button>
+    </div>
+</div>
+
+<div class="chart-controls">
+    <div class="button-group">
+        <label>Chart Type:</label>
+        <button class="chart-type-btn" data-type="line" onclick="setChartType('line')">Line</button>
+        <button class="chart-type-btn active" data-type="candlestick" onclick="setChartType('candlestick')">Candlestick</button>
+        <button class="chart-type-btn" data-type="area" onclick="setChartType('area')">Area</button>
+        <button class="chart-type-btn" data-type="bar" onclick="setChartType('bar')">Bar (OHLC)</button>
+    </div>
     
-    <label for="timeRangeSelect">Time Range:</label>
-    <select id="timeRangeSelect">
-        <option value="7">7 Days</option>
-        <option value="30" selected>30 Days</option>
-        <option value="90">90 Days</option>
-        <option value="180">6 Months</option>
-        <option value="365">1 Year</option>
-        <option value="730">2 Years</option>
-        <option value="1825">5 Years</option>
-        <option value="18250">All Time</option>
-    </select>
-    
-    <label for="chartTypeSelect">Chart Type:</label>
-    <select id="chartTypeSelect">
-        <option value="line">Line</option>
-        <option value="candlestick" selected>Candlestick</option>
-        <option value="area">Area</option>
-        <option value="bar">Bar (OHLC)</option>
-    </select>
-    
-    <button onclick="updateChart()" id="updateBtn">Update Chart</button>
     <button onclick="toggleAutoRefresh()" id="autoRefreshBtn">Auto-Refresh: OFF</button>
     <span class="auto-refresh-indicator" id="refreshIndicator"></span>
 </div>
@@ -311,6 +323,7 @@ let barSeries = null;
 let volumeSeries = null;
 let currentSymbol = '';
 let currentChartType = 'candlestick';
+let currentTimeRange = 30;
 let indicatorSeries = {};
 let indicatorCharts = {};
 let autoRefreshInterval = null;
@@ -405,6 +418,36 @@ function createIndicatorChart(containerId, title, minValue = undefined, maxValue
     return indicatorChart;
 }
 
+// Set time range from buttons
+function setTimeRange(days) {
+    currentTimeRange = days;
+    
+    // Update button states
+    document.querySelectorAll('.time-range-btn').forEach(btn => {
+        btn.classList.remove('active');
+        if (parseInt(btn.dataset.days) === days) {
+            btn.classList.add('active');
+        }
+    });
+    
+    updateChart();
+}
+
+// Set chart type from buttons
+function setChartType(type) {
+    currentChartType = type;
+    
+    // Update button states
+    document.querySelectorAll('.chart-type-btn').forEach(btn => {
+        btn.classList.remove('active');
+        if (btn.dataset.type === type) {
+            btn.classList.add('active');
+        }
+    });
+    
+    updateChart();
+}
+
 // Load stocks list
 async function loadStocks() {
     try {
@@ -428,8 +471,8 @@ async function loadStocks() {
 // Update chart with current settings
 async function updateChart() {
     const symbol = document.getElementById('stockSelect').value;
-    const days = document.getElementById('timeRangeSelect').value;
-    const chartType = document.getElementById('chartTypeSelect').value;
+    const days = currentTimeRange;
+    const chartType = currentChartType;
     
     if (!symbol) return;
     
@@ -625,7 +668,7 @@ function updateStockInfo(data) {
 // Update indicators
 async function updateIndicators() {
     const symbol = currentSymbol;
-    const days = document.getElementById('timeRangeSelect').value;
+    const days = currentTimeRange;
     
     if (!symbol) return;
     
@@ -905,7 +948,7 @@ function addOscillatorPanels(indicators) {
         indicatorCharts.volume = volChart;
         
         // Fetch OHLC data for volume
-        const days = document.getElementById('timeRangeSelect').value;
+        const days = currentTimeRange;
         fetch(\`/api/stocks/\${currentSymbol}/ohlc?days=\${days}\`)
             .then(res => res.json())
             .then(data => {
@@ -991,14 +1034,6 @@ function toggleAutoRefresh() {
 
 // Event listeners
 document.getElementById('stockSelect').addEventListener('change', () => {
-    updateChart();
-});
-
-document.getElementById('timeRangeSelect').addEventListener('change', () => {
-    updateChart();
-});
-
-document.getElementById('chartTypeSelect').addEventListener('change', () => {
     updateChart();
 });
 
