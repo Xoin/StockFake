@@ -1,10 +1,18 @@
 /**
  * Market Crash Simulation Engine
  * Handles the execution and impact calculation of market crash events
+ * 
+ * Enhanced with research-based models:
+ * - GARCH(1,1) volatility modeling
+ * - Fat-tailed return distributions
+ * - Stock correlations
+ * - Early warning system
  */
 
 const crashEvents = require('../data/market-crash-events');
 const dynamicEventGenerator = require('./dynamicEventGenerator');
+const { GARCHModel, generateStudentT } = require('./volatilityModeling');
+const { CorrelationMatrix } = require('./correlationMatrix');
 
 /**
  * Active crash events state
@@ -21,6 +29,17 @@ let marketState = {
   sentimentScore: 0.0,  // -1.0 (extreme fear) to 1.0 (extreme greed)
   sectorSentiment: {}
 };
+
+/**
+ * GARCH volatility models for each stock
+ * Map: symbol -> GARCHModel instance
+ */
+const stockVolatilityModels = new Map();
+
+/**
+ * Correlation matrix manager
+ */
+const correlationMatrix = new CorrelationMatrix();
 
 // Decay constants for market state recovery
 const VOLATILITY_DECAY_RATE = 0.99;  // 1% daily decay when no events active
@@ -185,7 +204,32 @@ function calculateCascadingEffect(event, daysSinceStart) {
 }
 
 /**
+ * Initialize GARCH volatility model for a stock
+ * @param {string} symbol - Stock symbol
+ * @returns {GARCHModel} - Initialized GARCH model
+ */
+function initializeStockVolatility(symbol) {
+  const garchModel = new GARCHModel();
+  stockVolatilityModels.set(symbol, garchModel);
+  return garchModel;
+}
+
+/**
+ * Get or create GARCH model for stock
+ * @param {string} symbol - Stock symbol
+ * @returns {GARCHModel}
+ */
+function getStockVolatilityModel(symbol) {
+  if (!stockVolatilityModels.has(symbol)) {
+    return initializeStockVolatility(symbol);
+  }
+  return stockVolatilityModels.get(symbol);
+}
+
+/**
  * Calculate price impact for a specific stock
+ * Enhanced with GARCH volatility and fat-tailed distributions
+ * 
  * @param {string} symbol - Stock symbol
  * @param {string} sector - Stock sector
  * @param {number} basePrice - Original stock price
@@ -193,13 +237,13 @@ function calculateCascadingEffect(event, daysSinceStart) {
  * @returns {number} - Adjusted price with crash impact
  */
 function calculateStockPriceImpact(symbol, sector, basePrice, currentTime) {
-  if (activeEvents.length === 0) {
-    return basePrice;
-  }
+  // Get GARCH model for this stock
+  const garchModel = getStockVolatilityModel(symbol);
   
   let totalImpact = 0;
   let volatilityFactor = 1.0;
   
+  // Calculate crash impact from active events
   for (const event of activeEvents) {
     if (event.status !== 'active') continue;
     
@@ -265,15 +309,30 @@ function calculateStockPriceImpact(symbol, sector, basePrice, currentTime) {
     volatilityFactor *= event.impact.volatilityMultiplier;
   }
   
-  // Apply total impact to price
-  let adjustedPrice = basePrice * (1 + totalImpact);
+  // Generate stochastic return component
+  // Only add significant volatility if crash is active or for normal daily movements
+  let volatilityReturn = 0;
   
-  // Add volatility-based random fluctuation
-  if (volatilityFactor > 1.0) {
-    const volatilityRange = 0.02 * (volatilityFactor - 1.0);  // 2% base range per volatility unit
-    const randomFactor = 1 + (Math.random() - 0.5) * 2 * volatilityRange;
-    adjustedPrice *= randomFactor;
+  if (activeEvents.length > 0 && volatilityFactor > 1.0) {
+    // During crash: apply volatility shock and generate larger returns
+    garchModel.applyVolatilityShock(volatilityFactor);
+    volatilityReturn = garchModel.generateReturn(5, 0);
+  } else {
+    // Normal times: use moderate drift and volatility (daily scale)
+    // Typical daily drift ~0.0003 (about 8% annualized)
+    // Typical daily vol ~0.01 (about 15% annualized)
+    const dailyDrift = 0.0003;
+    volatilityReturn = garchModel.generateReturn(5, dailyDrift);
   }
+  
+  // Combine crash impact with stochastic volatility
+  const totalReturn = totalImpact + volatilityReturn;
+  
+  // Update GARCH model with realized return
+  garchModel.updateVolatility(totalReturn);
+  
+  // Apply to price
+  let adjustedPrice = basePrice * (1 + totalReturn);
   
   return Math.max(0.01, adjustedPrice);  // Ensure price doesn't go negative or zero
 }
@@ -474,10 +533,16 @@ module.exports = {
   // Condition checking
   checkTriggerConditions,
   
+  // New: Advanced volatility features
+  getStockVolatilityModel,
+  initializeStockVolatility,
+  getCorrelationMatrix: () => correlationMatrix,
+  
   // Test utilities
   resetForTesting: () => {
     activeEvents = [];
     eventHistory = [];
+    stockVolatilityModels.clear();
     initializeMarketState();
   }
 };
