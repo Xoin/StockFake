@@ -125,6 +125,44 @@
             background-color: #003300;
             border-color: #00ff00;
         }
+        .stock-search-container {
+            position: relative;
+            display: inline-block;
+            width: 300px;
+        }
+        .stock-search-input {
+            width: 100%;
+            background-color: #001100;
+            border: 1px solid #00ff00;
+            color: #00ff00;
+            padding: 8px;
+            font-family: 'Courier New', monospace;
+        }
+        .stock-search-dropdown {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background-color: #001100;
+            border: 1px solid #00ff00;
+            border-top: none;
+            max-height: 300px;
+            overflow-y: auto;
+            z-index: 1000;
+            display: none;
+        }
+        .stock-search-item {
+            padding: 8px;
+            cursor: pointer;
+            color: #00ff00;
+            border-bottom: 1px solid #003300;
+        }
+        .stock-search-item:hover {
+            background-color: #002200;
+        }
+        .stock-search-item.selected {
+            background-color: #003300;
+        }
     `
 }) %>
 
@@ -233,10 +271,11 @@
 <!-- Stocks Tab -->
 <div id="tab-stocks" class="tab-content">
     <div class="controls">
-        <label for="stockSelect">Select Stock:</label>
-        <select id="stockSelect">
-            <option value="">Loading...</option>
-        </select>
+        <label for="stockSearchInput">Select Stock:</label>
+        <div class="stock-search-container">
+            <input type="text" id="stockSearchInput" class="stock-search-input" placeholder="Search by symbol or name..." autocomplete="off">
+            <div id="stockSearchDropdown" class="stock-search-dropdown"></div>
+        </div>
         
         <button onclick="toggleIndicators()" style="margin-left: 15px;">Toggle Indicators</button>
         <button onclick="toggleAutoRefresh()" id="autoRefreshBtn" style="margin-left: 15px;">Auto-Refresh: OFF</button>
@@ -352,6 +391,9 @@ const MAX_INDEX_FUNDS_DISPLAY = 10;
 let currentTab = 'overview';
 let selectedSectors = [];
 let allSectors = [];
+let allStocks = [];
+let selectedStockIndex = -1;
+let currentStockSymbol = '';
 
 // Color palette for multiple series
 const colorPalette = [
@@ -431,18 +473,74 @@ async function loadMarketStats() {
 async function loadStocks() {
     try {
         const response = await fetch('/api/stocks');
-        const stocks = await response.json();
+        allStocks = await response.json();
         
-        const select = document.getElementById('stockSelect');
-        select.innerHTML = '<option value="">Select Stock</option>' + 
-            stocks.map(s => \`<option value="\${s.symbol}">\${s.symbol} - \${s.name}</option>\`).join('');
-        
-        if (stocks.length > 0) {
-            select.value = stocks[0].symbol;
+        if (allStocks.length > 0) {
+            currentStockSymbol = allStocks[0].symbol;
+            document.getElementById('stockSearchInput').value = `${allStocks[0].symbol} - ${allStocks[0].name}`;
         }
     } catch (error) {
         console.error('Failed to load stocks:', error);
     }
+}
+
+// Filter and display stock suggestions
+function filterStocks(query) {
+    if (!query) {
+        document.getElementById('stockSearchDropdown').style.display = 'none';
+        return;
+    }
+    
+    const lowerQuery = query.toLowerCase();
+    const filtered = allStocks.filter(s => 
+        s.symbol.toLowerCase().includes(lowerQuery) || 
+        s.name.toLowerCase().includes(lowerQuery)
+    );
+    
+    const dropdown = document.getElementById('stockSearchDropdown');
+    
+    if (filtered.length === 0) {
+        dropdown.style.display = 'none';
+        return;
+    }
+    
+    dropdown.innerHTML = filtered.slice(0, 20).map((stock, idx) => 
+        `<div class="stock-search-item" data-symbol="${stock.symbol}" data-index="${idx}">
+            <strong>${stock.symbol}</strong> - ${stock.name}
+        </div>`
+    ).join('');
+    
+    dropdown.style.display = 'block';
+    selectedStockIndex = -1;
+    
+    // Add click handlers
+    dropdown.querySelectorAll('.stock-search-item').forEach(item => {
+        item.addEventListener('click', () => selectStock(item.dataset.symbol));
+    });
+}
+
+// Select a stock
+function selectStock(symbol) {
+    const stock = allStocks.find(s => s.symbol === symbol);
+    if (stock) {
+        currentStockSymbol = symbol;
+        document.getElementById('stockSearchInput').value = `${stock.symbol} - ${stock.name}`;
+        document.getElementById('stockSearchDropdown').style.display = 'none';
+        if (currentTab === 'stocks') {
+            updateStockChart();
+        }
+    }
+}
+
+function updateStockSelection(items) {
+    items.forEach((item, idx) => {
+        if (idx === selectedStockIndex) {
+            item.classList.add('selected');
+            item.scrollIntoView({ block: 'nearest' });
+        } else {
+            item.classList.remove('selected');
+        }
+    });
 }
 
 // Update market index chart
@@ -1009,7 +1107,7 @@ async function updateIndexFundChart() {
 // Update stock chart
 async function updateStockChart() {
     const days = document.getElementById('daysSelect').value;
-    const symbol = document.getElementById('stockSelect').value;
+    const symbol = currentStockSymbol;
     
     if (!symbol) return;
     
@@ -1702,10 +1800,38 @@ setInterval(() => {
     loadMarketStats();
 }, 10000);
 
-// Listen for stock selection change
-document.getElementById('stockSelect').addEventListener('change', () => {
-    if (currentTab === 'stocks') {
-        updateStockChart();
+// Listen for stock search input
+const stockSearchInput = document.getElementById('stockSearchInput');
+stockSearchInput.addEventListener('input', (e) => {
+    filterStocks(e.target.value);
+});
+
+stockSearchInput.addEventListener('keydown', (e) => {
+    const dropdown = document.getElementById('stockSearchDropdown');
+    const items = dropdown.querySelectorAll('.stock-search-item');
+    
+    if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        selectedStockIndex = Math.min(selectedStockIndex + 1, items.length - 1);
+        updateStockSelection(items);
+    } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        selectedStockIndex = Math.max(selectedStockIndex - 1, -1);
+        updateStockSelection(items);
+    } else if (e.key === 'Enter') {
+        e.preventDefault();
+        if (selectedStockIndex >= 0 && items[selectedStockIndex]) {
+            selectStock(items[selectedStockIndex].dataset.symbol);
+        }
+    } else if (e.key === 'Escape') {
+        dropdown.style.display = 'none';
+    }
+});
+
+// Close dropdown when clicking outside
+document.addEventListener('click', (e) => {
+    if (!e.target.closest('.stock-search-container')) {
+        document.getElementById('stockSearchDropdown').style.display = 'none';
     }
 });
     </script>
