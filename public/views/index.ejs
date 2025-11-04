@@ -263,7 +263,7 @@
             </a>
             <a href="/events" class="portal-link">
                 <h2>⚡ Market Events</h2>
-                <p>Crashes • Corporate actions • Economic data</p>
+                <p>Historical events • Crashes • Recessions • Booms</p>
             </a>
             <a href="/news" class="portal-link" id="newsLink">
                 <h2>📰 News</h2>
@@ -301,8 +301,8 @@
             const data = await response.json();
             
             document.getElementById('cashBalance').textContent = '$' + data.cash.toFixed(2);
-            document.getElementById('portfolioValue').textContent = '$' + data.portfolioValue.toFixed(2);
-            document.getElementById('netWorth').textContent = '$' + (data.cash + data.portfolioValue).toFixed(2);
+            document.getElementById('portfolioValue').textContent = '$' + data.portfolioMetrics.portfolioValue.toFixed(2);
+            document.getElementById('netWorth').textContent = '$' + (data.cash + data.portfolioMetrics.portfolioValue).toFixed(2);
             document.getElementById('creditScore').textContent = data.creditScore;
         } catch (error) {
             console.error('Error loading account overview:', error);
