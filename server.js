@@ -1161,7 +1161,6 @@ function checkIndexFundRebalancing() {
     console.log(`Rebalanced ${results.length} index fund(s)`);
     for (const result of results) {
       console.log(`  - ${result.fundName}: ${result.changes.adjusted.length} constituents adjusted, ${result.changes.added.length} added, ${result.changes.removed.length} removed`);
-      }
     }
   }
 }
