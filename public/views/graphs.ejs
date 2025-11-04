@@ -477,7 +477,7 @@ async function loadStocks() {
         
         if (allStocks.length > 0) {
             currentStockSymbol = allStocks[0].symbol;
-            document.getElementById('stockSearchInput').value = `${allStocks[0].symbol} - ${allStocks[0].name}`;
+            document.getElementById('stockSearchInput').value = allStocks[0].symbol + ' - ' + allStocks[0].name;
         }
     } catch (error) {
         console.error('Failed to load stocks:', error);
@@ -505,9 +505,9 @@ function filterStocks(query) {
     }
     
     dropdown.innerHTML = filtered.slice(0, 20).map((stock, idx) => 
-        `<div class="stock-search-item" data-symbol="${stock.symbol}" data-index="${idx}">
-            <strong>${stock.symbol}</strong> - ${stock.name}
-        </div>`
+        '<div class="stock-search-item" data-symbol="' + stock.symbol + '" data-index="' + idx + '">' +
+            '<strong>' + stock.symbol + '</strong> - ' + stock.name +
+        '</div>'
     ).join('');
     
     dropdown.style.display = 'block';
@@ -524,7 +524,7 @@ function selectStock(symbol) {
     const stock = allStocks.find(s => s.symbol === symbol);
     if (stock) {
         currentStockSymbol = symbol;
-        document.getElementById('stockSearchInput').value = `${stock.symbol} - ${stock.name}`;
+        document.getElementById('stockSearchInput').value = stock.symbol + ' - ' + stock.name;
         document.getElementById('stockSearchDropdown').style.display = 'none';
         if (currentTab === 'stocks') {
             updateStockChart();
