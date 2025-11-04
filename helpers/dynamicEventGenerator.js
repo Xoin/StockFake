@@ -1,9 +1,12 @@
 /**
  * Dynamic Event Generator
  * Automatically generates market crash events for dates beyond historical data
+ * 
+ * Enhanced with early warning system for intelligent crash timing
  */
 
 const crashEvents = require('../data/market-crash-events');
+const { EarlyWarningSystem } = require('./earlyWarningSystem');
 
 /**
  * Configuration for dynamic event generation
@@ -40,6 +43,11 @@ const DYNAMIC_EVENT_CONFIG = {
 let lastEventCheck = null;
 let lastEventDate = null;
 let generatedEvents = [];
+
+/**
+ * Early warning system instance
+ */
+const earlyWarning = new EarlyWarningSystem();
 
 /**
  * Seeded random number generator for deterministic event generation
@@ -312,8 +320,13 @@ function shouldGenerateEvent(currentTime, lastCheck, eventType, probabilityPerYe
 
 /**
  * Generate dynamic events for the current time period
+ * Enhanced with early warning system for intelligent crash timing
+ * 
+ * @param {Date} currentTime - Current game time
+ * @param {Object} marketData - Optional market data for early warning analysis
+ * @returns {Array} Array of generated events
  */
-function generateDynamicEvents(currentTime) {
+function generateDynamicEvents(currentTime, marketData = null) {
   // Only generate events if we're past the historical data end date
   if (currentTime <= DYNAMIC_EVENT_CONFIG.historicalDataEndDate) {
     return [];
@@ -330,16 +343,37 @@ function generateDynamicEvents(currentTime) {
   const newEvents = [];
   const seed = dateSeed(currentTime);
   
-  // Check for market crash
-  if (shouldGenerateEvent(currentTime, lastEventCheck, 'crash', DYNAMIC_EVENT_CONFIG.annualCrashProbability)) {
+  // Calculate crash probability using early warning system if market data available
+  let crashProbability = DYNAMIC_EVENT_CONFIG.annualCrashProbability;
+  let correctionProbability = DYNAMIC_EVENT_CONFIG.annualCorrectionProbability;
+  
+  if (marketData) {
+    const warningAnalysis = earlyWarning.calculateCrashProbability(marketData);
+    
+    // Adjust probabilities based on warning signals
+    crashProbability = warningAnalysis.adjustedProbability;
+    correctionProbability = DYNAMIC_EVENT_CONFIG.annualCorrectionProbability * warningAnalysis.amplificationFactor;
+    
+    // Log warning if elevated risk
+    if (warningAnalysis.warningLevel > 0.5) {
+      console.log(`[Early Warning] ${warningAnalysis.recommendation}`);
+      console.log(`[Early Warning] Active signals: ${warningAnalysis.activeSignals.map(s => s.category).join(', ')}`);
+    }
+  }
+  
+  // Check for market crash (using adjusted probability)
+  if (shouldGenerateEvent(currentTime, lastEventCheck, 'crash', crashProbability)) {
     const event = generateDynamicCrash(currentTime, crashEvents.CRASH_TYPES.MARKET_CRASH, seed);
     newEvents.push(event);
     generatedEvents.push(event);
     lastEventDate = currentTime;
+    
+    // Record crash in early warning system for accuracy tracking
+    earlyWarning.recordCrash(currentTime, event.severity);
   }
   
-  // Check for correction (if no crash)
-  if (newEvents.length === 0 && shouldGenerateEvent(currentTime, lastEventCheck, 'correction', DYNAMIC_EVENT_CONFIG.annualCorrectionProbability)) {
+  // Check for correction (if no crash, using adjusted probability)
+  if (newEvents.length === 0 && shouldGenerateEvent(currentTime, lastEventCheck, 'correction', correctionProbability)) {
     const event = generateDynamicCrash(currentTime, crashEvents.CRASH_TYPES.CORRECTION, seed + 100);
     newEvents.push(event);
     generatedEvents.push(event);
@@ -392,7 +426,22 @@ function resetGeneratorState() {
   lastEventCheck = null;
   lastEventDate = null;
   generatedEvents = [];
+  earlyWarning.reset();
 }
+
+module.exports = {
+  generateDynamicEvents,
+  getGeneratedEvents,
+  getConfiguration,
+  updateConfiguration,
+  resetGeneratorState,
+  
+  // New: Early warning system access
+  getEarlyWarningSystem: () => earlyWarning,
+  
+  // For testing
+  generateDynamicCrash
+};
 
 module.exports = {
   generateDynamicEvents,
