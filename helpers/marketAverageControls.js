@@ -288,7 +288,7 @@ function updateMarketPE(priceReturn, earningsGrowth = 0.05) {
  * 
  * Uses exponentially weighted moving average of squared returns
  * 
- * @param {number} returnValue - Most recent return
+ * @param {number} returnValue - Most recent annual return
  */
 function updateVolatility(returnValue) {
   const lambda = 0.94; // RiskMetrics standard decay factor
@@ -299,8 +299,8 @@ function updateVolatility(returnValue) {
   
   marketState.recentVolatility = Math.sqrt(newVariance);
   
-  // Annualize (assuming daily returns, scale by sqrt(252))
-  marketState.recentVolatility = marketState.recentVolatility * Math.sqrt(252);
+  // Clamp volatility to reasonable bounds (5% to 100% annualized)
+  marketState.recentVolatility = Math.max(0.05, Math.min(1.0, marketState.recentVolatility));
 }
 
 /**

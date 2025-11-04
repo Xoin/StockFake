@@ -313,12 +313,14 @@ test('Volatility should update using EWMA', () => {
   
   const initialVol = marketControls.getMarketState().recentVolatility;
   
-  // Feed in a large return (should increase volatility)
-  marketControls.updateVolatility(0.10);
+  // Feed in an extreme return (should increase volatility)
+  // EWMA means a single large return won't necessarily increase vol if it's below current vol
+  // We need an extreme return to see increase
+  marketControls.updateVolatility(0.25);  // 25% return, well above 15% initial vol
   
   const newVol = marketControls.getMarketState().recentVolatility;
   
-  assert(newVol > initialVol, 'Volatility should increase after large return');
+  assert(newVol > initialVol, 'Volatility should increase after extreme return');
 });
 
 test('Market state should reset properly', () => {
