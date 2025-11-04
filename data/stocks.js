@@ -245,7 +245,10 @@ function seededRandom(symbol, time) {
   return Math.abs(Math.sin(hash) * 10000) % 1;
 }
 
-// Volatility scaling constants
+// Volatility scaling constants (DEPRECATED - no longer used)
+// Volatility no longer scales with game speed since each day is calculated individually
+// Previously used when assuming ticks would be skipped at high speeds
+/*
 const SPEED_SLOW_THRESHOLD = 60;        // 1s = 1min
 const SPEED_MODERATE_THRESHOLD = 600;   // 1s = 10min  
 const SPEED_NORMAL = 3600;              // 1s = 1hr (baseline)
@@ -290,6 +293,7 @@ function getVolatilityScale(timeMultiplier) {
     return VOLATILITY_HIGH;
   }
 }
+*/
 
 // Get interpolated price with minor fluctuations
 function getStockPrice(symbol, currentTime, timeMultiplier, isPaused, bypassCache = false) {
@@ -371,9 +375,10 @@ function getStockPrice(symbol, currentTime, timeMultiplier, isPaused, bypassCach
       basePrice = basePrice * growthFactor;
     }
     
-    // Add daily volatility (±2%)
+    // Add daily volatility (±1.5%)
+    // Reduced from ±2% to prevent compound effects from exceeding caps
     const randomValue = seededRandom(symbol, Math.floor(currentTime.getTime() / (1000 * 60 * 60 * 24)));
-    const volatility = (randomValue - 0.5) * 0.04; // ±2%
+    const volatility = (randomValue - 0.5) * 0.03; // ±1.5%
     basePrice = basePrice * (1 + volatility);
     
     // Apply crash simulation impact if module is loaded
@@ -414,13 +419,26 @@ function getStockPrice(symbol, currentTime, timeMultiplier, isPaused, bypassCach
       }
       
       const prevRandomValue = seededRandom(symbol, Math.floor(previousDay.getTime() / (1000 * 60 * 60 * 24)));
-      const prevVolatility = (prevRandomValue - 0.5) * 0.04;
+      const prevVolatility = (prevRandomValue - 0.5) * 0.03; // ±1.5%
       prevBasePrice = prevBasePrice * (1 + prevVolatility);
       
       // Apply crash simulation impact for previous day
       let prevFinalPrice = prevBasePrice;
       if (crashSimModule) {
         prevFinalPrice = crashSimModule.calculateStockPriceImpact(symbol, sector, prevBasePrice, previousDay);
+      }
+      
+      // Safety cap: Prevent unrealistic daily price movements (>20% in normal conditions)
+      // This is a final safeguard to ensure game balance
+      const MAX_DAILY_CHANGE = 0.20; // ±20%
+      const minAllowedPrice = prevFinalPrice * (1 - MAX_DAILY_CHANGE);
+      const maxAllowedPrice = prevFinalPrice * (1 + MAX_DAILY_CHANGE);
+      
+      // Only apply cap if crash simulation is not active
+      // During crashes, allow larger movements for realism
+      const hasCrash = crashSimModule && typeof crashSimModule.hasActiveEvents === 'function' && crashSimModule.hasActiveEvents();
+      if (!hasCrash) {
+        finalPrice = Math.max(minAllowedPrice, Math.min(maxAllowedPrice, finalPrice));
       }
       
       // Calculate percentage change
@@ -450,14 +468,11 @@ function getStockPrice(symbol, currentTime, timeMultiplier, isPaused, bypassCach
   
   const basePrice = before.price + (priceRange * (timePassed / timeRange));
   
-  // Calculate volatility scale based on game speed
-  const volatilityScale = getVolatilityScale(timeMultiplier);
-  
-  // Add minor deterministic fluctuation (±2% base, scaled by game speed)
+  // Add minor deterministic fluctuation (±1.5% base)
+  // Volatility does not depend on game speed - each day is calculated individually
   const randomValue = seededRandom(symbol, currentTime.getTime());
-  const baseFluctuation = (randomValue - 0.5) * 0.04 * basePrice;
-  const fluctuation = baseFluctuation * volatilityScale;
-  let price = Math.max(0.01, basePrice + fluctuation);
+  const baseFluctuation = (randomValue - 0.5) * 0.03 * basePrice; // ±1.5%
+  let price = Math.max(0.01, basePrice + baseFluctuation);
   
   // Apply crash simulation impact if module is loaded
   if (crashSimModule) {
