@@ -1,0 +1,1021 @@
+<%- include('partials/header', { 
+    title: 'Advanced Charts',
+    pageTitle: '📈 ADVANCED TECHNICAL ANALYSIS',
+    pageStyles: `
+        .chart-controls {
+            background-color: #000;
+            border: 2px solid #00ff00;
+            padding: 15px;
+            margin-bottom: 20px;
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        .chart-controls label {
+            color: #00ff00;
+            margin-right: 5px;
+        }
+        .chart-controls select,
+        .chart-controls input {
+            background-color: #001100;
+            border: 1px solid #00ff00;
+            color: #00ff00;
+            padding: 8px;
+            font-family: 'Courier New', monospace;
+        }
+        .chart-controls button {
+            background-color: #003300;
+            border: 2px solid #00ff00;
+            color: #00ff00;
+            padding: 8px 16px;
+            cursor: pointer;
+            font-family: 'Courier New', monospace;
+        }
+        .chart-controls button:hover {
+            background-color: #004400;
+        }
+        .chart-controls button.active {
+            background-color: #005500;
+        }
+        .main-chart-container {
+            background-color: #000;
+            border: 2px solid #00ff00;
+            padding: 0;
+            margin-bottom: 20px;
+            position: relative;
+        }
+        #mainChart {
+            width: 100%;
+            height: 600px;
+        }
+        .indicator-panels {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        .indicator-panel {
+            background-color: #000;
+            border: 2px solid #00ff00;
+            padding: 0;
+            height: 200px;
+        }
+        .indicator-controls {
+            background-color: #000;
+            border: 2px solid #00ff00;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+        .indicator-controls h3 {
+            color: #00ff00;
+            margin-top: 0;
+            margin-bottom: 10px;
+        }
+        .indicator-group {
+            margin-bottom: 15px;
+        }
+        .indicator-group label {
+            color: #00ff00;
+            display: block;
+            margin-bottom: 5px;
+        }
+        .checkbox-group {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 10px;
+        }
+        .checkbox-item {
+            display: flex;
+            align-items: center;
+            color: #00ff00;
+        }
+        .checkbox-item input[type="checkbox"] {
+            margin-right: 8px;
+        }
+        .info-panel {
+            background-color: #001100;
+            border: 1px solid #00ff00;
+            padding: 10px;
+            margin-bottom: 20px;
+        }
+        .info-panel h4 {
+            color: #00ff00;
+            margin: 0 0 10px 0;
+        }
+        .info-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 10px;
+        }
+        .info-item {
+            color: #00aa00;
+        }
+        .info-item .label {
+            font-size: 12px;
+            color: #00ff00;
+        }
+        .info-item .value {
+            font-size: 16px;
+            font-weight: bold;
+        }
+        .chart-type-selector {
+            display: flex;
+            gap: 10px;
+        }
+        .event-marker {
+            position: absolute;
+            width: 2px;
+            background-color: #ff0000;
+            z-index: 10;
+        }
+        .auto-refresh-indicator {
+            color: #00ff00;
+            font-size: 12px;
+            margin-left: 10px;
+        }
+        .auto-refresh-indicator.active {
+            animation: blink 1s infinite;
+        }
+        @keyframes blink {
+            0%, 50% { opacity: 1; }
+            51%, 100% { opacity: 0.3; }
+        }
+    `
+}) %>
+
+<!-- Stock Selection -->
+<div class="chart-controls">
+    <label for="stockSelect">Stock:</label>
+    <select id="stockSelect">
+        <option value="">Loading...</option>
+    </select>
+    
+    <label for="timeRangeSelect">Time Range:</label>
+    <select id="timeRangeSelect">
+        <option value="7">7 Days</option>
+        <option value="30" selected>30 Days</option>
+        <option value="90">90 Days</option>
+        <option value="180">6 Months</option>
+        <option value="365">1 Year</option>
+        <option value="730">2 Years</option>
+        <option value="1825">5 Years</option>
+    </select>
+    
+    <label for="chartTypeSelect">Chart Type:</label>
+    <select id="chartTypeSelect">
+        <option value="line">Line</option>
+        <option value="candlestick" selected>Candlestick</option>
+        <option value="area">Area</option>
+        <option value="bar">Bar (OHLC)</option>
+    </select>
+    
+    <button onclick="updateChart()" id="updateBtn">Update Chart</button>
+    <button onclick="toggleAutoRefresh()" id="autoRefreshBtn">Auto-Refresh: OFF</button>
+    <span class="auto-refresh-indicator" id="refreshIndicator"></span>
+</div>
+
+<!-- Stock Info Panel -->
+<div class="info-panel" id="stockInfo" style="display: none;">
+    <h4>Stock Information</h4>
+    <div class="info-grid">
+        <div class="info-item">
+            <div class="label">Current Price</div>
+            <div class="value" id="currentPrice">-</div>
+        </div>
+        <div class="info-item">
+            <div class="label">Change</div>
+            <div class="value" id="priceChange">-</div>
+        </div>
+        <div class="info-item">
+            <div class="label">Volume</div>
+            <div class="value" id="volume">-</div>
+        </div>
+        <div class="info-item">
+            <div class="label">RSI (14)</div>
+            <div class="value" id="rsiValue">-</div>
+        </div>
+        <div class="info-item">
+            <div class="label">MACD</div>
+            <div class="value" id="macdValue">-</div>
+        </div>
+    </div>
+</div>
+
+<!-- Main Chart -->
+<div class="main-chart-container">
+    <div id="mainChart"></div>
+</div>
+
+<!-- Indicator Controls -->
+<div class="indicator-controls">
+    <h3>Technical Indicators</h3>
+    
+    <div class="indicator-group">
+        <label>Moving Averages:</label>
+        <div class="checkbox-group">
+            <div class="checkbox-item">
+                <input type="checkbox" id="sma20" value="sma20" onchange="updateIndicators()">
+                <label for="sma20">SMA 20</label>
+            </div>
+            <div class="checkbox-item">
+                <input type="checkbox" id="sma50" value="sma50" onchange="updateIndicators()">
+                <label for="sma50">SMA 50</label>
+            </div>
+            <div class="checkbox-item">
+                <input type="checkbox" id="sma200" value="sma200" onchange="updateIndicators()">
+                <label for="sma200">SMA 200</label>
+            </div>
+            <div class="checkbox-item">
+                <input type="checkbox" id="ema12" value="ema12" onchange="updateIndicators()">
+                <label for="ema12">EMA 12</label>
+            </div>
+            <div class="checkbox-item">
+                <input type="checkbox" id="ema26" value="ema26" onchange="updateIndicators()">
+                <label for="ema26">EMA 26</label>
+            </div>
+        </div>
+    </div>
+    
+    <div class="indicator-group">
+        <label>Bands & Envelopes:</label>
+        <div class="checkbox-group">
+            <div class="checkbox-item">
+                <input type="checkbox" id="bollinger" value="bollinger" onchange="updateIndicators()">
+                <label for="bollinger">Bollinger Bands</label>
+            </div>
+        </div>
+    </div>
+    
+    <div class="indicator-group">
+        <label>Oscillators (separate panels):</label>
+        <div class="checkbox-group">
+            <div class="checkbox-item">
+                <input type="checkbox" id="rsi" value="rsi" onchange="updateIndicators()">
+                <label for="rsi">RSI (14)</label>
+            </div>
+            <div class="checkbox-item">
+                <input type="checkbox" id="macd" value="macd" onchange="updateIndicators()">
+                <label for="macd">MACD</label>
+            </div>
+            <div class="checkbox-item">
+                <input type="checkbox" id="stochastic" value="stochastic" onchange="updateIndicators()">
+                <label for="stochastic">Stochastic</label>
+            </div>
+        </div>
+    </div>
+    
+    <div class="indicator-group">
+        <label>Volume & Volatility:</label>
+        <div class="checkbox-group">
+            <div class="checkbox-item">
+                <input type="checkbox" id="volume" value="volume" onchange="updateIndicators()">
+                <label for="volume">Volume</label>
+            </div>
+            <div class="checkbox-item">
+                <input type="checkbox" id="vwap" value="vwap" onchange="updateIndicators()">
+                <label for="vwap">VWAP</label>
+            </div>
+            <div class="checkbox-item">
+                <input type="checkbox" id="atr" value="atr" onchange="updateIndicators()">
+                <label for="atr">ATR (14)</label>
+            </div>
+        </div>
+    </div>
+    
+    <div class="indicator-group">
+        <label>Market Events:</label>
+        <div class="checkbox-group">
+            <div class="checkbox-item">
+                <input type="checkbox" id="showEvents" value="events" checked onchange="updateChart()">
+                <label for="showEvents">Show Market Events</label>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Indicator Panels (dynamically created) -->
+<div class="indicator-panels" id="indicatorPanels"></div>
+
+<%- include('partials/footer', {
+    pageScripts: `
+    <script src="https://unpkg.com/lightweight-charts@4.1.0/dist/lightweight-charts.standalone.production.js"></script>
+    <script>
+// Global variables
+let chart = null;
+let candlestickSeries = null;
+let lineSeries = null;
+let areaSeries = null;
+let barSeries = null;
+let volumeSeries = null;
+let currentSymbol = '';
+let currentChartType = 'candlestick';
+let indicatorSeries = {};
+let indicatorCharts = {};
+let autoRefreshInterval = null;
+let marketEvents = [];
+
+// Color scheme
+const colors = {
+    green: '#00ff00',
+    red: '#ff0000',
+    yellow: '#ffff00',
+    cyan: '#00ffff',
+    magenta: '#ff00ff',
+    white: '#ffffff',
+    background: '#000000',
+    gridColor: '#003300'
+};
+
+// Initialize chart
+function initChart() {
+    const chartContainer = document.getElementById('mainChart');
+    
+    chart = LightweightCharts.createChart(chartContainer, {
+        width: chartContainer.clientWidth,
+        height: 600,
+        layout: {
+            background: { color: colors.background },
+            textColor: colors.green,
+        },
+        grid: {
+            vertLines: { color: colors.gridColor },
+            horzLines: { color: colors.gridColor },
+        },
+        crosshair: {
+            mode: LightweightCharts.CrosshairMode.Normal,
+        },
+        rightPriceScale: {
+            borderColor: colors.green,
+        },
+        timeScale: {
+            borderColor: colors.green,
+            timeVisible: true,
+            secondsVisible: false,
+        },
+    });
+    
+    // Handle window resize
+    window.addEventListener('resize', () => {
+        chart.applyOptions({ width: chartContainer.clientWidth });
+    });
+}
+
+// Create indicator chart
+function createIndicatorChart(containerId, title, minValue = undefined, maxValue = undefined) {
+    const container = document.getElementById(containerId);
+    
+    const indicatorChart = LightweightCharts.createChart(container, {
+        width: container.clientWidth,
+        height: 200,
+        layout: {
+            background: { color: colors.background },
+            textColor: colors.green,
+        },
+        grid: {
+            vertLines: { color: colors.gridColor },
+            horzLines: { color: colors.gridColor },
+        },
+        crosshair: {
+            mode: LightweightCharts.CrosshairMode.Normal,
+        },
+        rightPriceScale: {
+            borderColor: colors.green,
+        },
+        timeScale: {
+            borderColor: colors.green,
+            visible: false,
+        },
+    });
+    
+    if (minValue !== undefined && maxValue !== undefined) {
+        indicatorChart.priceScale('right').applyOptions({
+            scaleMargins: {
+                top: 0.1,
+                bottom: 0.1,
+            },
+        });
+    }
+    
+    window.addEventListener('resize', () => {
+        indicatorChart.applyOptions({ width: container.clientWidth });
+    });
+    
+    return indicatorChart;
+}
+
+// Load stocks list
+async function loadStocks() {
+    try {
+        const response = await fetch('/api/stocks');
+        const stocks = await response.json();
+        
+        const select = document.getElementById('stockSelect');
+        select.innerHTML = '<option value="">Select Stock</option>' + 
+            stocks.map(s => \`<option value="\${s.symbol}">\${s.symbol} - \${s.name}</option>\`).join('');
+        
+        if (stocks.length > 0) {
+            select.value = stocks[0].symbol;
+            currentSymbol = stocks[0].symbol;
+            updateChart();
+        }
+    } catch (error) {
+        console.error('Failed to load stocks:', error);
+    }
+}
+
+// Update chart with current settings
+async function updateChart() {
+    const symbol = document.getElementById('stockSelect').value;
+    const days = document.getElementById('timeRangeSelect').value;
+    const chartType = document.getElementById('chartTypeSelect').value;
+    
+    if (!symbol) return;
+    
+    currentSymbol = symbol;
+    currentChartType = chartType;
+    
+    try {
+        // Fetch data based on chart type
+        let data;
+        if (chartType === 'line' || chartType === 'area') {
+            const response = await fetch(\`/api/stocks/\${symbol}/history?days=\${days}\`);
+            data = await response.json();
+        } else {
+            const response = await fetch(\`/api/stocks/\${symbol}/ohlc?days=\${days}\`);
+            data = await response.json();
+        }
+        
+        // Fetch market events if enabled
+        if (document.getElementById('showEvents').checked) {
+            const eventsResponse = await fetch(\`/api/market/events?days=\${days}&symbol=\${symbol}\`);
+            marketEvents = await eventsResponse.json();
+        } else {
+            marketEvents = [];
+        }
+        
+        // Clear existing series
+        clearSeries();
+        
+        // Create appropriate series based on chart type
+        if (chartType === 'candlestick') {
+            candlestickSeries = chart.addCandlestickSeries({
+                upColor: colors.green,
+                downColor: colors.red,
+                borderUpColor: colors.green,
+                borderDownColor: colors.red,
+                wickUpColor: colors.green,
+                wickDownColor: colors.red,
+            });
+            
+            const candleData = data.map(d => ({
+                time: new Date(d.date).getTime() / 1000,
+                open: d.open,
+                high: d.high,
+                low: d.low,
+                close: d.close
+            }));
+            
+            candlestickSeries.setData(candleData);
+        } else if (chartType === 'bar') {
+            barSeries = chart.addBarSeries({
+                upColor: colors.green,
+                downColor: colors.red,
+            });
+            
+            const barData = data.map(d => ({
+                time: new Date(d.date).getTime() / 1000,
+                open: d.open,
+                high: d.high,
+                low: d.low,
+                close: d.close
+            }));
+            
+            barSeries.setData(barData);
+        } else if (chartType === 'area') {
+            areaSeries = chart.addAreaSeries({
+                lineColor: colors.green,
+                topColor: 'rgba(0, 255, 0, 0.4)',
+                bottomColor: 'rgba(0, 255, 0, 0.0)',
+            });
+            
+            const areaData = data.map(d => ({
+                time: new Date(d.date).getTime() / 1000,
+                value: d.price
+            }));
+            
+            areaSeries.setData(areaData);
+        } else {
+            lineSeries = chart.addLineSeries({
+                color: colors.green,
+                lineWidth: 2,
+            });
+            
+            const lineData = data.map(d => ({
+                time: new Date(d.date).getTime() / 1000,
+                value: d.price
+            }));
+            
+            lineSeries.setData(lineData);
+        }
+        
+        // Add event markers
+        addEventMarkers();
+        
+        // Update stock info
+        updateStockInfo(data);
+        
+        // Update indicators
+        await updateIndicators();
+        
+        // Fit content
+        chart.timeScale().fitContent();
+        
+    } catch (error) {
+        console.error('Failed to update chart:', error);
+    }
+}
+
+// Clear all series
+function clearSeries() {
+    if (candlestickSeries) {
+        chart.removeSeries(candlestickSeries);
+        candlestickSeries = null;
+    }
+    if (lineSeries) {
+        chart.removeSeries(lineSeries);
+        lineSeries = null;
+    }
+    if (areaSeries) {
+        chart.removeSeries(areaSeries);
+        areaSeries = null;
+    }
+    if (barSeries) {
+        chart.removeSeries(barSeries);
+        barSeries = null;
+    }
+    if (volumeSeries) {
+        chart.removeSeries(volumeSeries);
+        volumeSeries = null;
+    }
+    
+    // Clear indicator series from main chart
+    Object.values(indicatorSeries).forEach(series => {
+        if (series && series.chart === chart) {
+            chart.removeSeries(series.series);
+        }
+    });
+    indicatorSeries = {};
+}
+
+// Add event markers to chart
+function addEventMarkers() {
+    if (marketEvents.length === 0) return;
+    
+    const mainSeries = candlestickSeries || barSeries || lineSeries || areaSeries;
+    if (!mainSeries) return;
+    
+    const markers = marketEvents.map(event => {
+        const color = event.impact === 'negative' ? colors.red :
+                     event.impact === 'positive' ? colors.green :
+                     colors.yellow;
+        
+        const shape = event.type === 'crash' ? 'arrowDown' :
+                     event.type === 'ipo' ? 'arrowUp' :
+                     'circle';
+        
+        return {
+            time: new Date(event.date).getTime() / 1000,
+            position: event.impact === 'negative' ? 'aboveBar' : 'belowBar',
+            color: color,
+            shape: shape,
+            text: event.title,
+        };
+    });
+    
+    mainSeries.setMarkers(markers);
+}
+
+// Update stock info panel
+function updateStockInfo(data) {
+    if (data.length === 0) return;
+    
+    document.getElementById('stockInfo').style.display = 'block';
+    
+    const latest = data[data.length - 1];
+    const previous = data.length > 1 ? data[data.length - 2] : latest;
+    
+    const currentPrice = latest.close || latest.price;
+    const previousPrice = previous.close || previous.price;
+    const change = currentPrice - previousPrice;
+    const changePercent = (change / previousPrice) * 100;
+    
+    document.getElementById('currentPrice').textContent = '$' + currentPrice.toFixed(2);
+    document.getElementById('priceChange').textContent = 
+        (change >= 0 ? '+' : '') + change.toFixed(2) + 
+        ' (' + (changePercent >= 0 ? '+' : '') + changePercent.toFixed(2) + '%)';
+    document.getElementById('priceChange').style.color = change >= 0 ? colors.green : colors.red;
+    
+    if (latest.volume) {
+        document.getElementById('volume').textContent = latest.volume.toLocaleString();
+    }
+}
+
+// Update indicators
+async function updateIndicators() {
+    const symbol = currentSymbol;
+    const days = document.getElementById('timeRangeSelect').value;
+    
+    if (!symbol) return;
+    
+    // Get selected indicators
+    const selectedIndicators = [];
+    document.querySelectorAll('.checkbox-item input[type="checkbox"]:checked').forEach(cb => {
+        if (cb.value !== 'events') {
+            selectedIndicators.push(cb.value);
+        }
+    });
+    
+    if (selectedIndicators.length === 0) {
+        // Clear indicator panels
+        document.getElementById('indicatorPanels').innerHTML = '';
+        Object.values(indicatorCharts).forEach(chart => chart.remove());
+        indicatorCharts = {};
+        return;
+    }
+    
+    try {
+        // Fetch indicator data
+        const response = await fetch(\`/api/stocks/\${symbol}/indicators?days=\${days}&indicators=\${selectedIndicators.join(',')}\`);
+        const indicators = await response.json();
+        
+        if (indicators.error) {
+            console.error('Indicator error:', indicators.error);
+            return;
+        }
+        
+        // Clear old indicator series from main chart
+        Object.keys(indicatorSeries).forEach(key => {
+            if (indicatorSeries[key] && indicatorSeries[key].chart === chart) {
+                chart.removeSeries(indicatorSeries[key].series);
+                delete indicatorSeries[key];
+            }
+        });
+        
+        // Add moving averages and bands to main chart
+        addOverlayIndicators(indicators);
+        
+        // Add oscillators to separate panels
+        addOscillatorPanels(indicators);
+        
+        // Update info panel with latest indicator values
+        updateIndicatorInfo(indicators);
+        
+    } catch (error) {
+        console.error('Failed to update indicators:', error);
+    }
+}
+
+// Add overlay indicators (MAs, Bollinger Bands) to main chart
+function addOverlayIndicators(indicators) {
+    const indicatorColors = {
+        sma20: colors.cyan,
+        sma50: colors.yellow,
+        sma200: colors.magenta,
+        ema12: colors.cyan,
+        ema26: colors.yellow,
+        vwap: colors.white
+    };
+    
+    ['sma20', 'sma50', 'sma200', 'ema12', 'ema26', 'vwap'].forEach(ind => {
+        if (indicators[ind] && document.getElementById(ind)?.checked) {
+            const series = chart.addLineSeries({
+                color: indicatorColors[ind],
+                lineWidth: 1,
+                title: ind.toUpperCase(),
+            });
+            
+            const data = indicators.dates.map((date, i) => ({
+                time: new Date(date).getTime() / 1000,
+                value: indicators[ind][i]
+            })).filter(d => d.value !== null);
+            
+            series.setData(data);
+            indicatorSeries[ind] = { series, chart };
+        }
+    });
+    
+    // Bollinger Bands
+    if (indicators.bollingerUpper && document.getElementById('bollinger')?.checked) {
+        const upperSeries = chart.addLineSeries({
+            color: colors.yellow,
+            lineWidth: 1,
+            lineStyle: 2, // dashed
+        });
+        const middleSeries = chart.addLineSeries({
+            color: colors.yellow,
+            lineWidth: 1,
+        });
+        const lowerSeries = chart.addLineSeries({
+            color: colors.yellow,
+            lineWidth: 1,
+            lineStyle: 2, // dashed
+        });
+        
+        const upperData = indicators.dates.map((date, i) => ({
+            time: new Date(date).getTime() / 1000,
+            value: indicators.bollingerUpper[i]
+        })).filter(d => d.value !== null);
+        
+        const middleData = indicators.dates.map((date, i) => ({
+            time: new Date(date).getTime() / 1000,
+            value: indicators.bollingerMiddle[i]
+        })).filter(d => d.value !== null);
+        
+        const lowerData = indicators.dates.map((date, i) => ({
+            time: new Date(date).getTime() / 1000,
+            value: indicators.bollingerLower[i]
+        })).filter(d => d.value !== null);
+        
+        upperSeries.setData(upperData);
+        middleSeries.setData(middleData);
+        lowerSeries.setData(lowerData);
+        
+        indicatorSeries.bollingerUpper = { series: upperSeries, chart };
+        indicatorSeries.bollingerMiddle = { series: middleSeries, chart };
+        indicatorSeries.bollingerLower = { series: lowerSeries, chart };
+    }
+}
+
+// Add oscillator panels (RSI, MACD, Stochastic, etc.)
+function addOscillatorPanels(indicators) {
+    const panelsContainer = document.getElementById('indicatorPanels');
+    panelsContainer.innerHTML = '';
+    
+    // Clear old indicator charts
+    Object.values(indicatorCharts).forEach(chart => chart.remove());
+    indicatorCharts = {};
+    
+    // RSI Panel
+    if (indicators.rsi && document.getElementById('rsi')?.checked) {
+        const panelDiv = document.createElement('div');
+        panelDiv.className = 'indicator-panel';
+        panelDiv.id = 'rsiPanel';
+        panelsContainer.appendChild(panelDiv);
+        
+        const rsiChart = createIndicatorChart('rsiPanel', 'RSI', 0, 100);
+        indicatorCharts.rsi = rsiChart;
+        
+        const rsiSeries = rsiChart.addLineSeries({
+            color: colors.cyan,
+            lineWidth: 2,
+        });
+        
+        const rsiData = indicators.dates.map((date, i) => ({
+            time: new Date(date).getTime() / 1000,
+            value: indicators.rsi[i]
+        })).filter(d => d.value !== null);
+        
+        rsiSeries.setData(rsiData);
+        
+        // Add reference lines at 30 and 70
+        const refLine30 = rsiChart.addLineSeries({
+            color: colors.red,
+            lineWidth: 1,
+            lineStyle: 2,
+        });
+        const refLine70 = rsiChart.addLineSeries({
+            color: colors.green,
+            lineWidth: 1,
+            lineStyle: 2,
+        });
+        
+        refLine30.setData(rsiData.map(d => ({ time: d.time, value: 30 })));
+        refLine70.setData(rsiData.map(d => ({ time: d.time, value: 70 })));
+        
+        rsiChart.timeScale().fitContent();
+    }
+    
+    // MACD Panel
+    if (indicators.macd && document.getElementById('macd')?.checked) {
+        const panelDiv = document.createElement('div');
+        panelDiv.className = 'indicator-panel';
+        panelDiv.id = 'macdPanel';
+        panelsContainer.appendChild(panelDiv);
+        
+        const macdChart = createIndicatorChart('macdPanel', 'MACD');
+        indicatorCharts.macd = macdChart;
+        
+        const macdSeries = macdChart.addLineSeries({
+            color: colors.cyan,
+            lineWidth: 2,
+        });
+        const signalSeries = macdChart.addLineSeries({
+            color: colors.red,
+            lineWidth: 2,
+        });
+        const histogramSeries = macdChart.addHistogramSeries({
+            color: colors.green,
+        });
+        
+        const macdData = indicators.dates.map((date, i) => ({
+            time: new Date(date).getTime() / 1000,
+            value: indicators.macd[i]
+        })).filter(d => d.value !== null);
+        
+        const signalData = indicators.dates.map((date, i) => ({
+            time: new Date(date).getTime() / 1000,
+            value: indicators.macdSignal[i]
+        })).filter(d => d.value !== null);
+        
+        const histogramData = indicators.dates.map((date, i) => ({
+            time: new Date(date).getTime() / 1000,
+            value: indicators.macdHistogram[i],
+            color: indicators.macdHistogram[i] >= 0 ? colors.green : colors.red
+        })).filter(d => d.value !== null);
+        
+        macdSeries.setData(macdData);
+        signalSeries.setData(signalData);
+        histogramSeries.setData(histogramData);
+        
+        macdChart.timeScale().fitContent();
+    }
+    
+    // Stochastic Panel
+    if (indicators.stochasticK && document.getElementById('stochastic')?.checked) {
+        const panelDiv = document.createElement('div');
+        panelDiv.className = 'indicator-panel';
+        panelDiv.id = 'stochasticPanel';
+        panelsContainer.appendChild(panelDiv);
+        
+        const stochChart = createIndicatorChart('stochasticPanel', 'Stochastic', 0, 100);
+        indicatorCharts.stochastic = stochChart;
+        
+        const kSeries = stochChart.addLineSeries({
+            color: colors.cyan,
+            lineWidth: 2,
+        });
+        const dSeries = stochChart.addLineSeries({
+            color: colors.red,
+            lineWidth: 2,
+        });
+        
+        const kData = indicators.dates.map((date, i) => ({
+            time: new Date(date).getTime() / 1000,
+            value: indicators.stochasticK[i]
+        })).filter(d => d.value !== null);
+        
+        const dData = indicators.dates.map((date, i) => ({
+            time: new Date(date).getTime() / 1000,
+            value: indicators.stochasticD[i]
+        })).filter(d => d.value !== null);
+        
+        kSeries.setData(kData);
+        dSeries.setData(dData);
+        
+        // Add reference lines
+        const refLine20 = stochChart.addLineSeries({
+            color: colors.red,
+            lineWidth: 1,
+            lineStyle: 2,
+        });
+        const refLine80 = stochChart.addLineSeries({
+            color: colors.green,
+            lineWidth: 1,
+            lineStyle: 2,
+        });
+        
+        if (kData.length > 0) {
+            refLine20.setData(kData.map(d => ({ time: d.time, value: 20 })));
+            refLine80.setData(kData.map(d => ({ time: d.time, value: 80 })));
+        }
+        
+        stochChart.timeScale().fitContent();
+    }
+    
+    // Volume Panel
+    if (document.getElementById('volume')?.checked) {
+        const panelDiv = document.createElement('div');
+        panelDiv.className = 'indicator-panel';
+        panelDiv.id = 'volumePanel';
+        panelsContainer.appendChild(panelDiv);
+        
+        const volChart = createIndicatorChart('volumePanel', 'Volume');
+        indicatorCharts.volume = volChart;
+        
+        // Fetch OHLC data for volume
+        const days = document.getElementById('timeRangeSelect').value;
+        fetch(\`/api/stocks/\${currentSymbol}/ohlc?days=\${days}\`)
+            .then(res => res.json())
+            .then(data => {
+                const volumeSeries = volChart.addHistogramSeries({
+                    color: colors.cyan,
+                    priceFormat: {
+                        type: 'volume',
+                    },
+                });
+                
+                const volumeData = data.map(d => ({
+                    time: new Date(d.date).getTime() / 1000,
+                    value: d.volume,
+                    color: d.close >= d.open ? colors.green : colors.red
+                }));
+                
+                volumeSeries.setData(volumeData);
+                volChart.timeScale().fitContent();
+            });
+    }
+    
+    // ATR Panel
+    if (indicators.atr && document.getElementById('atr')?.checked) {
+        const panelDiv = document.createElement('div');
+        panelDiv.className = 'indicator-panel';
+        panelDiv.id = 'atrPanel';
+        panelsContainer.appendChild(panelDiv);
+        
+        const atrChart = createIndicatorChart('atrPanel', 'ATR');
+        indicatorCharts.atr = atrChart;
+        
+        const atrSeries = atrChart.addLineSeries({
+            color: colors.yellow,
+            lineWidth: 2,
+        });
+        
+        const atrData = indicators.dates.map((date, i) => ({
+            time: new Date(date).getTime() / 1000,
+            value: indicators.atr[i]
+        })).filter(d => d.value !== null);
+        
+        atrSeries.setData(atrData);
+        atrChart.timeScale().fitContent();
+    }
+}
+
+// Update indicator info panel
+function updateIndicatorInfo(indicators) {
+    if (indicators.rsi && indicators.rsi.length > 0) {
+        const latestRSI = indicators.rsi.filter(v => v !== null).pop();
+        if (latestRSI !== undefined) {
+            document.getElementById('rsiValue').textContent = latestRSI.toFixed(2);
+            document.getElementById('rsiValue').style.color = 
+                latestRSI > 70 ? colors.red : latestRSI < 30 ? colors.green : colors.yellow;
+        }
+    }
+    
+    if (indicators.macd && indicators.macd.length > 0) {
+        const latestMACD = indicators.macd.filter(v => v !== null).pop();
+        if (latestMACD !== undefined) {
+            document.getElementById('macdValue').textContent = latestMACD.toFixed(4);
+        }
+    }
+}
+
+// Toggle auto-refresh
+function toggleAutoRefresh() {
+    if (autoRefreshInterval) {
+        clearInterval(autoRefreshInterval);
+        autoRefreshInterval = null;
+        document.getElementById('autoRefreshBtn').textContent = 'Auto-Refresh: OFF';
+        document.getElementById('refreshIndicator').classList.remove('active');
+        document.getElementById('refreshIndicator').textContent = '';
+    } else {
+        autoRefreshInterval = setInterval(() => {
+            updateChart();
+        }, 10000); // Refresh every 10 seconds
+        document.getElementById('autoRefreshBtn').textContent = 'Auto-Refresh: ON';
+        document.getElementById('refreshIndicator').classList.add('active');
+        document.getElementById('refreshIndicator').textContent = '● LIVE';
+    }
+}
+
+// Event listeners
+document.getElementById('stockSelect').addEventListener('change', () => {
+    updateChart();
+});
+
+document.getElementById('timeRangeSelect').addEventListener('change', () => {
+    updateChart();
+});
+
+document.getElementById('chartTypeSelect').addEventListener('change', () => {
+    updateChart();
+});
+
+// Initialize
+initChart();
+loadStocks();
+
+// Update era theme
+async function updateEraTheme() {
+    const response = await fetch('/api/time');
+    const data = await response.json();
+    const gameDate = new Date(data.currentTime);
+    const year = gameDate.getFullYear();
+    applyEraTheme(year);
+}
+
+updateEraTheme();
+setInterval(updateEraTheme, 10000);
+    </script>
+    `
+}) %>

@@ -33,6 +33,7 @@ const dynamicRates = require('./helpers/dynamicRatesGenerator');
 const dataRetention = require('./helpers/dataRetention');
 const bondManager = require('./helpers/bondManager');
 const cryptoManager = require('./helpers/cryptoManager');
+const technicalIndicators = require('./helpers/technicalIndicators');
 
 // Set up EJS as the view engine
 app.set('view engine', 'ejs');
@@ -44,7 +45,7 @@ app.use(express.json());
 // Middleware to handle legacy .html URLs (must be before static middleware)
 // Whitelist of known pages to prevent open redirects
 const validPages = new Set([
-  '/index', '/bank', '/trading', '/news', '/email', '/graphs', 
+  '/index', '/bank', '/trading', '/news', '/email', '/graphs', '/advanced-charts',
   '/loans', '/bonds', '/crypto', '/taxes', '/cheat', '/indexfunds', '/indexfund', '/company', '/pendingorders', '/status'
 ]);
 
@@ -316,6 +317,10 @@ app.get('/graphs', (req, res) => {
   res.render('graphs');
 });
 
+app.get('/advanced-charts', (req, res) => {
+  res.render('advanced-charts');
+});
+
 app.get('/loans', (req, res) => {
   res.render('loans');
 });
@@ -491,6 +496,193 @@ app.get('/api/stocks/:symbol/history', (req, res) => {
   });
   
   res.json(history);
+});
+
+// Stock OHLC data API for candlestick/OHLC charts
+app.get('/api/stocks/:symbol/ohlc', (req, res) => {
+  const { symbol } = req.params;
+  const { days } = req.query;
+  
+  const daysToFetch = parseInt(days) || 30;
+  const priceHistory = [];
+  
+  // Determine sampling interval based on time period
+  let sampleInterval = 1; // days
+  if (daysToFetch > 365) {
+    sampleInterval = 7; // Weekly for > 1 year
+  } else if (daysToFetch > 180) {
+    sampleInterval = 3; // Every 3 days for > 6 months
+  } else if (daysToFetch > 90) {
+    sampleInterval = 2; // Every 2 days for > 3 months
+  }
+  
+  // Get historical prices
+  for (let i = daysToFetch; i >= 0; i -= sampleInterval) {
+    const date = new Date(gameTime.getTime() - (i * 24 * 60 * 60 * 1000));
+    const price = stocks.getStockPrice(symbol, date, timeMultiplier, false, BYPASS_CACHE_FOR_HISTORICAL);
+    if (price) {
+      priceHistory.push({
+        date: date.toISOString(),
+        price: price.price
+      });
+    }
+  }
+  
+  // Always include the most recent data point
+  if (priceHistory.length === 0 || priceHistory[priceHistory.length - 1].date !== gameTime.toISOString()) {
+    const price = stocks.getStockPrice(symbol, gameTime, timeMultiplier, false, BYPASS_CACHE_FOR_HISTORICAL);
+    if (price) {
+      priceHistory.push({
+        date: gameTime.toISOString(),
+        price: price.price
+      });
+    }
+  }
+  
+  // Generate OHLC data from price data
+  const ohlcData = technicalIndicators.generateOHLC(priceHistory);
+  
+  res.json(ohlcData);
+});
+
+// Technical indicators API
+app.get('/api/stocks/:symbol/indicators', (req, res) => {
+  const { symbol } = req.params;
+  const { days, indicators: indicatorsList } = req.query;
+  
+  const daysToFetch = parseInt(days) || 90;
+  const requestedIndicators = indicatorsList ? indicatorsList.split(',') : [];
+  
+  // Get price history
+  const priceHistory = [];
+  let sampleInterval = 1;
+  if (daysToFetch > 365) {
+    sampleInterval = 7;
+  } else if (daysToFetch > 180) {
+    sampleInterval = 3;
+  } else if (daysToFetch > 90) {
+    sampleInterval = 2;
+  }
+  
+  for (let i = daysToFetch; i >= 0; i -= sampleInterval) {
+    const date = new Date(gameTime.getTime() - (i * 24 * 60 * 60 * 1000));
+    const price = stocks.getStockPrice(symbol, date, timeMultiplier, false, BYPASS_CACHE_FOR_HISTORICAL);
+    if (price) {
+      priceHistory.push({
+        date: date.toISOString(),
+        price: price.price
+      });
+    }
+  }
+  
+  // Always include most recent
+  if (priceHistory.length === 0 || priceHistory[priceHistory.length - 1].date !== gameTime.toISOString()) {
+    const price = stocks.getStockPrice(symbol, gameTime, timeMultiplier, false, BYPASS_CACHE_FOR_HISTORICAL);
+    if (price) {
+      priceHistory.push({
+        date: gameTime.toISOString(),
+        price: price.price
+      });
+    }
+  }
+  
+  if (priceHistory.length === 0) {
+    return res.json({ error: 'No price data available' });
+  }
+  
+  const prices = priceHistory.map(p => p.price);
+  const dates = priceHistory.map(p => p.date);
+  const ohlcData = technicalIndicators.generateOHLC(priceHistory);
+  
+  const result = { dates: dates };
+  
+  // Calculate requested indicators or all if none specified
+  if (requestedIndicators.length === 0 || requestedIndicators.includes('sma')) {
+    result.sma20 = technicalIndicators.calculateSMA(prices, 20);
+    result.sma50 = technicalIndicators.calculateSMA(prices, 50);
+    result.sma200 = technicalIndicators.calculateSMA(prices, 200);
+  }
+  
+  if (requestedIndicators.length === 0 || requestedIndicators.includes('ema')) {
+    result.ema12 = technicalIndicators.calculateEMA(prices, 12);
+    result.ema26 = technicalIndicators.calculateEMA(prices, 26);
+  }
+  
+  if (requestedIndicators.length === 0 || requestedIndicators.includes('rsi')) {
+    result.rsi = technicalIndicators.calculateRSI(prices, 14);
+  }
+  
+  if (requestedIndicators.length === 0 || requestedIndicators.includes('macd')) {
+    const macd = technicalIndicators.calculateMACD(prices, 12, 26, 9);
+    result.macd = macd.macd;
+    result.macdSignal = macd.signal;
+    result.macdHistogram = macd.histogram;
+  }
+  
+  if (requestedIndicators.length === 0 || requestedIndicators.includes('bollinger')) {
+    const bb = technicalIndicators.calculateBollingerBands(prices, 20, 2);
+    result.bollingerUpper = bb.upper;
+    result.bollingerMiddle = bb.middle;
+    result.bollingerLower = bb.lower;
+  }
+  
+  if (requestedIndicators.length === 0 || requestedIndicators.includes('stochastic')) {
+    const stoch = technicalIndicators.calculateStochastic(ohlcData, 14, 3, 3);
+    result.stochasticK = stoch.k;
+    result.stochasticD = stoch.d;
+  }
+  
+  if (requestedIndicators.length === 0 || requestedIndicators.includes('atr')) {
+    result.atr = technicalIndicators.calculateATR(ohlcData, 14);
+  }
+  
+  if (requestedIndicators.length === 0 || requestedIndicators.includes('obv')) {
+    result.obv = technicalIndicators.calculateOBV(ohlcData);
+  }
+  
+  if (requestedIndicators.length === 0 || requestedIndicators.includes('vwap')) {
+    result.vwap = technicalIndicators.calculateVWAP(ohlcData);
+  }
+  
+  res.json(result);
+});
+
+// Market events API for chart annotations
+app.get('/api/market/events', (req, res) => {
+  const { days } = req.query;
+  const daysToFetch = parseInt(days) || 365;
+  
+  const startDate = new Date(gameTime.getTime() - (daysToFetch * 24 * 60 * 60 * 1000));
+  const endDate = gameTime;
+  
+  const events = [];
+  
+  // Get market events (crashes, major events)
+  const allEvents = historicalEvents.getEventsUpToDate(endDate);
+  const crashEvents = allEvents.filter(e => {
+    const eventDate = new Date(e.date);
+    return eventDate >= startDate && eventDate <= endDate && 
+           (e.type === 'crash' || e.severity === 'major' || e.category === 'Market Crash');
+  });
+  
+  crashEvents.forEach(event => {
+    events.push({
+      date: event.date,
+      type: 'crash',
+      title: event.name || event.title,
+      description: event.description,
+      impact: event.marketImpact || 'negative',
+      severity: event.severity || 'moderate'
+    });
+  });
+  
+  // Note: Corporate events (IPOs, mergers, etc.) could be added here in the future
+  // when a getEventsForSymbol method is available in the corporateEvents module
+  
+  // Sort by date
+  events.sort((a, b) => new Date(a.date) - new Date(b.date));
+  
+  res.json(events);
 });
 
 // Market index API for market overview charts
