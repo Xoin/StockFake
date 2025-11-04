@@ -436,7 +436,7 @@ function getStockPrice(symbol, currentTime, timeMultiplier, isPaused, bypassCach
       
       // Only apply cap if crash simulation is not active
       // During crashes, allow larger movements for realism
-      const hasCrash = crashSimModule && crashSimModule.hasActiveEvents && crashSimModule.hasActiveEvents();
+      const hasCrash = crashSimModule && typeof crashSimModule.hasActiveEvents === 'function' && crashSimModule.hasActiveEvents();
       if (!hasCrash) {
         finalPrice = Math.max(minAllowedPrice, Math.min(maxAllowedPrice, finalPrice));
       }

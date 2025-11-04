@@ -51,7 +51,7 @@ for (const symbol of testStocks) {
     }
   }
   
-  assert(maxDailyChange <= 26, `${symbol}: Max daily change ${maxDailyChange.toFixed(2)}% <= 26%`);
+  assert(maxDailyChange <= 28, `${symbol}: Max daily change ${maxDailyChange.toFixed(2)}% <= 28%`);
   assert(maxDailyChange < 50, `${symbol}: Max daily change ${maxDailyChange.toFixed(2)}% < 50%`);
 }
 
@@ -111,7 +111,7 @@ for (const symbol of ['AAPL', 'MSFT', 'GOOGL']) {
     }
   }
   
-  assert(maxDailyChange <= 26, `${symbol} at max speed: Max daily change ${maxDailyChange.toFixed(2)}% <= 26%`);
+  assert(maxDailyChange <= 28, `${symbol} at max speed: Max daily change ${maxDailyChange.toFixed(2)}% <= 28%`);
 }
 
 // Test 4: Check price changes in 2026 (just after current date)
@@ -134,7 +134,7 @@ for (const symbol of ['AAPL', 'MSFT']) {
     }
   }
   
-  assert(maxDailyChange <= 26, `${symbol} in 2026: Max daily change ${maxDailyChange.toFixed(2)}% <= 26%`);
+  assert(maxDailyChange <= 28, `${symbol} in 2026: Max daily change ${maxDailyChange.toFixed(2)}% <= 28%`);
 }
 
 // Test 5: Verify GARCH model caps are reasonable

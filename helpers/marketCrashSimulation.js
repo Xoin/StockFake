@@ -416,7 +416,7 @@ function getActiveEvents() {
  * @returns {boolean} - True if there are active crash events
  */
 function hasActiveEvents() {
-  return activeEvents.length > 0;
+  return getActiveEvents().length > 0;
 }
 
 /**
