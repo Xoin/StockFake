@@ -4441,19 +4441,112 @@ app.get('/api/historical-events', (req, res) => {
   // Get dynamic/crash events that have occurred
   const crashEventHistory = marketCrashSim.getEventHistory(1000); // Get all events
   
-  // Convert crash events to the same format as historical events
+  // Convert crash events to the same format as historical events with enhanced descriptions
   const dynamicEvents = crashEventHistory
     .filter(event => new Date(event.activatedAt) <= gameTime)
-    .map(event => ({
-      id: event.id,
-      date: event.activatedAt,
-      title: event.name,
-      category: 'Market Event',
-      severity: event.severity,
-      description: event.description || `Dynamic market event: ${event.name}`,
-      impact: event.impact ? `Market impact: ${JSON.stringify(event.impact)}` : 'Market volatility and uncertainty',
-      isDynamic: true
-    }));
+    .map(event => {
+      // Create more descriptive text based on event properties
+      let description = event.description || '';
+      let impactText = '';
+      
+      // Enhance description based on severity and type
+      if (!description || description.includes('Dynamic market event')) {
+        const severityDescriptions = {
+          severe: 'A severe market disruption has occurred, causing significant volatility and widespread investor concern.',
+          major: 'A major market event is unfolding, triggering notable shifts in investor sentiment and trading patterns.',
+          moderate: 'Market participants are reacting to emerging economic developments affecting multiple sectors.',
+          positive: 'Positive market momentum is building as economic conditions improve and investor confidence strengthens.'
+        };
+        
+        description = severityDescriptions[event.severity] || 'A significant market event is occurring.';
+        description += ` This ${event.name} represents a dynamic economic phenomenon that emerged based on current market conditions and economic factors. `;
+        
+        // Add context about the event type
+        if (event.name.toLowerCase().includes('crash')) {
+          description += 'Market crashes are characterized by rapid, steep declines in asset prices, often triggered by a combination of economic weakness, loss of confidence, and forced selling.';
+        } else if (event.name.toLowerCase().includes('recession')) {
+          description += 'Recessions involve periods of economic contraction marked by declining GDP, rising unemployment, and reduced business activity across multiple sectors.';
+        } else if (event.name.toLowerCase().includes('crisis')) {
+          description += 'Financial crises typically involve disruptions to credit markets, banking system stress, and broader economic uncertainty affecting investment decisions.';
+        } else if (event.name.toLowerCase().includes('boom')) {
+          description += 'Economic booms feature rapid growth, increasing employment, and rising asset prices as confidence and activity accelerate across the economy.';
+        } else if (event.name.toLowerCase().includes('volatility')) {
+          description += 'Periods of heightened volatility see larger-than-normal price swings as markets digest new information and investors reassess risk.';
+        } else {
+          description += 'Such events can have far-reaching effects on investment returns, portfolio positioning, and economic conditions.';
+        }
+      }
+      
+      // Create detailed impact description
+      if (event.impact && typeof event.impact === 'object') {
+        const impacts = [];
+        
+        if (event.impact.marketMultiplier !== undefined) {
+          const changePercent = ((event.impact.marketMultiplier - 1) * 100).toFixed(1);
+          if (event.impact.marketMultiplier > 1) {
+            impacts.push(`Broad market rally with indices gaining approximately ${changePercent}% during the event period`);
+          } else if (event.impact.marketMultiplier < 1) {
+            impacts.push(`Widespread market decline with indices falling approximately ${Math.abs(changePercent)}% during the event period`);
+          }
+        }
+        
+        if (event.impact.volatilityMultiplier !== undefined && event.impact.volatilityMultiplier > 1) {
+          const volIncrease = ((event.impact.volatilityMultiplier - 1) * 100).toFixed(0);
+          impacts.push(`Market volatility elevated by ${volIncrease}%, creating both increased risk and trading opportunities`);
+        }
+        
+        if (event.impact.sectorEffects) {
+          Object.entries(event.impact.sectorEffects).forEach(([sector, multiplier]) => {
+            const sectorChange = ((multiplier - 1) * 100).toFixed(1);
+            if (multiplier > 1.05) {
+              impacts.push(`${sector} sector showing strength with gains of approximately ${sectorChange}%`);
+            } else if (multiplier < 0.95) {
+              impacts.push(`${sector} sector under pressure, declining approximately ${Math.abs(sectorChange)}%`);
+            }
+          });
+        }
+        
+        if (impacts.length === 0) {
+          impactText = [
+            'Market participants adjusting positions in response to changing economic conditions.',
+            'Volatility and uncertainty affecting trading across all asset classes.',
+            'Investors reassessing risk tolerance and portfolio allocations.',
+            'Flight to quality potentially benefiting defensive sectors and safe-haven assets.',
+            'Long-term investors may find opportunities amid short-term turbulence.'
+          ].join(' ');
+        } else {
+          impactText = impacts.join('. ') + '. ';
+          impactText += [
+            'Investors advised to review portfolio positioning and risk management strategies.',
+            'Consider rebalancing to maintain target allocations.',
+            'Long-term fundamentals remain important despite near-term volatility.'
+          ].join(' ');
+        }
+      } else {
+        impactText = [
+          'Markets experiencing increased volatility and uncertainty.',
+          'All sectors affected to varying degrees with correlations rising during stress periods.',
+          'Trading volumes elevated as investors reposition portfolios.',
+          'Risk assets like stocks showing heightened price swings.',
+          'Safe-haven assets such as government bonds and gold may benefit.',
+          'Dividend-paying stocks and defensive sectors potentially offering relative stability.',
+          'Market timing challenging; long-term investors maintaining discipline often rewarded.',
+          'Opportunities may emerge for value-oriented investors.',
+          'Portfolio diversification remains critical risk management tool.'
+        ].join(' ');
+      }
+      
+      return {
+        id: event.id,
+        date: event.activatedAt,
+        title: event.name,
+        category: 'Market Event',
+        severity: event.severity,
+        description: description,
+        impact: impactText,
+        isDynamic: true
+      };
+    });
   
   // Merge historical and dynamic events
   events = [...events, ...dynamicEvents];
