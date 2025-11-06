@@ -11,7 +11,6 @@ module.exports = {
   // Paths to ignore - unmigrated legacy test files
   testPathIgnorePatterns: [
     '/node_modules/',
-    'tests/unit/data-retention.test.js',
     'tests/integration/bond-api.test.js',
     'tests/integration/data-retention-api.test.js',
     'tests/simulation/comprehensive-market-simulation.test.js'

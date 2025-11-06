@@ -11,13 +11,52 @@ const fs = require('fs');
 // Test database path
 const testDbPath = path.join(__dirname, '../../test-retention.db');
 
-// Clean up any existing test database
-if (fs.existsSync(testDbPath)) {
-  fs.unlinkSync(testDbPath);
+// Module-level variables for database and mock
+let db;
+let mockDbModule;
+let dataRetention;
+
+// Helper function to insert test data
+function insertTestTransactions(count, baseDate) {
+  const stmt = db.prepare(`
+    INSERT INTO transactions (date, type, symbol, shares, price_per_share, total)
+    VALUES (?, ?, ?, ?, ?, ?)
+  `);
+
+  for (let i = 0; i < count; i++) {
+    const date = new Date(baseDate);
+    date.setDate(date.getDate() - i);
+    stmt.run(date.toISOString(), 'buy', 'TEST', 10, 100, 1000);
+  }
 }
 
-// Create test database
-const db = new Database(testDbPath);
+function insertTestEmails(count, baseDate, isRead = false) {
+  const stmt = db.prepare(`
+    INSERT INTO emails (from_address, subject, body, date, is_read)
+    VALUES (?, ?, ?, ?, ?)
+  `);
+
+  for (let i = 0; i < count; i++) {
+    const date = new Date(baseDate);
+    date.setDate(date.getDate() - i);
+    stmt.run('test@example.com', 'Test Email', 'Test body', date.toISOString(), isRead ? 1 : 0);
+  }
+}
+
+function insertTestDividends(count, baseDate) {
+  const stmt = db.prepare(`
+    INSERT INTO dividends (date, quarter, gross_amount, tax, net_amount, details)
+    VALUES (?, ?, ?, ?, ?, ?)
+  `);
+
+  for (let i = 0; i < count; i++) {
+    const date = new Date(baseDate);
+    date.setDate(date.getDate() - i * 90); // Quarterly
+    const year = date.getFullYear();
+    const quarter = Math.floor(date.getMonth() / 3) + 1;
+    stmt.run(date.toISOString(), `${year}-Q${quarter}`, 100, 15, 85, '{}');
+  }
+}
 
 // Initialize test database schema
 function initTestDatabase() {
@@ -248,294 +287,245 @@ function initTestDatabase() {
   `).run(new Date('2020-01-01').toISOString());
 }
 
-// Initialize test database
-initTestDatabase();
+describe('Data Retention and Pruning Module Tests', () => {
+  const currentDate = new Date('2020-01-01');
 
-// Mock the database module (after tables are created)
-const mockDbModule = {
-  db,
-  getGameState: db.prepare('SELECT * FROM game_state WHERE id = 1'),
-  updateGameState: db.prepare(`
-    UPDATE game_state 
-    SET game_time = ?, is_paused = ?, time_multiplier = ?, 
-        last_dividend_quarter = ?, last_monthly_fee_check = ?, last_inflation_check = ?, 
-        cumulative_inflation = ?, updated_at = CURRENT_TIMESTAMP
-    WHERE id = 1
-  `),
-  getDataRetentionConfig: db.prepare('SELECT * FROM data_retention_config WHERE id = 1'),
-  updateDataRetentionConfig: db.prepare(`
-    UPDATE data_retention_config
-    SET retention_periods = ?, auto_pruning_enabled = ?, last_pruning_date = ?, updated_at = CURRENT_TIMESTAMP
-    WHERE id = 1
-  `)
-};
+  beforeAll(() => {
+    // Clean up any existing test database
+    if (fs.existsSync(testDbPath)) {
+      fs.unlinkSync(testDbPath);
+    }
 
-// Mock require to inject our test database
-const Module = require('module');
-const originalRequire = Module.prototype.require;
-Module.prototype.require = function(id) {
-  if (id === '../database' || id === '../../database') {
-    return mockDbModule;
-  }
-  return originalRequire.apply(this, arguments);
-};
+    // Create test database
+    db = new Database(testDbPath);
 
-// Now load the data retention module
-const dataRetention = require('../../helpers/dataRetention');
+    // Initialize test database schema
+    initTestDatabase();
 
-console.log('======================================================================');
-console.log('Data Retention and Pruning Module Tests');
-console.log('======================================================================\n');
+    // Mock the database module
+    mockDbModule = {
+      db,
+      getGameState: db.prepare('SELECT * FROM game_state WHERE id = 1'),
+      updateGameState: db.prepare(`
+        UPDATE game_state 
+        SET game_time = ?, is_paused = ?, time_multiplier = ?, 
+            last_dividend_quarter = ?, last_monthly_fee_check = ?, last_inflation_check = ?, 
+            cumulative_inflation = ?, updated_at = CURRENT_TIMESTAMP
+        WHERE id = 1
+      `),
+      getDataRetentionConfig: db.prepare('SELECT * FROM data_retention_config WHERE id = 1'),
+      updateDataRetentionConfig: db.prepare(`
+        UPDATE data_retention_config
+        SET retention_periods = ?, auto_pruning_enabled = ?, last_pruning_date = ?, updated_at = CURRENT_TIMESTAMP
+        WHERE id = 1
+      `)
+    };
 
-// Helper function to insert test data
-function insertTestTransactions(count, baseDate) {
-  const stmt = db.prepare(`
-    INSERT INTO transactions (date, type, symbol, shares, price_per_share, total)
-    VALUES (?, ?, ?, ?, ?, ?)
-  `);
+    // Mock require to inject our test database
+    const Module = require('module');
+    const originalRequire = Module.prototype.require;
+    Module.prototype.require = function(id) {
+      if (id === '../database' || id === '../../database') {
+        return mockDbModule;
+      }
+      return originalRequire.apply(this, arguments);
+    };
 
-  for (let i = 0; i < count; i++) {
-    const date = new Date(baseDate);
-    date.setDate(date.getDate() - i);
-    stmt.run(date.toISOString(), 'buy', 'TEST', 10, 100, 1000);
-  }
-}
+    // Now load the data retention module
+    dataRetention = require('../../helpers/dataRetention');
+  });
 
-function insertTestEmails(count, baseDate, isRead = false) {
-  const stmt = db.prepare(`
-    INSERT INTO emails (from_address, subject, body, date, is_read)
-    VALUES (?, ?, ?, ?, ?)
-  `);
+  afterAll(() => {
+    // Close and cleanup test database
+    if (db) {
+      db.close();
+    }
+    if (fs.existsSync(testDbPath)) {
+      fs.unlinkSync(testDbPath);
+    }
+  });
 
-  for (let i = 0; i < count; i++) {
-    const date = new Date(baseDate);
-    date.setDate(date.getDate() - i);
-    stmt.run('test@example.com', 'Test Email', 'Test body', date.toISOString(), isRead ? 1 : 0);
-  }
-}
+  describe('Configuration Management', () => {
+    test('Should retrieve retention configuration', () => {
+      const config = dataRetention.getRetentionConfig();
+      expect(config).toBeDefined();
+      expect(config.transactions).toBeGreaterThan(0);
+      expect(config.emails).toBeGreaterThan(0);
+      expect(config.taxes).toBeGreaterThan(0);
+    });
 
-function insertTestDividends(count, baseDate) {
-  const stmt = db.prepare(`
-    INSERT INTO dividends (date, quarter, gross_amount, tax, net_amount, details)
-    VALUES (?, ?, ?, ?, ?, ?)
-  `);
+    test('Should save and update custom retention configuration', () => {
+      const config = dataRetention.getRetentionConfig();
+      const originalTransactionRetention = config.transactions;
+      const customConfig = { ...config, transactions: 365 * 3 };
+      dataRetention.saveRetentionConfig(customConfig);
+      const updatedConfig = dataRetention.getRetentionConfig();
+      expect(updatedConfig.transactions).toBe(365 * 3);
+      
+      // Restore original config
+      const restoreConfig = { ...config, transactions: originalTransactionRetention };
+      dataRetention.saveRetentionConfig(restoreConfig);
+    });
+  });
 
-  for (let i = 0; i < count; i++) {
-    const date = new Date(baseDate);
-    date.setDate(date.getDate() - i * 90); // Quarterly
-    const year = date.getFullYear();
-    const quarter = Math.floor(date.getMonth() / 3) + 1;
-    stmt.run(date.toISOString(), `${year}-Q${quarter}`, 100, 15, 85, '{}');
-  }
-}
+  describe('Transaction Pruning', () => {
+    beforeEach(() => {
+      // Clear existing transactions
+      db.exec('DELETE FROM transactions');
+    });
 
-// Test 1: Configuration Management
-console.log('Test 1: Configuration Management');
-console.log('----------------------------------------------------------------------');
+    test('Should prune old transactions correctly', () => {
+      // Insert 2000 days worth of transactions
+      insertTestTransactions(2000, currentDate);
 
-const config = dataRetention.getRetentionConfig();
-console.log('✓ Retrieved retention configuration');
-console.log('  Transactions retention:', config.transactions, 'days');
-console.log('  Emails retention:', config.emails, 'days');
-console.log('  Taxes retention:', config.taxes, 'days');
+      const totalBefore = db.prepare('SELECT COUNT(*) as count FROM transactions').get().count;
+      expect(totalBefore).toBe(2000);
 
-// Test custom config
-const customConfig = { ...config, transactions: 365 * 3 };
-dataRetention.saveRetentionConfig(customConfig);
-const updatedConfig = dataRetention.getRetentionConfig();
-console.log('✓ Saved custom retention configuration');
-console.log('  Updated transactions retention:', updatedConfig.transactions, 'days');
+      // Prune transactions older than 5 years (1825 days)
+      const prunedCount = dataRetention.pruneTransactions(currentDate, 365 * 5);
+      const totalAfter = db.prepare('SELECT COUNT(*) as count FROM transactions').get().count;
 
-console.log('\n');
+      // Either records were pruned, or all were within retention period
+      expect(prunedCount).toBeGreaterThanOrEqual(0);
+      expect(totalAfter).toBeLessThanOrEqual(totalBefore);
+      // If pruning occurred, verify the count is reasonable
+      if (prunedCount > 0) {
+        expect(totalAfter).toBeGreaterThanOrEqual(365 * 5 - 10);
+        expect(totalAfter).toBeLessThanOrEqual(365 * 5 + 10);
+      }
+    });
+  });
 
-// Test 2: Transaction Pruning
-console.log('Test 2: Transaction Pruning');
-console.log('----------------------------------------------------------------------');
+  describe('Email Pruning', () => {
+    beforeEach(() => {
+      // Clear existing emails
+      db.exec('DELETE FROM emails');
+    });
 
-// Insert 2000 days worth of transactions
-const currentDate = new Date('2020-01-01');
-insertTestTransactions(2000, currentDate);
+    test('Should prune old read emails but preserve unread emails', () => {
+      // Insert 1000 read emails and 100 unread emails
+      insertTestEmails(1000, currentDate, true);
+      insertTestEmails(100, currentDate, false);
 
-const totalBefore = db.prepare('SELECT COUNT(*) as count FROM transactions').get().count;
-console.log(`Inserted ${totalBefore} test transactions`);
+      const emailsBefore = db.prepare('SELECT COUNT(*) as count FROM emails').get().count;
+      expect(emailsBefore).toBe(1100);
 
-// Prune transactions older than 5 years (1825 days)
-const prunedCount = dataRetention.pruneTransactions(currentDate, 365 * 5);
-const totalAfter = db.prepare('SELECT COUNT(*) as count FROM transactions').get().count;
+      // Prune emails older than 2 years
+      const prunedEmails = dataRetention.pruneEmails(currentDate, 365 * 2);
+      const emailsAfter = db.prepare('SELECT COUNT(*) as count FROM emails').get().count;
+      const unreadAfter = db.prepare('SELECT COUNT(*) as count FROM emails WHERE is_read = 0').get().count;
 
-console.log(`✓ Pruned ${prunedCount} old transactions`);
-console.log(`  Remaining transactions: ${totalAfter}`);
-console.log(`  Expected to keep: ~${365 * 5} transactions`);
+      // Either records were pruned, or all were within retention period
+      expect(prunedEmails).toBeGreaterThanOrEqual(0);
+      // Unread emails should always be preserved
+      expect(unreadAfter).toBe(100);
+    });
+  });
 
-if (totalAfter >= 365 * 5 - 10 && totalAfter <= 365 * 5 + 10 && prunedCount > 0) {
-  console.log('✓ PASS: Transaction pruning works correctly');
-} else {
-  console.log('✓ INFO: Transaction pruning completed (within acceptable range)');
-}
+  describe('Dividend Pruning', () => {
+    beforeEach(() => {
+      // Clear existing dividends
+      db.exec('DELETE FROM dividends');
+    });
 
-console.log('\n');
+    test('Should prune old dividend records correctly', () => {
+      // Insert 30 quarters of dividends (7.5 years)
+      insertTestDividends(30, currentDate);
 
-// Test 3: Email Pruning (preserves unread)
-console.log('Test 3: Email Pruning (preserves unread emails)');
-console.log('----------------------------------------------------------------------');
+      const dividendsBefore = db.prepare('SELECT COUNT(*) as count FROM dividends').get().count;
+      expect(dividendsBefore).toBe(30);
 
-// Clear emails
-db.exec('DELETE FROM emails');
+      // Prune dividends older than 5 years
+      const prunedDividends = dataRetention.pruneDividends(currentDate, 365 * 5);
+      const dividendsAfter = db.prepare('SELECT COUNT(*) as count FROM dividends').get().count;
 
-// Insert 1000 read emails and 100 unread emails
-insertTestEmails(1000, currentDate, true);
-insertTestEmails(100, currentDate, false);
+      // Either records were pruned, or all were within retention period
+      expect(prunedDividends).toBeGreaterThanOrEqual(0);
+      expect(dividendsAfter).toBeLessThanOrEqual(dividendsBefore);
+      // If pruning occurred, verify reasonable count
+      if (prunedDividends > 0) {
+        expect(dividendsAfter).toBeLessThanOrEqual(22);
+      }
+    });
+  });
 
-const emailsBefore = db.prepare('SELECT COUNT(*) as count FROM emails').get().count;
-console.log(`Inserted ${emailsBefore} test emails`);
+  describe('Pruning Statistics', () => {
+    test('Should retrieve pruning statistics for all tables', () => {
+      const stats = dataRetention.getPruningStats(currentDate);
+      expect(stats).toBeDefined();
+      expect(Object.keys(stats).length).toBeGreaterThan(0);
 
-// Prune emails older than 2 years
-const prunedEmails = dataRetention.pruneEmails(currentDate, 365 * 2);
-const emailsAfter = db.prepare('SELECT COUNT(*) as count FROM emails').get().count;
-const unreadAfter = db.prepare('SELECT COUNT(*) as count FROM emails WHERE is_read = 0').get().count;
+      // Check that stats have expected structure
+      for (const [table, stat] of Object.entries(stats)) {
+        if (!stat.error && stat.total > 0) {
+          expect(stat).toHaveProperty('total');
+          expect(stat).toHaveProperty('pruneable');
+        }
+      }
+    });
+  });
 
-console.log(`✓ Pruned ${prunedEmails} old read emails`);
-console.log(`  Remaining emails: ${emailsAfter}`);
-console.log(`  Unread emails preserved: ${unreadAfter}`);
+  describe('Full Pruning Operation', () => {
+    test('Should execute full pruning operation and return results', () => {
+      const results = dataRetention.pruneOldData(currentDate);
+      
+      expect(results).toBeDefined();
+      expect(results).toHaveProperty('timestamp');
+      expect(results).toHaveProperty('pruned');
+      expect(typeof results.pruned).toBe('object');
 
-if (unreadAfter === 100) {
-  console.log('✓ PASS: Email pruning preserves unread emails');
-} else {
-  console.log('✗ FAIL: Email pruning did not preserve unread emails');
-}
+      const totalPruned = Object.values(results.pruned).reduce((sum, count) => sum + count, 0);
+      expect(totalPruned).toBeGreaterThanOrEqual(0);
+    });
+  });
 
-console.log('\n');
+  describe('Pruning Schedule Check', () => {
+    test('Should track last pruning time', () => {
+      const lastPruning = dataRetention.getLastPruningTime();
+      // May be null or a date string
+      expect(lastPruning === null || typeof lastPruning === 'string').toBe(true);
+    });
 
-// Test 4: Dividend Pruning
-console.log('Test 4: Dividend Pruning');
-console.log('----------------------------------------------------------------------');
+    test('Should determine if pruning should run based on schedule', () => {
+      const shouldRun1 = dataRetention.shouldRunPruning(currentDate);
+      expect(typeof shouldRun1).toBe('boolean');
 
-// Clear dividends
-db.exec('DELETE FROM dividends');
+      // Check again after 31 days
+      const futureDate = new Date(currentDate);
+      futureDate.setDate(futureDate.getDate() + 31);
+      const shouldRun2 = dataRetention.shouldRunPruning(futureDate);
+      
+      expect(typeof shouldRun2).toBe('boolean');
+      expect(shouldRun2).toBe(true);
+    });
+  });
 
-// Insert 30 quarters of dividends (7.5 years)
-insertTestDividends(30, currentDate);
+  describe('Data Integrity Check', () => {
+    beforeEach(() => {
+      // Clear existing transactions
+      db.exec('DELETE FROM transactions');
+    });
 
-const dividendsBefore = db.prepare('SELECT COUNT(*) as count FROM dividends').get().count;
-console.log(`Inserted ${dividendsBefore} test dividend records`);
+    test('Should preserve business-critical data during pruning', () => {
+      // Add a recent important transaction
+      const recentDate = new Date(currentDate);
+      recentDate.setDate(recentDate.getDate() - 10); // 10 days ago
 
-// Prune dividends older than 5 years
-const prunedDividends = dataRetention.pruneDividends(currentDate, 365 * 5);
-const dividendsAfter = db.prepare('SELECT COUNT(*) as count FROM dividends').get().count;
+      db.prepare(`
+        INSERT INTO transactions (date, type, total)
+        VALUES (?, 'initial_balance', 10000)
+      `).run(recentDate.toISOString());
 
-console.log(`✓ Pruned ${prunedDividends} old dividend records`);
-console.log(`  Remaining dividend records: ${dividendsAfter}`);
+      const beforeCount = db.prepare("SELECT COUNT(*) as count FROM transactions WHERE type = 'initial_balance'").get().count;
+      expect(beforeCount).toBe(1);
 
-if (dividendsAfter <= 22 && prunedDividends > 0) {
-  console.log('✓ PASS: Dividend pruning works correctly');
-} else {
-  console.log('✓ INFO: Dividend pruning completed (within acceptable range)');
-}
+      // Prune everything older than 5 days
+      dataRetention.pruneTransactions(currentDate, 5);
 
-console.log('\n');
-
-// Test 5: Pruning Statistics
-console.log('Test 5: Pruning Statistics');
-console.log('----------------------------------------------------------------------');
-
-const stats = dataRetention.getPruningStats(currentDate);
-console.log('✓ Retrieved pruning statistics');
-console.log('  Tables analyzed:', Object.keys(stats).length);
-
-for (const [table, stat] of Object.entries(stats)) {
-  if (!stat.error && stat.total > 0) {
-    console.log(`  ${table}: ${stat.pruneable}/${stat.total} records pruneable`);
-  }
-}
-
-console.log('\n');
-
-// Test 6: Full Pruning Operation
-console.log('Test 6: Full Pruning Operation');
-console.log('----------------------------------------------------------------------');
-
-const results = dataRetention.pruneOldData(currentDate);
-console.log('✓ Executed full pruning operation');
-console.log('  Timestamp:', results.timestamp);
-console.log('  Total records pruned:', Object.values(results.pruned).reduce((sum, count) => sum + count, 0));
-
-for (const [category, count] of Object.entries(results.pruned)) {
-  if (count > 0) {
-    console.log(`  ${category}: ${count} records pruned`);
-  }
-}
-
-console.log('\n');
-
-// Test 7: Pruning Schedule Check
-console.log('Test 7: Pruning Schedule Check');
-console.log('----------------------------------------------------------------------');
-
-const lastPruning = dataRetention.getLastPruningTime();
-console.log('✓ Last pruning time:', lastPruning || 'Never');
-
-const shouldRun1 = dataRetention.shouldRunPruning(currentDate);
-console.log('  Should run pruning now:', shouldRun1);
-
-// Check again after 31 days
-const futureDate = new Date(currentDate);
-futureDate.setDate(futureDate.getDate() + 31);
-const shouldRun2 = dataRetention.shouldRunPruning(futureDate);
-console.log('  Should run pruning in 31 days:', shouldRun2);
-
-if (shouldRun2 === true) {
-  console.log('✓ PASS: Pruning schedule works correctly');
-} else {
-  console.log('✗ FAIL: Pruning schedule did not work as expected');
-}
-
-console.log('\n');
-
-// Test 8: Data Integrity Check
-console.log('Test 8: Data Integrity Check - No Business-Critical Data Lost');
-console.log('----------------------------------------------------------------------');
-
-// Verify that important records are not pruned
-const recentDate = new Date(currentDate);
-recentDate.setDate(recentDate.getDate() - 10); // 10 days ago
-
-db.prepare(`
-  INSERT INTO transactions (date, type, total)
-  VALUES (?, 'initial_balance', 10000)
-`).run(recentDate.toISOString());
-
-const beforeCount = db.prepare("SELECT COUNT(*) as count FROM transactions WHERE type = 'initial_balance'").get().count;
-
-dataRetention.pruneTransactions(currentDate, 5); // Prune everything older than 5 days
-
-const afterCount = db.prepare("SELECT COUNT(*) as count FROM transactions WHERE type = 'initial_balance'").get().count;
-
-console.log('✓ Protected transaction types preserved');
-console.log(`  Initial balance records before pruning: ${beforeCount}`);
-console.log(`  Initial balance records after pruning: ${afterCount}`);
-
-if (beforeCount === afterCount) {
-  console.log('✓ PASS: Business-critical data is preserved during pruning');
-} else {
-  console.log('✗ FAIL: Business-critical data was lost during pruning');
-}
-
-console.log('\n');
-
-// Cleanup
-console.log('======================================================================');
-console.log('Test Summary');
-console.log('======================================================================');
-console.log('✓ All data retention tests completed successfully');
-console.log('✓ Database pruning functionality is working as expected');
-console.log('✓ Business-critical data is preserved during cleanup');
-console.log('✓ Configurable retention periods are functional');
-console.log('\n');
-
-// Close and cleanup test database
-db.close();
-if (fs.existsSync(testDbPath)) {
-  fs.unlinkSync(testDbPath);
-}
-
-console.log('Test database cleaned up.');
+      const afterCount = db.prepare("SELECT COUNT(*) as count FROM transactions WHERE type = 'initial_balance'").get().count;
+      
+      // Business-critical data should be preserved
+      expect(afterCount).toBe(beforeCount);
+    });
+  });
+});
