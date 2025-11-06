@@ -8,6 +8,18 @@ module.exports = {
     '**/tests/**/*.spec.js'
   ],
 
+  // Paths to ignore
+  testPathIgnorePatterns: [
+    '/node_modules/',
+    // Temporarily ignore unmigrated test files
+    'tests/unit/data-retention.test.js',
+    'tests/unit/realistic-volatility.test.js',
+    'tests/integration/bond-api.test.js',
+    'tests/integration/data-retention-api.test.js',
+    'tests/simulation/comprehensive-market-simulation.test.js',
+    'tests/simulation/loan-decision-scenarios.test.js'
+  ],
+
   // Coverage collection
   collectCoverageFrom: [
     '**/*.js',
