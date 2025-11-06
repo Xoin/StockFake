@@ -8,10 +8,9 @@ module.exports = {
     '**/tests/**/*.spec.js'
   ],
 
-  // Paths to ignore
+  // Paths to ignore - unmigrated legacy test files
   testPathIgnorePatterns: [
     '/node_modules/',
-    // Temporarily ignore unmigrated test files
     'tests/unit/data-retention.test.js',
     'tests/integration/bond-api.test.js',
     'tests/integration/data-retention-api.test.js',
