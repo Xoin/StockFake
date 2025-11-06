@@ -96,10 +96,20 @@ All documentation has been organized in the `docs/` folder:
 ## 🧪 Testing
 
 ```bash
+# Run all tests
 npm test
+
+# Run tests in watch mode
+npm test -- --watch
+
+# Run with coverage
+npm test -- --coverage
+
+# Run specific test file
+npm test -- tests/unit/bonds.test.js
 ```
 
-The test suite includes unit tests, integration tests, and full market simulations covering major historical periods. See [docs/TESTING.md](docs/TESTING.md) for details.
+The project uses **Jest** as its testing framework. The test suite includes unit tests, integration tests, and full market simulations covering major historical periods. See [docs/TESTING.md](docs/TESTING.md) for complete testing documentation and best practices.
 
 ## 📸 Screenshots
 
